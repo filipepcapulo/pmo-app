@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.0.0';
+const VERSAO_WEB = '2.0.1';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -167,6 +167,7 @@ function estadoDe(m) {
 
 async function recarregar(m, forcar = false) {
   const st = estadoDe(m);
+  if (st.carregando && !forcar) return !st.erro; // já está buscando (ex.: pré-carga)
   st.carregando = true; st.erro = null; redesenhar(m);
   try {
     const json = await lerArquivoServidor(m.arquivo, forcar);
@@ -296,7 +297,7 @@ function mostrar() {
   $('#fab').onclick = () => atualizarAgora(m);
   const st = estadoDe(m);
   redesenhar(m, true);
-  if (!st.lidoEm || Date.now() - st.lidoEm > 30000) recarregar(m);
+  if (!st.carregando && (!st.lidoEm || Date.now() - st.lidoEm > 30000)) recarregar(m);
   acompanharSeRodando(m);
 }
 
@@ -445,6 +446,7 @@ function telaLogin(app) {
         guardar.gravar('sessao', r.sessao);
         guardar.gravar('usuario', r.usuario);
         irPara(''); mostrar();
+        preCarregar();
       } catch (e) { desenhar(mensagemAmigavel(e)); }
     };
     b.onclick = entrar;
@@ -1673,5 +1675,13 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* segue sem modo offline */ });
 }
 mostrar();
-if (sessao.token) conferirAcesso();
+/** Pré-carrega os módulos em segundo plano para abrirem na hora. */
+async function preCarregar() {
+  const lista = MODULOS.filter(m => temModulo(m.id)).filter(m => { const st = estadoDe(m); return !st.carregando && (!st.lidoEm || Date.now() - st.lidoEm > 60000); });
+  if (!lista.length) return;
+  await recarregar(lista[0]); // o 1º aquece o cache do servidor; os demais vêm juntos
+  await Promise.all(lista.slice(1).map(m => recarregar(m)));
+}
+
+if (sessao.token) conferirAcesso().then(preCarregar);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && sessao.token) conferirAcesso(); });

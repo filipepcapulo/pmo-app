@@ -1,16 +1,18 @@
 /*
  * PMO BP-MS — versão web (iPhone / qualquer navegador).
- * Mesmos módulos do app Android, lendo os mesmos JSONs (app_*.json) do Gist
- * da Carga de Trabalho e disparando os mesmos workflows do repositório
- * pmo-automations. Nenhum segredo fica neste código: cada pessoa entra com
- * o token do GitHub, e o ID do Gist vem do arquivo app_web.json do
- * repositório privado (só quem tem o token consegue ler).
+ *
+ * Segurança: este código NÃO tem nenhum token nem ID de integração. Tudo passa
+ * pelo servidor do app (Google Apps Script), que guarda os tokens do ClickUp e
+ * do GitHub e confere, a cada pedido, a sessão e as permissões do usuário.
+ * O acesso é por e-mail autorizado + código enviado por e-mail; a sessão fica
+ * guardada no aparelho (não pede de novo a cada abertura).
  */
 'use strict';
 
-const VERSAO_WEB = '1.0.0';
-const CFG = { dono: 'filipepcapulo', repo: 'pmo-automations', arquivoConfig: 'app_web.json' };
-const API = 'https://api.github.com';
+const VERSAO_WEB = '2.0.0';
+// URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
+// sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
+const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
 
 // ---------------------------------------------------------------- utilidades
 
@@ -25,7 +27,6 @@ const guardar = {
   gravar(k, v) { try { localStorage.setItem('pmo.' + k, JSON.stringify(v)); } catch { /* sem armazenamento */ } },
   apagar(k) { try { localStorage.removeItem('pmo.' + k); } catch { /* ignora */ } },
 };
-
 function horas(h) {
   h = Number(h) || 0;
   return (h % 1 === 0 ? String(h) : h.toFixed(1).replace('.', ',')) + 'h';
@@ -73,6 +74,10 @@ const IC = {
   x: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
   sair: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/></svg>',
+  chave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2"/></svg>',
+  lapis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
+  mais: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  alerta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>',
   adicionar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>',
 };
 
@@ -84,134 +89,60 @@ function toast(msg) {
   toast._t = setTimeout(() => { t.hidden = true; }, 2200);
 }
 
-// ---------------------------------------------------------------- GitHub
+// ---------------------------------------------------------------- servidor
 
 class ErroApi extends Error {
-  constructor(status, corpo) { super(`HTTP ${status}`); this.status = status; this.corpo = corpo; }
+  constructor(codigo, msg, extra) { super(msg || codigo); this.codigo = codigo; Object.assign(this, extra || {}); }
 }
 
 const sessao = {
-  get token() { return guardar.ler('token') || ''; },
-  get gist() { return guardar.ler('gist') || ''; },
+  get token() { return guardar.ler('sessao') || ''; },
+  get usuario() { return guardar.ler('usuario') || null; },
 };
+const pode = p => !!(sessao.usuario && sessao.usuario[p]);
+const temModulo = id => !!(sessao.usuario && (sessao.usuario.modulos || []).includes(id));
 
-async function gh(caminho, { metodo = 'GET', corpo, token = sessao.token, aceitar } = {}) {
-  const cab = { Accept: aceitar || 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
-  if (token) cab.Authorization = 'Bearer ' + token;
-  if (corpo !== undefined) cab['Content-Type'] = 'application/json';
-  const r = await fetch(caminho.startsWith('http') ? caminho : API + caminho, {
-    method: metodo, headers: cab, cache: 'no-store',
-    body: corpo === undefined ? undefined : JSON.stringify(corpo),
-  });
-  const texto = await r.text();
-  if (!r.ok) throw new ErroApi(r.status, texto);
-  if (!texto) return null;
-  try { return JSON.parse(texto); } catch { return texto; }
+function limparSessaoLocal() {
+  try { Object.keys(localStorage).filter(k => k.startsWith('pmo.') && k !== 'pmo.ultimoEmail').forEach(k => localStorage.removeItem(k)); } catch { /* ignora */ }
+  for (const k of Object.keys(estados)) delete estados[k];
 }
 
-const repo = () => `/repos/${CFG.dono}/${CFG.repo}`;
+/** Chama o servidor. Sessão inválida -> volta para a tela de acesso. */
+async function api(acao, dados = {}, { tempo = 60000 } = {}) {
+  const corpo = JSON.stringify({ acao, sessao: sessao.token, plataforma: 'web', versao: VERSAO_WEB, ...dados });
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), tempo);
+  let r;
+  try {
+    // text/plain: pedido "simples" (sem preflight), o que o Apps Script aceita
+    r = await fetch(SERVIDOR, { method: 'POST', body: corpo, headers: { 'Content-Type': 'text/plain;charset=utf-8' }, signal: ctl.signal, redirect: 'follow', cache: 'no-store' });
+  } catch (e) {
+    throw new ErroApi('REDE', e.name === 'AbortError' ? 'O servidor demorou para responder. Tente de novo.' : 'Sem conexão com a internet.');
+  } finally { clearTimeout(t); }
+  let j;
+  try { j = await r.json(); } catch { throw new ErroApi('SERVIDOR', `Resposta inválida do servidor (HTTP ${r.status}).`); }
+  if (!j.ok) {
+    if (j.codigo === 'SESSAO_INVALIDA') {
+      limparSessaoLocal();
+      setTimeout(() => { irPara(''); mostrar(); toast(j.erro || 'Entre novamente.'); }, 0);
+    }
+    throw new ErroApi(j.codigo, j.erro, j);
+  }
+  return j;
+}
 
 function mensagemAmigavel(e) {
-  if (e instanceof ErroApi) {
-    let msg = '';
-    try { msg = JSON.parse(e.corpo).message || ''; } catch { /* corpo não é JSON */ }
-    if (e.status === 401) return 'Token do GitHub inválido ou expirado. Toque em "Sair" na tela inicial e entre de novo.';
-    if (e.status === 403 && /rate limit/i.test(msg)) return 'Limite de consultas do GitHub atingido. Tente de novo em alguns minutos.';
-    if (e.status === 403) return 'O token não tem permissão para isso (' + (msg || '403') + ').';
-    if (e.status === 404) return 'Não encontrado no GitHub (404). Confira se o token tem acesso ao repositório.';
-    if (e.status === 422) return 'O GitHub recusou o pedido: ' + (msg || '422');
-    return `Erro do GitHub (${e.status})${msg ? ': ' + msg : ''}`;
-  }
+  if (e instanceof ErroApi) return e.message;
   if (e instanceof TypeError) return 'Sem conexão com a internet.';
   return e?.message || String(e);
 }
 
-/** Lê app_web.json do repositório privado (ID do Gist dos dados). */
-async function lerConfigRepo(token) {
-  const txt = await gh(`${repo()}/contents/${CFG.arquivoConfig}`, { token, aceitar: 'application/vnd.github.raw+json' });
-  const cfg = typeof txt === 'string' ? JSON.parse(txt) : txt;
-  if (!cfg || !cfg.gist_carga) throw new Error(`O arquivo ${CFG.arquivoConfig} do repositório não tem "gist_carga".`);
-  return cfg;
+async function lerArquivoServidor(arquivo, forcar) {
+  return (await api('dados', { arquivo, forcar: !!forcar })).conteudo;
 }
-
-// Um único download do Gist serve todos os módulos (cache de 20s).
-let gistCache = { em: 0, promessa: null };
-async function lerGist(forcar = false) {
-  const agora = Date.now();
-  if (!forcar && gistCache.promessa && agora - gistCache.em < 20000) return gistCache.promessa;
-  gistCache = {
-    em: agora,
-    promessa: (async () => {
-      try {
-        return await gh(`/gists/${sessao.gist}?t=${agora}`);
-      } catch (e) {
-        if (e instanceof ErroApi && (e.status === 401 || e.status === 403)) {
-          return await gh(`/gists/${sessao.gist}?t=${agora}`, { token: '' }); // tenta sem o token
-        }
-        throw e;
-      }
-    })(),
-  };
-  gistCache.promessa.catch(() => { gistCache.promessa = null; });
-  return gistCache.promessa;
-}
-
-async function lerArquivoGist(arquivo, forcar) {
-  const g = await lerGist(forcar);
-  const f = g.files && g.files[arquivo];
-  if (!f) throw new Error(`O arquivo ${arquivo} ainda não existe no Gist. Toque em "Atualizar agora" para gerá-lo.`);
-  if (!f.truncated) return f.content;
-  const r = await fetch(f.raw_url, { cache: 'no-store' });
-  if (!r.ok) throw new ErroApi(r.status, await r.text());
-  return r.text();
-}
-
-async function listarExecucoes(wf, n = 10) {
-  const r = await gh(`${repo()}/actions/workflows/${wf}/runs?per_page=${n}`);
-  return (r.workflow_runs || []).map(execucao);
-}
-function execucao(o) {
-  return { id: o.id, status: o.status || '', conclusao: o.conclusion || null, link: o.html_url || '', terminou: o.status === 'completed' };
-}
-async function buscarExecucao(id) { return execucao(await gh(`${repo()}/actions/runs/${id}`)); }
-
-let branchCache = null;
-async function branchPadrao() {
-  if (!branchCache) branchCache = (await gh(repo())).default_branch || 'main';
-  return branchCache;
-}
-
-/**
- * Versão enviada no disparo (input versao_app): os workflows só aceitam a
- * versão da Release mais recente. A versão web é sempre a atual (o navegador
- * baixa o código novo), então informa a versão da última Release.
- */
-async function versaoAceita() {
-  try {
-    const r = await gh(`${repo()}/releases/latest`);
-    return String(r.tag_name || '').replace(/^app-v/, '').replace(/^v/, '');
-  } catch (e) {
-    if (!(e instanceof ErroApi) || (e.status !== 403 && e.status !== 404)) throw e;
-    const b = await gh(`${repo()}/actions/workflows/android.yml/runs?status=success&branch=${await branchPadrao()}&per_page=1`);
-    const run = (b.workflow_runs || [])[0];
-    if (!run) throw new Error('Não encontrei a versão atual do app no GitHub.');
-    return '1.0.' + run.run_number;
-  }
-}
-
-async function dispararWorkflow(wf, entradas = {}) {
-  const url = `${repo()}/actions/workflows/${wf}/dispatches`;
-  const ref = await branchPadrao();
-  const inputs = { ...entradas, versao_app: await versaoAceita() };
-  try {
-    const r = await gh(url, { metodo: 'POST', corpo: { ref, inputs, return_run_details: true } });
-    return (r && r.workflow_run_id) || null;
-  } catch (e) {
-    if (!(e instanceof ErroApi) || e.status !== 422) throw e;
-    await gh(url, { metodo: 'POST', corpo: { ref, inputs } }); // formato clássico
-    return null;
-  }
-}
+async function listarExecucoes(wf, n = 10) { return (await api('execucoes', { workflow: wf, n })).execucoes; }
+async function buscarExecucao(id) { return (await api('execucao', { id })).execucao; }
+async function dispararWorkflow(wf) { return (await api('disparar', { workflow: wf })).id; }
 
 const espera = ms => new Promise(r => setTimeout(r, ms));
 
@@ -238,7 +169,7 @@ async function recarregar(m, forcar = false) {
   const st = estadoDe(m);
   st.carregando = true; st.erro = null; redesenhar(m);
   try {
-    const json = await lerArquivoGist(m.arquivo, forcar);
+    const json = await lerArquivoServidor(m.arquivo, forcar);
     st.dados = m.interpretar(json);
     guardar.gravar('json.' + m.arquivo, json);
     st.lidoEm = Date.now();
@@ -256,7 +187,7 @@ async function atualizarAgora(m) {
   if (st.atualizacao.tipo === 'andamento') return;
   const setA = a => { st.atualizacao = a; redesenhar(m); };
   try {
-    setA({ tipo: 'andamento', msg: 'Conectando ao GitHub…' });
+    setA({ tipo: 'andamento', msg: 'Conectando…' });
     const recentes = await listarExecucoes(m.workflow);
     const ativa = recentes.find(x => !x.terminou);
     let id;
@@ -265,7 +196,7 @@ async function atualizarAgora(m) {
     } else {
       setA({ tipo: 'andamento', msg: 'Disparando a atualização…' });
       const antes = new Set(recentes.map(x => x.id));
-      id = await dispararWorkflow(m.workflow, m.entradas || {});
+      id = await dispararWorkflow(m.workflow);
       if (!id) id = await localizarNova(m.workflow, antes);
     }
     await acompanhar(m, id);
@@ -280,7 +211,7 @@ async function localizarNova(wf, antes) {
     const nova = (await listarExecucoes(wf, 5)).find(x => !antes.has(x.id));
     if (nova) return nova.id;
   }
-  throw new Error('A atualização foi disparada, mas não apareceu no GitHub. Tente de novo.');
+  throw new Error('A atualização foi disparada, mas ainda não apareceu. Tente de novo em instantes.');
 }
 
 async function acompanhar(m, id) {
@@ -300,13 +231,13 @@ async function acompanhar(m, id) {
           setA({ tipo: 'falhou', msg: st.erro || 'Não consegui baixar os dados novos.', link: ex.link });
         }
       } else {
-        setA({ tipo: 'falhou', msg: `A atualização terminou com erro (${ex.conclusao || 'sem status'}). Veja o log no GitHub.`, link: ex.link });
+        setA({ tipo: 'falhou', msg: `A atualização terminou com erro (${ex.conclusao || 'sem status'}). Avise o administrador.`, link: ex.link });
       }
       return;
     }
-    setA({ tipo: 'andamento', msg: ex.status === 'in_progress' ? m.etapa : 'Na fila do GitHub… (pode levar alguns minutos)', link: ex.link });
+    setA({ tipo: 'andamento', msg: ex.status === 'in_progress' ? m.etapa : 'Na fila… (pode levar alguns minutos)', link: ex.link });
     if (Date.now() - inicio > 15 * 60000) {
-      setA({ tipo: 'falhou', msg: 'A atualização está demorando mais que o normal. Ela continua rodando no GitHub; recarregue daqui a pouco.', link: ex.link });
+      setA({ tipo: 'falhou', msg: 'A atualização está demorando mais que o normal. Ela continua rodando; recarregue daqui a pouco.', link: ex.link });
       return;
     }
     await espera(5000);
@@ -341,10 +272,13 @@ window.addEventListener('hashchange', mostrar);
 function mostrar() {
   fecharFolha();
   const app = $('#app');
-  if (!sessao.token || !sessao.gist) { moduloAtual = null; telaLogin(app); return; }
-  const m = MODULOS.find(x => x.id === rota());
-  moduloAtual = m || null;
+  if (!sessao.token || !sessao.usuario) { moduloAtual = null; telaLogin(app); return; }
+  const r = rota();
   window.scrollTo(0, 0);
+  if (r === 'permissoes' && pode('admin')) { moduloAtual = null; telaPermissoes(app); return; }
+  if (r === 'historico') { moduloAtual = null; telaHistorico(app); return; }
+  const m = MODULOS.find(x => x.id === r && temModulo(x.id));
+  moduloAtual = m || null;
   if (!m) { telaInicio(app); return; }
   app.innerHTML = `
     <header class="barra">
@@ -381,7 +315,7 @@ function redesenhar(m, inteiro = false) {
     <div class="aviso ${a.tipo === 'falhou' ? 'falhou' : a.tipo === 'concluida' ? 'ok' : 'andamento'}">
       ${rodando ? '<span class="spinner p"></span>' : ''}
       <span class="msg">${esc(a.msg)}</span>
-      ${a.link ? `<a href="${esc(a.link)}" target="_blank" rel="noopener">Ver no GitHub</a>` : ''}
+      ${a.link ? `<a href="${esc(a.link)}" target="_blank" rel="noopener">Ver log</a>` : ''}
       ${!rodando ? `<button data-fechar-aviso aria-label="Fechar">${IC.x}</button>` : ''}
     </div>`;
   const fa = $('[data-fechar-aviso]');
@@ -457,36 +391,78 @@ function folhaEnviar(titulo, texto) {
 
 // ---------------------------------------------------------------- tela de acesso
 
+function nomeAparelho() {
+  const ua = navigator.userAgent;
+  const so = /iphone/i.test(ua) ? 'iPhone' : /ipad/i.test(ua) ? 'iPad' : /android/i.test(ua) ? 'Android' : /mac/i.test(ua) ? 'Mac' : /windows/i.test(ua) ? 'Windows' : 'Navegador';
+  return so + (instaladoNaTela() ? ' (app)' : ' (navegador)');
+}
+
 function telaLogin(app) {
-  app.innerHTML = `
-    <header class="barra"><div class="titulo inicio"><h1>PMO BP-MS</h1></div></header>
-    <div class="login">
-      <h2>Acesso</h2>
-      <p class="muted">Cole o token de acesso do GitHub que você recebeu. Ele fica guardado só neste aparelho.</p>
-      <input id="tk" class="campo" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
-      <div id="tk-erro" class="erro-txt"></div>
-      <button id="entrar" class="btn primario largo" style="margin-top:14px">Entrar</button>
-    </div>`;
-  const entrar = async () => {
-    const token = $('#tk').value.trim();
-    const b = $('#entrar');
-    if (!token) { $('#tk-erro').textContent = 'Informe o token.'; return; }
-    b.disabled = true; b.innerHTML = '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Conferindo…';
-    $('#tk-erro').textContent = '';
-    try {
-      const cfg = await lerConfigRepo(token);
-      guardar.gravar('token', token);
-      guardar.gravar('gist', cfg.gist_carga);
-      mostrar();
-    } catch (e) {
-      $('#tk-erro').textContent = e instanceof ErroApi && e.status === 404
-        ? `Não consegui ler ${CFG.arquivoConfig} no repositório. O token precisa de acesso de leitura (Contents) ao ${CFG.repo}.`
-        : mensagemAmigavel(e);
-      b.disabled = false; b.textContent = 'Entrar';
+  const ui = { etapa: 'email', email: guardar.ler('ultimoEmail') || '' };
+  const desenhar = (erro = '', info = '') => {
+    app.innerHTML = `
+      <header class="barra"><div class="titulo inicio"><h1>PMO BP-MS</h1></div></header>
+      <div class="login">
+        <h2>Acesso</h2>
+        ${ui.etapa === 'email' ? `
+          <p class="muted">Informe o seu e-mail. Se ele tiver acesso, você recebe um código para entrar.</p>
+          <input id="em" class="campo" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="nome@sankhya.com.br" value="${esc(ui.email)}">
+          <div class="erro-txt" id="erro">${esc(erro)}</div>
+          <button id="ok" class="btn primario largo" style="margin-top:14px">Enviar código</button>` : `
+          <p class="muted">${esc(ui.info || info || 'Enviamos um código para')} <b>${esc(ui.email)}</b>. Digite-o abaixo (vale 10 minutos).</p>
+          <input id="cod" class="campo codigo" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+          <div class="erro-txt" id="erro">${esc(erro)}</div>
+          <button id="ok" class="btn primario largo" style="margin-top:14px">Entrar</button>
+          <div style="display:flex;justify-content:space-between;margin-top:10px">
+            <button class="btn texto" id="trocar">Trocar e-mail</button><button class="btn texto" id="reenviar">Reenviar código</button>
+          </div>`}
+        <p class="muted" style="margin-top:22px">Depois de entrar, o app lembra do seu acesso neste aparelho.</p>
+      </div>`;
+    const b = $('#ok');
+    const ocupado = t => { b.disabled = true; b.innerHTML = `<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> ${t}`; };
+    const pedirCodigo = async () => {
+      ui.email = ($('#em') ? $('#em').value : ui.email).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ui.email)) { $('#erro').textContent = 'Informe um e-mail válido.'; return; }
+      ocupado('Enviando…');
+      try {
+        const r = await api('iniciar', { email: ui.email });
+        guardar.gravar('ultimoEmail', ui.email);
+        ui.etapa = 'codigo'; ui.info = 'Se este e-mail tiver acesso, enviamos um código para'; desenhar();
+        $('#cod').focus();
+      } catch (e) { desenhar(mensagemAmigavel(e)); }
+    };
+    if (ui.etapa === 'email') {
+      b.onclick = pedirCodigo;
+      $('#em').onkeydown = e => { if (e.key === 'Enter') pedirCodigo(); };
+      return;
     }
+    const entrar = async () => {
+      const codigo = $('#cod').value.replace(/\D/g, '');
+      if (codigo.length !== 6) { $('#erro').textContent = 'O código tem 6 números.'; return; }
+      ocupado('Conferindo…');
+      try {
+        const r = await api('entrar', { email: ui.email, codigo, aparelho: nomeAparelho() });
+        guardar.gravar('sessao', r.sessao);
+        guardar.gravar('usuario', r.usuario);
+        irPara(''); mostrar();
+      } catch (e) { desenhar(mensagemAmigavel(e)); }
+    };
+    b.onclick = entrar;
+    $('#cod').oninput = e => { if (e.target.value.replace(/\D/g, '').length === 6) entrar(); };
+    $('#trocar').onclick = () => { ui.etapa = 'email'; desenhar(); };
+    $('#reenviar').onclick = pedirCodigo;
   };
-  $('#entrar').onclick = entrar;
-  $('#tk').onkeydown = e => { if (e.key === 'Enter') entrar(); };
+  desenhar();
+}
+
+/** Confere no servidor se o acesso continua valendo e atualiza as permissões. */
+async function conferirAcesso() {
+  try {
+    const r = await api('eu');
+    const antes = JSON.stringify(sessao.usuario);
+    guardar.gravar('usuario', r.usuario);
+    if (antes !== JSON.stringify(r.usuario) && !moduloAtual) mostrar();
+  } catch { /* sem internet: segue com o que tem; sessão inválida já volta ao login */ }
 }
 
 // ---------------------------------------------------------------- tela inicial
@@ -497,34 +473,464 @@ function instaladoNaTela() {
 
 function telaInicio(app) {
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const u = sessao.usuario;
+  const meus = MODULOS.filter(m => temModulo(m.id));
+  const extras = [];
+  if (pode('agendar') || pode('editar')) extras.push({ id: 'historico', titulo: 'Agendamentos feitos', descricao: 'O que você gravou no ClickUp e se deu certo', icone: IC.ok });
+  if (pode('admin')) extras.push({ id: 'permissoes', titulo: 'Permissões', descricao: 'Quem pode acessar o app e o quê', icone: IC.chave });
   app.innerHTML = `
     <header class="barra">
-      <div class="titulo inicio"><h1>PMO BP-MS</h1></div>
+      <div class="titulo inicio"><h1>PMO BP-MS</h1><div class="sub">${esc(u.nome || u.email)}</div></div>
       <button class="icone-btn" id="sair" aria-label="Sair">${IC.sair}</button>
     </header>
     ${ios && !instaladoNaTela() ? `<div class="dica">${IC.adicionar}<div><b>Instale no iPhone:</b> toque em <b>Compartilhar</b> no Safari e depois em <b>Adicionar à Tela de Início</b>. O app abre em tela cheia, como um app normal.</div></div>` : ''}
     <div class="lista-modulos">
-      ${MODULOS.map(m => `
+      ${meus.length ? '' : '<div class="vazio">Seu acesso ainda não tem módulos liberados. Fale com o administrador.</div>'}
+      ${[...meus, ...extras].map(m => `
         <button class="modulo" data-mod="${m.id}">
           <span class="ic">${m.icone}</span>
           <span><b>${esc(m.titulo)}</b><span>${esc(m.descricao)}</span></span>
           <span class="seta">${IC.seta}</span>
         </button>`).join('')}
     </div>
-    <div class="rodape">Versão web ${VERSAO_WEB}</div>`;
+    <div class="rodape">Versão web ${VERSAO_WEB} · ${esc(u.email)}</div>`;
   app.querySelectorAll('[data-mod]').forEach(b => { b.onclick = () => irPara(b.dataset.mod); });
   $('#sair').onclick = () => {
-    abrirFolha(`<h3>Sair deste aparelho?</h3><p class="muted">O token e os dados guardados serão apagados. Para entrar de novo, é preciso colar o token.</p>
+    abrirFolha(`<h3>Sair deste aparelho?</h3><p class="muted">Para entrar de novo, será preciso pedir um novo código por e-mail.</p>
       <div class="rodape-f"><button class="btn contorno" id="nao">Cancelar</button><button class="btn primario" id="sim">Sair</button></div>`, f => {
       $('#nao', f).onclick = fecharFolha;
-      $('#sim', f).onclick = () => {
-        try { Object.keys(localStorage).filter(k => k.startsWith('pmo.')).forEach(k => localStorage.removeItem(k)); } catch { /* ignora */ }
-        for (const k of Object.keys(estados)) delete estados[k];
-        gistCache = { em: 0, promessa: null };
+      $('#sim', f).onclick = async () => {
+        try { await api('sair', {}, { tempo: 8000 }); } catch { /* sai mesmo sem internet */ }
+        limparSessaoLocal();
         irPara(''); mostrar();
       };
     });
   };
+}
+
+// ================================================================= AGENDAR / EDITAR NO CLICKUP
+
+/*
+ * Formulário único para incluir (subtarefa nova dentro da demanda) ou alterar
+ * uma agenda. Regras da skill agendar-atendimento-clickup: título, consultor,
+ * data, período e parceiro obrigatórios; observações vão no Detalhamento;
+ * Etapa "Atendimento avulso", Agendamento "Agendar", Experience "Não lançado"
+ * e Apontamento "OS Experience" por padrão; vários dias = uma subtarefa por dia.
+ * O servidor grava, lê a tarefa de volta e confere campo a campo — o resultado
+ * (ok / parcial / erro) aparece no fim e fica no histórico do aparelho.
+ */
+
+const PERIODOS_RAPIDOS = [['08h-12h', 'Manhã'], ['13h-17h', 'Tarde'], ['08h-18h', 'Dia inteiro']];
+let opcoesCache = null;
+async function opcoesAgenda(forcar) {
+  if (!forcar && opcoesCache && Date.now() - opcoesCache.em < 10 * 60000) return opcoesCache.dados;
+  const r = await api('agendaOpcoes');
+  opcoesCache = { em: Date.now(), dados: r };
+  return r;
+}
+const idTarefa = url => { const m = /\/t\/(?:\d+\/)?([a-z0-9]+)/i.exec(url || ''); return m ? m[1] : String(url || ''); };
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  return [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function parceiroPorNome(ops, ...nomes) {
+  for (const n of nomes) {
+    const t = semAcento(n).trim();
+    if (!t) continue;
+    const exato = ops.parceiros.find(p => semAcento(p.nome) === t);
+    if (exato) return exato.id;
+    const p1 = t.split(/[\s-]+/)[0];
+    const parc = ops.parceiros.filter(p => semAcento(p.nome).split(/[\s-]+/)[0] === p1);
+    if (parc.length === 1) return parc[0].id;
+  }
+  return '';
+}
+
+function horasPeriodo(p) {
+  const fixo = { '08h-12h': 4, '13h-17h': 4, '08h-18h': 8 }[p];
+  if (fixo) return fixo;
+  const m = /^(\d{1,2})h-(\d{1,2})h$/.exec(p || '');
+  if (!m) return 0;
+  let h = +m[2] - +m[1];
+  if (+m[1] <= 12 && +m[2] >= 13) h -= 1;
+  return Math.max(0, Math.min(8, h));
+}
+
+function registrarHistorico(item) {
+  const h = guardar.ler('historico') || [];
+  h.unshift(item);
+  guardar.gravar('historico', h.slice(0, 60));
+}
+
+/**
+ * inicial: { id } para editar; ou { pai: {id, nome, local}, consultorId, data, parceiro, cliente } para agendar.
+ */
+async function abrirFormAgenda(inicial = {}) {
+  const editando = !!inicial.id;
+  if (!pode(editando ? 'editar' : 'agendar')) { toast('Seu acesso não permite ' + (editando ? 'editar' : 'agendar') + '.'); return; }
+  const f = {
+    op: uuid(), estado: 'carregando', erro: '', resultado: null,
+    id: inicial.id || '', paiId: inicial.pai?.id || '', paiNome: inicial.pai?.nome || '', paiLocal: inicial.pai?.local || '',
+    pastaId: '', demandas: null, carregandoDemandas: false,
+    titulo: '', consultorId: inicial.consultorId || '', datas: [inicial.data && inicial.data >= isoHoje() ? inicial.data : isoHoje()],
+    periodo: '08h-12h', agenda: 'Remoto', apontamento: 'OS Experience', parceiroId: '', detalhamento: '', status: '',
+  };
+  let ops = null;
+  abrirFolha('<h3>' + (editando ? 'Editar agenda' : 'Agendar') + '</h3><div class="corpo" id="fa"></div><div class="rodape-f" id="fa-rod"></div>', raiz => {
+    raiz.classList.add('alta');
+  });
+  const folha = $('#folha .folha');
+  const desenhar = () => { if (folha.isConnected) desenharFormAgenda(folha, f, ops, editando, acoes); };
+  const acoes = {
+    desenhar,
+    async escolherPasta(id) {
+      f.pastaId = id; f.paiId = ''; f.demandas = null;
+      if (!id) { desenhar(); return; }
+      f.carregandoDemandas = true; desenhar();
+      try { f.demandas = (await api('agendaDemandas', { pastaId: id })).demandas; }
+      catch (e) { f.erro = mensagemAmigavel(e); }
+      f.carregandoDemandas = false; desenhar();
+    },
+    async salvar() {
+      const faltam = [];
+      if (!f.titulo.trim()) faltam.push('título');
+      if (!f.consultorId) faltam.push('consultor');
+      if (!f.datas.length) faltam.push('data');
+      if (!f.periodo) faltam.push('período');
+      if (!editando && !f.paiId) faltam.push('demanda');
+      if (faltam.length) { f.erro = 'Preencha: ' + faltam.join(', ') + '.'; desenhar(); return; }
+      f.estado = 'salvando'; f.erro = ''; desenhar();
+      const dados = {
+        id: f.id || undefined, paiId: f.paiId || undefined, titulo: f.titulo.trim(), consultorId: f.consultorId,
+        datas: [...f.datas].sort(), periodo: f.periodo, agenda: f.agenda, apontamento: f.apontamento,
+        parceiroId: f.parceiroId, detalhamento: f.detalhamento,
+      };
+      const consultor = (ops.consultores.find(c => c.id === f.consultorId) || {}).nome || '';
+      try {
+        const r = await api('agendaSalvar', { idOperacao: f.op, dados }, { tempo: 120000 });
+        f.resultado = r; f.estado = 'resultado';
+        registrarHistorico({ em: Date.now(), modo: editando ? 'editar' : 'incluir', titulo: dados.titulo, consultor, datas: dados.datas,
+          periodo: dados.periodo, demanda: f.paiNome, situacao: r.situacao,
+          resultados: r.resultados.map(x => ({ id: x.id, url: x.url, data: x.data, situacao: x.situacao, erro: x.erro, naoConfirmados: x.naoConfirmados })) });
+        if (r.agendaAtualizando) {
+          const ag = MODULOS.find(m => m.id === 'agenda');
+          if (ag) { const st = estadoDe(ag); st.lidoEm = 0; setTimeout(() => { if (moduloAtual === ag) acompanharSeRodando(ag); }, 4000); }
+        }
+      } catch (e) {
+        f.estado = 'resultado';
+        f.resultado = { situacao: e.codigo === 'REDE' ? 'incerto' : 'erro', erro: mensagemAmigavel(e), resultados: [] };
+        registrarHistorico({ em: Date.now(), modo: editando ? 'editar' : 'incluir', titulo: dados.titulo, consultor, datas: dados.datas,
+          periodo: dados.periodo, demanda: f.paiNome, situacao: f.resultado.situacao, erro: f.resultado.erro, resultados: [] });
+      }
+      desenhar();
+    },
+    voltar() { f.estado = 'editando'; f.resultado = null; desenhar(); },
+    novo() { f.op = uuid(); f.estado = 'editando'; f.resultado = null; f.titulo = ''; f.detalhamento = ''; desenhar(); },
+  };
+  desenhar();
+  try {
+    ops = await opcoesAgenda();
+    if (editando) {
+      const t = (await api('agendaTarefa', { id: inicial.id })).tarefa;
+      Object.assign(f, {
+        id: t.id, titulo: t.titulo, consultorId: t.consultorId, datas: [t.data || isoHoje()], periodo: t.periodo || '',
+        agenda: t.agenda || 'Remoto', apontamento: t.apontamento || 'OS Experience', parceiroId: t.parceiroId || '',
+        detalhamento: t.detalhamento || '', paiNome: t.pai.nome, paiLocal: [t.pasta?.nome, t.lista].filter(Boolean).join(' › '),
+        url: t.url, status: t.status,
+      });
+      if (t.consultores.length > 1) f.aviso = 'Esta agenda tem mais de um consultor no ClickUp (' + t.consultores.map(c => c.nome).join(', ') + '). Ao salvar, fica só o escolhido.';
+      if (t.consultorId && !ops.consultores.some(c => c.id === t.consultorId)) ops = { ...ops, consultores: [...ops.consultores, ...t.consultores.filter(c => c.id === t.consultorId)] };
+    } else {
+      f.parceiroId = parceiroPorNome(ops, inicial.parceiro, inicial.cliente);
+    }
+    f.estado = 'editando';
+  } catch (e) {
+    f.estado = 'falhaCarga'; f.erro = mensagemAmigavel(e);
+  }
+  desenhar();
+}
+
+function desenharFormAgenda(folha, f, ops, editando, acoes) {
+  const corpo = $('#fa', folha), rod = $('#fa-rod', folha);
+  if (!corpo) return;
+  const ativo = document.activeElement && corpo.contains(document.activeElement) ? document.activeElement.id : null;
+  if (f.estado === 'carregando') {
+    corpo.innerHTML = '<div class="centro"><div class="spinner"></div><div class="muted">Carregando do ClickUp…</div></div>';
+    rod.innerHTML = '<button class="btn contorno" data-x="fechar">Cancelar</button>';
+  } else if (f.estado === 'falhaCarga') {
+    corpo.innerHTML = `<div class="resultado erro">${IC.alerta}<b>Não consegui abrir o formulário</b><div>${esc(f.erro)}</div></div>`;
+    rod.innerHTML = '<button class="btn contorno" data-x="fechar">Fechar</button>';
+  } else if (f.estado === 'resultado') {
+    corpo.innerHTML = resultadoAgendaHTML(f.resultado, editando);
+    rod.innerHTML = f.resultado.situacao === 'ok' || f.resultado.situacao === 'parcial'
+      ? `<button class="btn contorno" data-x="fechar">Fechar</button>${editando ? '' : '<button class="btn primario" data-x="novo">Agendar outro</button>'}`
+      : `<button class="btn contorno" data-x="voltar">Voltar ao formulário</button><button class="btn primario" data-x="salvar">Tentar de novo</button>`;
+  } else {
+    const salvando = f.estado === 'salvando';
+    const opt = (v, t, sel) => `<option value="${esc(v)}"${sel ? ' selected' : ''}>${esc(t)}</option>`;
+    let demanda;
+    if (editando || f.paiId && f.paiNome) {
+      demanda = `<div class="caixa-dem"><div class="pequeno">${esc(f.paiLocal)}</div><b>${esc(f.paiNome || 'Demanda')}</b>
+        ${!editando ? '<button class="btn texto" data-x="trocar-dem" style="padding:4px 0">Trocar demanda</button>' : ''}</div>`;
+    } else {
+      const grupos = {};
+      (f.demandas || []).forEach(d => { (grupos[d.lista] = grupos[d.lista] || []).push(d); });
+      demanda = `
+        <select id="fa-pasta" class="campo">${opt('', 'Escolha o cliente…', !f.pastaId)}${ops.clientes.map(c => opt(c.id, c.nome, c.id === f.pastaId)).join('')}</select>
+        ${f.pastaId ? (f.carregandoDemandas ? '<div class="muted" style="margin-top:8px"><span class="spinner p" style="display:inline-block;vertical-align:middle"></span> Buscando demandas…</div>'
+          : `<select id="fa-dem" class="campo" style="margin-top:8px">${opt('', (f.demandas || []).length ? 'Escolha a demanda (tarefa-pai)…' : 'Nenhuma demanda aberta neste cliente', !f.paiId)}
+              ${Object.entries(grupos).map(([l, ds]) => `<optgroup label="${esc(l)}">${ds.map(d => opt(d.id, d.nome, d.id === f.paiId)).join('')}</optgroup>`).join('')}</select>`) : ''}`;
+    }
+    const periodoOutro = f.periodo && !PERIODOS_RAPIDOS.some(p => p[0] === f.periodo);
+    corpo.innerHTML = `
+      ${f.aviso ? `<div class="aviso andamento" style="margin:0 0 8px">${esc(f.aviso)}</div>` : ''}
+      <fieldset ${salvando ? 'disabled' : ''} class="form-ag">
+        <label>Demanda (tarefa-pai)</label>${demanda}
+        <label for="fa-titulo">Título da agenda *</label>
+        <input id="fa-titulo" class="campo" type="text" value="${esc(f.titulo)}" placeholder="O que será feito" autocomplete="off">
+        <label for="fa-cons">Consultor *</label>
+        <select id="fa-cons" class="campo">${opt('', 'Escolha…', !f.consultorId)}${ops.consultores.map(c => opt(c.id, c.nome, c.id === f.consultorId)).join('')}</select>
+        <label>${editando ? 'Data *' : 'Data(s) * — uma agenda por dia'}</label>
+        <div class="linha-datas">
+          <input id="fa-data" class="campo" type="date" value="${esc(f.datas[f.datas.length - 1] || '')}">
+          ${editando ? '' : '<button class="btn contorno pq" data-x="add-data" type="button">+ dia</button>'}
+        </div>
+        ${!editando && f.datas.length > 1 ? `<div class="chips" style="flex-wrap:wrap">${[...f.datas].sort().map(d => `<button class="chip sel" type="button" data-x="rem-data" data-d="${d}">${esc(dataTitulo(d))} ${IC.x}</button>`).join('')}</div>` : ''}
+        <label>Período *</label>
+        <div class="chips seg">${PERIODOS_RAPIDOS.map(([v, t]) => `<button type="button" class="chip${f.periodo === v ? ' sel' : ''}" data-x="periodo" data-v="${v}">${t}<small>${v}</small></button>`).join('')}
+          <button type="button" class="chip${periodoOutro || f.outroPeriodo ? ' sel' : ''}" data-x="periodo-outro">Outro</button></div>
+        ${periodoOutro || f.outroPeriodo ? `<select id="fa-per" class="campo" style="margin-top:8px">${opt('', 'Escolha o horário…', !f.periodo)}${ops.periodos.map(p => opt(p, `${p} (${horas(horasPeriodo(p))})`, p === f.periodo)).join('')}</select>` : ''}
+        <label>Tipo de agenda</label>
+        <div class="chips" style="flex-wrap:wrap">${ops.agendas.map(a => `<button type="button" class="chip${f.agenda === a ? ' sel' : ''}" data-x="agenda" data-v="${esc(a)}">${esc(a)}</button>`).join('')}</div>
+        <label for="fa-parc">Parceiro *</label>
+        <select id="fa-parc" class="campo">${opt('', editando ? 'Escolha…' : 'O mesmo da demanda', !f.parceiroId)}${ops.parceiros.map(p => opt(p.id, p.nome, p.id === f.parceiroId)).join('')}</select>
+        <label for="fa-apont">Apontamento</label>
+        <select id="fa-apont" class="campo">${ops.apontamentos.map(a => opt(a, a, a === f.apontamento)).join('')}</select>
+        <label for="fa-det">Detalhamento</label>
+        <textarea id="fa-det" class="campo" rows="4" placeholder="Observações da agenda (vão no campo Detalhamento)">${esc(f.detalhamento)}</textarea>
+        ${editando && f.url ? `<a class="pequeno" href="${esc(f.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px">Abrir no ClickUp</a>` : ''}
+      </fieldset>
+      <div class="erro-txt" style="margin-top:8px">${esc(f.erro)}</div>`;
+    const resumo = !editando && f.datas.length > 1 ? `Salvar ${f.datas.length} agendas` : editando ? 'Salvar alterações' : 'Salvar no ClickUp';
+    rod.innerHTML = `<button class="btn contorno" data-x="fechar" ${salvando ? 'disabled' : ''}>Cancelar</button>
+      <button class="btn primario" data-x="salvar" ${salvando ? 'disabled' : ''}>${salvando ? '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Gravando no ClickUp…' : resumo}</button>`;
+    // liga campos
+    const liga = (id, fn, ev = 'input') => { const el = $('#' + id, corpo); if (el) el.addEventListener(ev, () => fn(el.value)); };
+    liga('fa-titulo', v => { f.titulo = v; });
+    liga('fa-det', v => { f.detalhamento = v; });
+    liga('fa-cons', v => { f.consultorId = v; }, 'change');
+    liga('fa-parc', v => { f.parceiroId = v; }, 'change');
+    liga('fa-apont', v => { f.apontamento = v; }, 'change');
+    liga('fa-per', v => { f.periodo = v; }, 'change');
+    liga('fa-data', v => { if (!v) return; if (editando || f.datas.length <= 1) f.datas = [v]; else f.datas[f.datas.length - 1] = v; f.datas = [...new Set(f.datas)]; }, 'change');
+    liga('fa-pasta', v => acoes.escolherPasta(v), 'change');
+    liga('fa-dem', v => {
+      f.paiId = v;
+      const d = (f.demandas || []).find(x => x.id === v);
+      if (d) { f.paiNome = d.nome; f.paiLocal = [ops.clientes.find(c => c.id === f.pastaId)?.nome, d.lista].filter(Boolean).join(' › '); if (d.parceiroId) f.parceiroId = d.parceiroId; }
+      acoes.desenhar();
+    }, 'change');
+    if (ativo && $('#' + ativo, corpo)) $('#' + ativo, corpo).focus();
+  }
+  folha.onclick = ev => {
+    const b = ev.target.closest('[data-x]');
+    if (!b || b.disabled) return;
+    const x = b.dataset.x;
+    if (x === 'fechar') { fecharFolha(); return; }
+    if (x === 'salvar') { acoes.salvar(); return; }
+    if (x === 'voltar') { acoes.voltar(); return; }
+    if (x === 'novo') { acoes.novo(); return; }
+    if (x === 'trocar-dem') { f.paiId = ''; f.paiNome = ''; f.paiLocal = ''; f.pastaId = ''; f.demandas = null; }
+    if (x === 'periodo') { f.periodo = b.dataset.v; f.outroPeriodo = false; }
+    if (x === 'periodo-outro') { f.outroPeriodo = true; if (PERIODOS_RAPIDOS.some(p => p[0] === f.periodo)) f.periodo = ''; }
+    if (x === 'agenda') f.agenda = b.dataset.v;
+    if (x === 'add-data') {
+      const ult = [...f.datas].sort().pop() || isoHoje();
+      const d = parseDia(ult); d.setDate(d.getDate() + 1);
+      while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+      f.datas.push(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`);
+    }
+    if (x === 'rem-data') { f.datas = f.datas.filter(d => d !== b.dataset.d); if (!f.datas.length) f.datas = [isoHoje()]; }
+    acoes.desenhar();
+  };
+}
+
+function resultadoAgendaHTML(r, editando) {
+  const tit = {
+    ok: [IC.ok, editando ? 'Alteração gravada no ClickUp' : 'Agenda gravada no ClickUp', 'ok'],
+    parcial: [IC.alerta, 'Gravado, mas com pendências', 'parcial'],
+    erro: [IC.x, 'Não foi gravado no ClickUp', 'erro'],
+    incerto: [IC.alerta, 'Não consegui confirmar a gravação', 'parcial'],
+  }[r.situacao] || [IC.alerta, r.situacao, 'parcial'];
+  const linhas = (r.resultados || []).map(x => `
+    <div class="res-linha ${x.situacao}">
+      <span class="res-ic">${x.situacao === 'ok' ? IC.ok : x.situacao === 'erro' ? IC.x : IC.alerta}</span>
+      <div><b>${esc(dataTitulo(x.data))}</b>
+        <div class="pequeno">${x.situacao === 'ok' ? `Confirmado no ClickUp (${x.conferidos} itens conferidos)`
+          : x.situacao === 'erro' ? esc(x.erro || 'Erro') : 'Não confirmado: ' + esc((x.naoConfirmados || []).join(', '))}</div>
+        ${(x.avisos || []).length ? `<div class="pequeno">${esc(x.avisos.join(' '))}</div>` : ''}
+        ${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener" class="pequeno" style="font-weight:700">Abrir no ClickUp</a>` : ''}</div>
+    </div>`).join('');
+  return `<div class="resultado ${tit[2]}">${tit[0]}<b>${tit[1]}</b>
+      ${r.erro ? `<div>${esc(r.erro)}</div>` : ''}
+      ${r.situacao === 'incerto' ? '<div>A internet falhou no meio do envio. Toque em "Tentar de novo": se já tiver sido gravado, não duplica.</div>' : ''}
+      ${r.situacao === 'parcial' ? '<div>Confira os itens abaixo direto no ClickUp.</div>' : ''}
+    </div>
+    ${linhas}
+    ${r.agendaAtualizando ? '<p class="muted" style="margin-top:10px">A Agenda dos Consultores do app está sendo atualizada e mostra a mudança em 1–3 minutos.</p>' : ''}`;
+}
+
+// ---------------------------------------------------------------- histórico de agendamentos
+
+function telaHistorico(app) {
+  const h = guardar.ler('historico') || [];
+  const rot = { ok: ['Gravado', 'ok'], parcial: ['Com pendências', 'parcial'], erro: ['Não gravado', 'erro'], incerto: ['Não confirmado', 'parcial'] };
+  app.innerHTML = `
+    <header class="barra"><button class="icone-btn" data-nav="voltar" aria-label="Voltar">${IC.voltar}</button>
+      <div class="titulo"><h1>Agendamentos feitos</h1><div class="sub">Neste aparelho</div></div>
+      ${pode('agendar') ? `<button class="icone-btn" id="novo" aria-label="Agendar">${IC.mais}</button>` : ''}</header>
+    <main class="conteudo">
+      ${h.length ? h.map(x => {
+        const [t, c] = rot[x.situacao] || [x.situacao, 'parcial'];
+        return `<div class="cartao">
+          <div class="topo"><span class="nome-t">${esc(x.titulo)}</span><span class="selo-res ${c}">${esc(t)}</span></div>
+          <div class="pequeno">${x.modo === 'editar' ? 'Alteração' : 'Inclusão'} · ${esc(geradoEmTexto(x.em))}${x.consultor ? ' · ' + esc(x.consultor) : ''}</div>
+          <div class="pequeno">${esc((x.datas || []).map(dataCurta).join(', '))} · ${esc(x.periodo || '')}${x.demanda ? ' · ' + esc(x.demanda) : ''}</div>
+          ${x.erro ? `<div class="erro-txt">${esc(x.erro)}</div>` : ''}
+          ${(x.resultados || []).map(r => `<div class="pequeno">${esc(dataCurta(r.data))}: ${esc((rot[r.situacao] || [r.situacao])[0])}${r.naoConfirmados?.length ? ' (' + esc(r.naoConfirmados.join(', ')) + ')' : ''}${r.erro ? ' — ' + esc(r.erro) : ''}
+            ${r.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener">ClickUp</a>` : ''}${r.id && pode('editar') && r.situacao !== 'erro' ? ` · <a href="#" data-editar="${esc(r.id)}">Editar</a>` : ''}</div>`).join('')}
+        </div>`;
+      }).join('') : '<div class="vazio">Nada agendado ou alterado por este aparelho ainda.</div>'}
+    </main>`;
+  $('[data-nav="voltar"]').onclick = () => irPara('');
+  if ($('#novo')) $('#novo').onclick = () => abrirFormAgenda({});
+  app.querySelectorAll('[data-editar]').forEach(a => { a.onclick = e => { e.preventDefault(); abrirFormAgenda({ id: a.dataset.editar }); }; });
+}
+
+// ---------------------------------------------------------------- permissões (administrador)
+
+const NOMES_MODULOS = { agenda: 'Agenda dos Consultores', ociosidade: 'Ociosidade', demandas: 'Demandas', backlog: 'Backlog Base', comite: 'Comitê de Personalizações' };
+
+async function telaPermissoes(app) {
+  const ui = { lista: null, erro: '', busca: '' };
+  const desenhar = () => {
+    const t = semAcento(ui.busca);
+    const lista = (ui.lista || []).filter(u => !t || semAcento(u.email + ' ' + u.nome).includes(t));
+    $('#conteudo').innerHTML = ui.lista == null
+      ? (ui.erro ? `<div class="centro"><div>${esc(ui.erro)}</div><button class="btn primario" id="tentar">Tentar de novo</button></div>` : '<div class="centro"><div class="spinner"></div></div>')
+      : `<div class="secao"><div class="muted">${ui.lista.length} e-mails cadastrados. Só estes conseguem receber o código de acesso.</div>
+          ${campoBusca(ui.busca, 'Buscar e-mail ou nome')}</div><div class="divisor"></div>
+        ${lista.map(u => `<button class="cartao usuario" data-u="${esc(u.email)}" style="display:block;width:calc(100% - 24px);text-align:left">
+          <div class="topo"><span class="nome-t uma-linha">${esc(u.nome || u.email)}</span>${u.ativo ? '' : '<span class="selo-res erro">Bloqueado</span>'}${u.admin ? '<span class="selo-res ok">Admin</span>' : ''}</div>
+          ${u.nome ? `<div class="pequeno">${esc(u.email)}</div>` : ''}
+          <div class="pequeno">${esc(resumoPermissao(u))}</div>
+          <div class="pequeno">${u.aparelhos ? `${u.aparelhos} aparelho${u.aparelhos > 1 ? 's' : ''} conectado${u.aparelhos > 1 ? 's' : ''} · último uso ${esc(geradoEmTexto(u.ultimoUso))}` : 'Nenhum aparelho conectado'}</div>
+        </button>`).join('')}`;
+    const tt = $('#tentar'); if (tt) tt.onclick = carregar;
+    const inp = $('#busca');
+    if (inp) { inp.oninput = () => { ui.busca = inp.value; const pos = inp.selectionStart; desenhar(); const n = $('#busca'); n.focus(); n.setSelectionRange(pos, pos); }; }
+    const lb = $('[data-a="limpar-busca"]'); if (lb) lb.onclick = () => { ui.busca = ''; desenhar(); };
+    app.querySelectorAll('[data-u]').forEach(b => { b.onclick = () => folhaUsuario(ui.lista.find(u => u.email === b.dataset.u), carregar); });
+  };
+  const carregar = async () => {
+    ui.erro = ''; ui.lista = null; desenhar();
+    try { ui.lista = (await api('usuarios')).usuarios; } catch (e) { ui.erro = mensagemAmigavel(e); }
+    desenhar();
+  };
+  app.innerHTML = `
+    <header class="barra"><button class="icone-btn" data-nav="voltar" aria-label="Voltar">${IC.voltar}</button>
+      <div class="titulo"><h1>Permissões</h1><div class="sub">Acesso ao app por e-mail</div></div>
+      <button class="icone-btn" id="novo" aria-label="Incluir e-mail">${IC.mais}</button></header>
+    <main class="conteudo" id="conteudo"></main>`;
+  $('[data-nav="voltar"]').onclick = () => irPara('');
+  $('#novo').onclick = () => folhaUsuario(null, carregar);
+  carregar();
+}
+
+function resumoPermissao(u) {
+  const m = u.modulos || [];
+  const partes = [m.length === Object.keys(NOMES_MODULOS).length ? 'Todos os módulos' : m.length ? m.map(x => NOMES_MODULOS[x] || x).join(', ') : 'Nenhum módulo'];
+  if (u.agendar) partes.push('agenda');
+  if (u.editar) partes.push('edita');
+  return partes.join(' · ');
+}
+
+function folhaUsuario(u, aoSalvar) {
+  const novo = !u;
+  const eu = sessao.usuario.email;
+  const d = u ? { ...u, modulos: [...u.modulos] } : { email: '', nome: '', ativo: true, admin: false, agendar: false, editar: false, modulos: ['agenda'] };
+  const chk = (on, attr, txt, sub = '') => `<button type="button" class="opcao" ${attr}><span class="check ${on ? 'on' : ''}">${on ? IC.ok : ''}</span><span class="n">${txt}${sub ? `<span class="pequeno" style="display:block;white-space:normal">${sub}</span>` : ''}</span></button>`;
+  const desenhar = (erro = '', ocupado = false) => {
+    const completo = d.admin && d.agendar && d.editar && d.modulos.length === Object.keys(NOMES_MODULOS).length;
+    $('#fu').innerHTML = `
+      <fieldset class="form-ag" ${ocupado ? 'disabled' : ''}>
+      <label for="fu-email">E-mail *</label>
+      <input id="fu-email" class="campo" type="email" value="${esc(d.email)}" ${novo ? '' : 'disabled'} placeholder="nome@sankhya.com.br" autocapitalize="off">
+      <label for="fu-nome">Nome</label>
+      <input id="fu-nome" class="campo" type="text" value="${esc(d.nome)}" placeholder="Opcional">
+      <label>Acesso</label>
+      ${chk(completo, 'data-p="completo"', '<b>Permissão completa</b>', 'Todos os módulos, agendar, editar e administrar permissões')}
+      <label>Módulos que pode ver</label>
+      ${Object.entries(NOMES_MODULOS).map(([k, t]) => chk(d.modulos.includes(k), `data-m="${k}"`, t)).join('')}
+      <label>Ações</label>
+      ${chk(d.agendar, 'data-p="agendar"', 'Agendar no ClickUp', 'Criar agendas pelo app')}
+      ${chk(d.editar, 'data-p="editar"', 'Editar agendas no ClickUp')}
+      ${chk(d.admin, 'data-p="admin"', 'Administrador', 'Pode cadastrar e-mails e mudar permissões')}
+      ${chk(!d.ativo, 'data-p="bloquear"', 'Bloquear acesso', 'Desconecta todos os aparelhos e impede novos códigos')}
+      </fieldset>
+      ${!novo ? `<div class="acoes" style="margin:12px 0 4px">
+        ${u.aparelhos ? `<button class="btn contorno pq" id="fu-desc">Desconectar ${u.aparelhos} aparelho${u.aparelhos > 1 ? 's' : ''}</button>` : ''}
+        ${u.email !== eu ? '<button class="btn contorno pq" id="fu-rem" style="color:var(--vermelho)">Remover e-mail</button>' : ''}</div>` : ''}
+      <div class="erro-txt">${esc(erro)}</div>`;
+    const em = $('#fu-email'), nm = $('#fu-nome');
+    em.oninput = () => { d.email = em.value.trim().toLowerCase(); };
+    nm.oninput = () => { d.nome = nm.value; };
+    const desc = $('#fu-desc');
+    if (desc) desc.onclick = async () => {
+      desenhar('', true);
+      try { await api('usuarioDesconectar', { email: d.email }); toast('Aparelhos desconectados'); fecharFolha(); aoSalvar(); }
+      catch (e) { desenhar(mensagemAmigavel(e)); }
+    };
+    const rem = $('#fu-rem');
+    if (rem) rem.onclick = async () => {
+      if (!rem.dataset.conf) { rem.dataset.conf = '1'; rem.textContent = 'Toque de novo para remover'; return; }
+      desenhar('', true);
+      try { await api('usuarioRemover', { email: d.email }); toast('E-mail removido'); fecharFolha(); aoSalvar(); }
+      catch (e) { desenhar(mensagemAmigavel(e)); }
+    };
+    $('#fu-salvar').disabled = ocupado;
+    $('#fu-salvar').innerHTML = ocupado ? '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Salvando…' : 'Salvar';
+  };
+  abrirFolha(`<h3>${novo ? 'Incluir e-mail' : 'Permissões'}</h3><div class="corpo" id="fu"></div>
+    <div class="rodape-f"><button class="btn contorno" id="fu-canc">Cancelar</button><button class="btn primario" id="fu-salvar">Salvar</button></div>`, f => {
+    f.classList.add('alta');
+    $('#fu-canc', f).onclick = fecharFolha;
+    $('#fu', f).onclick = ev => {
+      const b = ev.target.closest('.opcao');
+      if (!b) return;
+      const p = b.dataset.p, m = b.dataset.m;
+      if (m) d.modulos = d.modulos.includes(m) ? d.modulos.filter(x => x !== m) : [...d.modulos, m];
+      if (p === 'completo') {
+        const on = !(d.admin && d.agendar && d.editar && d.modulos.length === Object.keys(NOMES_MODULOS).length);
+        Object.assign(d, { admin: on, agendar: on, editar: on, modulos: on ? Object.keys(NOMES_MODULOS) : ['agenda'] });
+      }
+      if (p === 'agendar' || p === 'editar' || p === 'admin') d[p] = !d[p];
+      if (p === 'bloquear') d.ativo = !d.ativo;
+      desenhar();
+    };
+    $('#fu-salvar', f).onclick = async () => {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { desenhar('Informe um e-mail válido.'); return; }
+      desenhar('', true);
+      try {
+        await api('usuarioSalvar', { usuario: d });
+        if (d.email === eu) await conferirAcesso();
+        toast(novo ? 'E-mail incluído' : 'Permissões salvas');
+        fecharFolha(); aoSalvar();
+      } catch (e) { desenhar(mensagemAmigavel(e)); }
+    };
+    desenhar();
+  });
 }
 
 // ================================================================= MÓDULOS
@@ -608,6 +1014,10 @@ function interpretarAgenda(json) {
 }
 const diaDe = (c, dk) => c.dias[dk] || { horas: 0, itens: [] };
 
+function botaoEditar(url, classe = 'btn contorno pq') {
+  return url && pode('editar') ? `<button class="${classe}" data-a="editar" data-id="${esc(idTarefa(url))}">${IC.lapis.replace('<svg', '<svg width="15" height="15"')} Editar</button>` : '';
+}
+
 function cardItem(item, chave, aberto, compacto = false) {
   const meta = [item.periodo, item.agenda].filter(Boolean).join(' · ');
   return `<div role="button" tabindex="0" class="card-item${compacto ? ' compacto' : ''}" style="background:${corTurno(item.turno)}" data-a="card" data-k="${esc(chave)}">
@@ -616,7 +1026,7 @@ function cardItem(item, chave, aberto, compacto = false) {
     ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}
     ${aberto
       ? (item.detalhamento ? `<div class="det">${esc(item.detalhamento)}</div>` : '') +
-        (item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a>` : '')
+        `<div class="acoes-card">${item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a>` : ''}${botaoEditar(item.url, 'btn-card')}</div>`
       : (item.detalhamento && !compacto ? '<div class="dica-det">Toque para ver o detalhamento</div>' : '')}
   </div>`;
 }
@@ -738,6 +1148,7 @@ function agendaPorDia(st) {
         ${aberto ? `<div class="itens-c">
           ${dc.itens.map((it, i) => { const k = `${c.id}|${dia}|${i}`; return cardItem(it, k, ui.cards.has(k)); }).join('')}
           <button class="btn texto" data-a="exportar" data-id="${esc(c.id)}">${IC.compartilhar.replace('<svg', '<svg width="16" height="16"')} Enviar agenda</button>
+          ${pode('agendar') ? `<button class="btn texto" data-a="agendar" data-id="${esc(c.id)}">${IC.mais.replace('<svg', '<svg width="16" height="16"')} Agendar</button>` : ''}
         </div>` : ''}
         <div class="divisor" style="opacity:.6"></div>
       </div>`;
@@ -788,7 +1199,7 @@ MODULOS.push({
     const d = st.dados, ui = st.ui, hoje = isoHoje();
     if (!ui.dia || !d.dias.includes(ui.dia)) ui.dia = d.dias.includes(hoje) ? hoje : d.dias[0];
     abas.innerHTML = `<nav class="abas"><button class="${ui.aba === 0 ? 'ativa' : ''}" data-a="aba" data-v="0">Por dia</button><button class="${ui.aba === 1 ? 'ativa' : ''}" data-a="aba" data-v="1">Grade</button></nav>`;
-    acoes.innerHTML = `<button class="icone-btn" data-a="escolher" aria-label="Enviar agenda de um consultor">${IC.compartilhar}</button>`;
+    acoes.innerHTML = `${pode('agendar') ? `<button class="icone-btn" data-a="agendar" aria-label="Agendar">${IC.mais}</button>` : ''}<button class="icone-btn" data-a="escolher" aria-label="Enviar agenda de um consultor">${IC.compartilhar}</button>`;
     trocarHTML(cont, ui.aba === 0 ? agendaPorDia(st) : agendaGrade(st));
     if (ui.aba === 0) {
       const chip = cont.querySelector('.chip-dia.sel');
@@ -808,6 +1219,8 @@ MODULOS.push({
       case 'dia': ui.dia = el.dataset.dk; return;
       case 'consultor': alternar(ui.abertos, el.dataset.id); return;
       case 'card': if (ev.target.closest('[data-link]')) return false; alternar(ui.cards, el.dataset.k); return;
+      case 'editar': abrirFormAgenda({ id: el.dataset.id }); return false;
+      case 'agendar': abrirFormAgenda({ consultorId: el.dataset.id || '', data: ui.aba === 0 ? ui.dia : isoHoje() }); return false;
       case 'grade':
         if (el.dataset.dk && !ui.abertosGrade.has(el.dataset.id)) ui.rolarPara = el.dataset.dk;
         alternar(ui.abertosGrade, el.dataset.id);
@@ -870,14 +1283,15 @@ function cartaoOcioso(c, aberto) {
     ${!aberto && c.sugestoes.length ? `<div class="pequeno" style="margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Sugestões: ${esc(c.sugestoes.slice(0, 3).map(x => x.rotulo).join(', '))}</div>` : ''}
     ${aberto ? `<div style="margin-top:8px">
       ${c.agendasHoje.length ? `<div class="rotulo">Agenda de hoje</div>${c.agendasHoje.map(a => `
-        <a class="linha-s" ${a.url ? `href="${esc(a.url)}" target="_blank" rel="noopener"` : ''} data-link><span>${esc(a.parceiro)} - ${esc(a.tarefa)}</span><b style="font-size:12px">${horas(a.horas)}</b></a>`).join('')}` : ''}
+        <div class="linha-s"><a ${a.url ? `href="${esc(a.url)}" target="_blank" rel="noopener"` : ''} data-link style="flex:1;color:inherit;text-decoration:none">${esc(a.parceiro)} - ${esc(a.tarefa)}</a><b style="font-size:12px">${horas(a.horas)}</b>${botaoEditar(a.url, 'btn-card')}</div>`).join('')}` : ''}
       ${c.situacao !== 'completo' ? `<div class="rotulo">Sugestões de alocação</div>
         ${c.sugestoes.length ? '' : '<div class="pequeno" style="font-size:13px">Sem sugestões disponíveis</div>'}
-        ${c.sugestoes.map(s => {
+        ${c.sugestoes.map((s, i) => {
           const meta = [s.lista, (s.datas || []).length ? s.datas.map(dataCurta).join(' e ') : '', s.horas > 0 ? horas(s.horas) : ''].filter(Boolean).join(' · ');
           return `<div class="sug"><div class="p">${esc(s.parceiro)}</div><div class="t">${esc(s.tarefa)}</div>
             ${meta ? `<div class="pequeno">${esc(meta)}</div>` : ''}
-            ${s.url ? `<a class="btn contorno pq" style="margin-top:6px;text-decoration:none" href="${esc(s.url)}" target="_blank" rel="noopener" data-link>Agendar no ClickUp</a>` : ''}</div>`;
+            ${s.url ? `<div class="acoes" style="margin-top:6px">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-sug" data-id="${esc(c.id)}" data-i="${i}">Agendar</button>` : ''}
+              <a class="btn contorno pq" style="text-decoration:none" href="${esc(s.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a></div>` : ''}</div>`;
         }).join('')}` : ''}
     </div>` : ''}
   </div>`;
@@ -915,6 +1329,13 @@ MODULOS.push({
   },
   acao(nome, el, st, ev) {
     if (ev.target.closest('[data-link]')) return false;
+    if (nome === 'editar') { abrirFormAgenda({ id: el.dataset.id }); return false; }
+    if (nome === 'agendar-sug') {
+      const c = st.dados.consultores.find(x => x.id === el.dataset.id), s = c && c.sugestoes[+el.dataset.i];
+      if (s) abrirFormAgenda({ pai: { id: idTarefa(s.url), nome: s.tarefa, local: [s.parceiro, s.lista].filter(Boolean).join(' › ') },
+        consultorId: c.id, data: st.dados.data, parceiro: s.parceiro });
+      return false;
+    }
     if (nome === 'ocioso') { alternar(st.ui.abertos, el.dataset.id); return; }
     if (nome === 'completos') { st.ui.verCompletos = !st.ui.verCompletos; return; }
     if (nome === 'enviar') { folhaEnviar('Enviar relatório', textoOciosidade(st.dados)); return false; }
@@ -993,7 +1414,7 @@ function linhaSub(a, chave, aberto, comPlanejamento) {
       ${a.horas > 0 || !comPlanejamento ? `<b style="font-size:12px">${horas(a.horas)}</b>` : ''}</div>
     ${aberto ? `<div class="extra">${selo(a.status, a.statusCor)}
       ${a.detalhamento ? `<div class="pre" style="font-size:12px;margin-top:4px">${esc(a.detalhamento)}</div>` : ''}
-      ${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a>` : ''}</div>` : ''}
+      <div class="acoes-card">${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a>` : ''}${botaoEditar(a.url, 'btn-card')}</div></div>` : ''}
   </div>`;
 }
 
@@ -1010,7 +1431,7 @@ function cartaoDemanda(d, ui) {
     ${aberto ? `<div style="margin-top:8px">
       ${d.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(d.detalhamento)}</div>` : ''}
       ${d.agendas.length ? `<div class="rotulo">Agendas (${d.agendas.length})</div>${d.agendas.map((a, i) => linhaSub(a, `${d.id}|${i}`, ui.subs.has(`${d.id}|${i}`), false)).join('')}` : ''}
-      ${d.url ? `<div class="acoes"><a class="btn primario pq" style="text-decoration:none" href="${esc(d.url)}" target="_blank" rel="noopener" data-link>Agendar</a>
+      ${d.url ? `<div class="acoes">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-dem" data-id="${esc(d.id)}">Agendar</button>` : ''}
         <a class="btn contorno pq" style="text-decoration:none" href="${esc(d.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a></div>` : ''}
     </div>` : ''}
   </div>`;
@@ -1094,6 +1515,14 @@ MODULOS.push({
       case 'abre': alternar(ui.abertos, el.dataset.k); return;
       case 'sub': alternar(ui.subs, el.dataset.k); return;
       case 'gerente-grupo': alternar(ui.gerentesFechados, el.dataset.g); return;
+      case 'editar': abrirFormAgenda({ id: el.dataset.id }); return false;
+      case 'agendar-dem': {
+        for (const c of st.dados.clientes) for (const l of c.listas) {
+          const d = l.demandas.find(x => x.id === el.dataset.id);
+          if (d) { abrirFormAgenda({ pai: { id: d.id, nome: d.nome, local: c.nome + ' › ' + l.nome }, parceiro: d.parceiro, cliente: c.nome }); return false; }
+        }
+        return false;
+      }
       case 'gerente': ui.gerente = el.dataset.g && ui.gerente !== el.dataset.g ? el.dataset.g : null; return;
       case 'atrasadas': ui.soAtrasadas = !ui.soAtrasadas; return;
       case 'limpar-busca': ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); return;
@@ -1145,7 +1574,7 @@ function cartaoTarefa(t, cfg, ui) {
       ${extras.map(([r, v]) => `<div class="pequeno">${esc(r)}: ${esc(v)}</div>`).join('')}
       ${t.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(t.detalhamento)}</div>` : ''}
       ${t.subtarefas.length ? `<div class="rotulo">Subtarefas (${t.subtarefas.length})</div>${t.subtarefas.map((a, i) => linhaSub(a, `${t.id}|${i}`, ui.subs.has(`${t.id}|${i}`), true)).join('')}` : ''}
-      ${t.url ? `<div class="acoes"><a class="btn primario pq" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener" data-link>Agendar</a>
+      ${t.url ? `<div class="acoes">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-tar" data-id="${esc(t.id)}">Agendar</button>` : ''}
         <a class="btn contorno pq" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a></div>` : ''}
     </div>` : ''}
   </div>`;
@@ -1200,6 +1629,14 @@ function moduloTarefas(cfg) {
         case 'abre': alternar(ui.abertos, el.dataset.k); return;
         case 'sub': alternar(ui.subs, el.dataset.k); return;
         case 'grupo': alternar(ui.fechados, el.dataset.g); return;
+        case 'editar': abrirFormAgenda({ id: el.dataset.id }); return false;
+        case 'agendar-tar': {
+          for (const g of st.dados.grupos) {
+            const t = g.itens.find(x => x.id === el.dataset.id);
+            if (t) { abrirFormAgenda({ pai: { id: t.id, nome: t.nome, local: [t.pasta, t.lista].filter(Boolean).join(' › ') }, parceiro: t.parceiro, cliente: t.pasta }); return false; }
+          }
+          return false;
+        }
         case 'atrasadas': ui.soAtrasadas = !ui.soAtrasadas; return;
         case 'limpar-busca': ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); return;
       }
@@ -1236,3 +1673,5 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* segue sem modo offline */ });
 }
 mostrar();
+if (sessao.token) conferirAcesso();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && sessao.token) conferirAcesso(); });

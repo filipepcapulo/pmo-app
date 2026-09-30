@@ -1,7 +1,7 @@
 // Service worker: guarda o app para abrir sem internet.
 // Sempre tenta a rede primeiro, então versões novas chegam na hora.
-const CACHE = 'pmo-web-v1';
-const ARQUIVOS = ['./', 'index.html', 'app.js?v=1.0.0', 'estilos.css?v=1.0.0', 'manifest.webmanifest', 'icones/icone-180.png', 'icones/icone-192.png', 'icones/icone-512.png'];
+const CACHE = 'pmo-web-v2';
+const ARQUIVOS = ['./', 'index.html', 'app.js?v=2.0.0', 'estilos.css?v=2.0.0', 'manifest.webmanifest', 'icones/icone-180.png', 'icones/icone-192.png', 'icones/icone-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));
@@ -15,7 +15,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== location.origin) return; // GitHub/API: sempre rede
+  if (e.request.method !== 'GET' || url.origin !== location.origin) return; // servidor: sempre rede
   e.respondWith(
     fetch(e.request)
       .then(r => {

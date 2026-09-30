@@ -286,3 +286,43 @@ tr.expandida td.col-nome { background: var(--superficie-2); }
 .check svg { width: 14px; height: 14px; }
 
 .toast { position: fixed; left: 50%; bottom: calc(var(--baixo) + 90px); transform: translateX(-50%); background: rgba(40,40,40,.92); color: #fff; padding: 10px 16px; border-radius: 20px; font-size: 14px; z-index: 60; }
+
+/* ---------- Login por código ---------- */
+.campo.codigo { font-size: 28px; letter-spacing: 10px; text-align: center; font-weight: 700; }
+
+/* ---------- Formulário de agenda / permissões ---------- */
+.folha.alta { max-height: 94vh; }
+.form-ag { border: 0; margin: 0; padding: 0; min-width: 0; }
+.form-ag label { display: block; font-size: 12px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; margin: 14px 0 6px; }
+.form-ag select.campo { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--texto-2) 50%), linear-gradient(135deg, var(--texto-2) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 34px; }
+.form-ag textarea.campo { resize: vertical; min-height: 88px; }
+.form-ag .chips { margin-top: 0; flex-wrap: wrap; }
+.form-ag .chip small { font-size: 11px; opacity: .7; margin-left: 2px; }
+.form-ag .chip svg { width: 12px; height: 12px; }
+.linha-datas { display: flex; gap: 8px; align-items: center; }
+.linha-datas .campo { flex: 1; }
+.caixa-dem { background: var(--superficie-2); border-radius: 12px; padding: 10px 12px; }
+.caixa-dem b { display: block; font-size: 15px; }
+
+.resultado { border-radius: 14px; padding: 16px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; font-size: 14px; margin-bottom: 8px; }
+.resultado > svg { width: 40px; height: 40px; }
+.resultado b { font-size: 17px; }
+.resultado.ok { background: var(--verde-claro); color: var(--verde-texto); }
+.resultado.parcial { background: rgba(193,101,10,.14); color: var(--laranja); }
+.resultado.erro { background: rgba(198,47,40,.12); color: var(--vermelho); }
+.res-linha { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--linha); }
+.res-ic { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; color: #fff; }
+.res-ic svg { width: 14px; height: 14px; }
+.res-linha.ok .res-ic { background: var(--verde); }
+.res-linha.parcial .res-ic { background: var(--laranja); }
+.res-linha.erro .res-ic { background: var(--vermelho); }
+.selo-res { font-size: 10px; font-weight: 800; text-transform: uppercase; border-radius: 6px; padding: 3px 7px; white-space: nowrap; flex: none; }
+.selo-res.ok { background: var(--verde-claro); color: var(--verde-texto); }
+.selo-res.parcial { background: rgba(193,101,10,.16); color: var(--laranja); }
+.selo-res.erro { background: rgba(198,47,40,.14); color: var(--vermelho); }
+.cartao.usuario .topo { gap: 6px; }
+
+.acoes-card { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.btn-card { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 12px; color: #1f5a36; margin-top: 6px; }
+.linha-s .btn-card, .sub-linha .btn-card { color: var(--verde); margin-top: 0; }
+.sub-linha .acoes-card .btn-card { margin-top: 4px; }

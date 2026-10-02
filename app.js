@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.0.1';
+const VERSAO_WEB = '2.0.2';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -446,7 +446,7 @@ function telaLogin(app) {
         guardar.gravar('sessao', r.sessao);
         guardar.gravar('usuario', r.usuario);
         irPara(''); mostrar();
-        preCarregar();
+        preCarregar().then(atualizarVencidos);
       } catch (e) { desenhar(mensagemAmigavel(e)); }
     };
     b.onclick = entrar;
@@ -1683,5 +1683,55 @@ async function preCarregar() {
   await Promise.all(lista.slice(1).map(m => recarregar(m)));
 }
 
-if (sessao.token) conferirAcesso().then(preCarregar);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && sessao.token) conferirAcesso(); });
+/*
+ * Atualização automática: ao entrar no app (abrir ou voltar para ele), todo
+ * módulo cujos dados foram gerados há mais de 3 horas dispara sozinho o
+ * "Atualizar agora". Módulos do mesmo workflow (Backlog Base e Comitê) disparam
+ * uma vez só. Sem internet, ou se a leitura falhar, não dispara; e o mesmo
+ * workflow não é disparado de novo pelo automático em menos de 30 minutos.
+ */
+const AUTO_LIMITE_MS = 3 * 3600000;
+const AUTO_INTERVALO_MS = 30 * 60000;
+let autoRodando = false;
+
+function dadosVencidos(st) {
+  if (!st.lidoEm || st.erro) return false; // só decide com dados recém-lidos do servidor
+  const t = st.dados ? new Date(st.dados.geradoEm).getTime() : NaN;
+  return isNaN(t) || Date.now() - t > AUTO_LIMITE_MS;
+}
+
+async function atualizarVencidos() {
+  if (autoRodando || !sessao.token) return;
+  autoRodando = true;
+  try {
+    const porWf = new Map();
+    for (const m of MODULOS.filter(x => x.workflow && temModulo(x.id))) {
+      const st = estadoDe(m);
+      if (st.atualizacao.tipo === 'andamento' || !dadosVencidos(st)) continue;
+      if (Date.now() - (guardar.ler('auto.' + m.workflow) || 0) < AUTO_INTERVALO_MS) continue;
+      if (!porWf.has(m.workflow)) porWf.set(m.workflow, []);
+      porWf.get(m.workflow).push(m);
+    }
+    if (!porWf.size) return;
+    toast('Dados com mais de 3 h: atualizando automaticamente…');
+    await Promise.all([...porWf].map(async ([wf, ms]) => {
+      guardar.gravar('auto.' + wf, Date.now());
+      const [principal, ...outros] = ms;
+      const msg = { tipo: 'andamento', msg: 'Atualização automática em andamento…' };
+      outros.forEach(m => { estadoDe(m).atualizacao = msg; redesenhar(m); });
+      await atualizarAgora(principal);
+      const ok = estadoDe(principal).atualizacao.tipo !== 'falhou';
+      await Promise.all(outros.map(async m => {
+        const st = estadoDe(m);
+        if (ok) await recarregar(m, true);
+        st.atualizacao = ok ? { tipo: 'parada' } : { ...estadoDe(principal).atualizacao };
+        redesenhar(m);
+      }));
+    }));
+  } finally { autoRodando = false; }
+}
+
+if (sessao.token) conferirAcesso().then(preCarregar).then(atualizarVencidos);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && sessao.token) conferirAcesso().then(preCarregar).then(atualizarVencidos);
+});

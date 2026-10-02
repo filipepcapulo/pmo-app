@@ -1,8 +1,8 @@
 // Service worker: abre o app na hora e funciona sem internet.
 // - Arquivos com versão (?v=), ícones e manifest: do cache (a versão nova tem outra URL).
 // - Página (index.html): rede com limite de 2,5 s; se demorar, abre do cache e atualiza por trás.
-const CACHE = 'pmo-web-v2.0.1';
-const ARQUIVOS = ['./', 'index.html', 'app.js?v=2.0.1', 'estilos.css?v=2.0.1', 'manifest.webmanifest', 'icones/icone-180.png', 'icones/icone-192.png', 'icones/icone-512.png'];
+const CACHE = 'pmo-web-v2.0.2';
+const ARQUIVOS = ['./', 'index.html', 'app.js?v=2.0.2', 'estilos.css?v=2.0.2', 'manifest.webmanifest', 'icones/icone-180.png', 'icones/icone-192.png', 'icones/icone-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));

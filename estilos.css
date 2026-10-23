@@ -326,3 +326,35 @@ tr.expandida td.col-nome { background: var(--superficie-2); }
 .btn-card { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 12px; color: #1f5a36; margin-top: 6px; }
 .linha-s .btn-card, .sub-linha .btn-card { color: var(--verde); margin-top: 0; }
 .sub-linha .acoes-card .btn-card { margin-top: 4px; }
+
+/* ---------- Backlog Desenvolvimento: Kanban ---------- */
+.kanban { display: flex; gap: 10px; overflow-x: auto; padding: 8px 12px 16px; align-items: flex-start; }
+.kb-col { flex: none; width: 260px; background: var(--superficie-2); border-radius: 12px; padding: 8px; min-height: 55vh; transition: background .12s; }
+.kb-col.fila { background: rgba(31,122,69,.10); }
+.kb-col.kb-alvo { background: var(--verde-claro); outline: 2px dashed var(--verde); outline-offset: -2px; }
+.kb-cab { display: flex; align-items: center; gap: 8px; padding: 4px 4px 8px; }
+.kb-cab b { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kb-itens { display: flex; flex-direction: column; gap: 8px; }
+.kb-vazio { padding: 8px 4px; }
+.kb-card { background: var(--superficie); border-radius: 10px; padding: 10px; box-shadow: var(--sombra); cursor: grab; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.kb-card .local { font-size: 11px; color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kb-nome { font-weight: 600; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.kb-card.kb-apagado { opacity: .35; }
+.kb-fantasma { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; box-shadow: 0 10px 28px rgba(0,0,0,.28); opacity: .95; margin: 0; }
+body.kb-arrastando, body.kb-arrastando * { cursor: grabbing; -webkit-user-select: none; user-select: none; }
+.atraso-txt { color: var(--vermelho); }
+
+/* ---------- Visualização celular / PC (ícone no canto superior direito) ---------- */
+body.modo-celular #app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--fundo); }
+@media (min-width: 520px) {
+  body.modo-celular { background: var(--superficie-2); }
+  body.modo-celular #app { box-shadow: 0 0 0 1px var(--linha), 0 8px 30px rgba(0,0,0,.12); }
+  body.modo-celular .fab { right: calc(50% - 240px + 16px); }
+  body.modo-celular .folha { max-width: 480px; }
+}
+body.modo-pc #app { min-width: 960px; max-width: 1400px; margin: 0 auto; }
+body.modo-pc .lista-modulos { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+body.modo-pc .folha-fundo { align-items: center; }
+body.modo-pc .folha { border-radius: 16px; max-width: 640px; }
+body.modo-pc .kb-col { width: 300px; }
+body.modo-pc .fab { right: max(16px, calc(50% - 684px)); }

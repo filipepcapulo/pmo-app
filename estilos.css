@@ -301,6 +301,23 @@ tr.expandida td.col-nome { background: var(--superficie-2); }
 .form-ag .chip svg { width: 12px; height: 12px; }
 .linha-datas { display: flex; gap: 8px; align-items: center; }
 .linha-datas .campo { flex: 1; }
+/* período por dia (vários dias no mesmo agendamento) */
+.dias-per { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.dia-per { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border: 1px solid var(--linha); border-radius: 10px; background: var(--superficie); }
+.dia-per.proprio { border-color: var(--verde); background: var(--superficie-2); }
+.dia-per .d { flex: 0 0 38%; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dia-per .campo { flex: 1; min-width: 0; padding-top: 8px; padding-bottom: 8px; font-size: 14px; }
+.rem-dia { flex: none; width: 32px; height: 32px; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; color: var(--texto-2); }
+.rem-dia:active { background: var(--superficie-2); }
+.rem-dia svg { width: 16px; height: 16px; }
+/* subtarefas no detalhe do Kanban, com Editar */
+.sub-kb { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--linha); }
+.sub-kb:first-of-type { border-top: 0; }
+.sub-kb .l { flex: 1; min-width: 0; }
+.sub-kb .t { font-size: 13px; font-weight: 600; }
+.sub-kb.destaque { background: var(--superficie-2); border-radius: 10px; padding: 8px 10px; border-top-color: transparent; margin-top: 4px; }
+.sub-kb.feita .t { color: var(--texto-2); }
+.sub-kb .btn { flex: none; display: inline-flex; align-items: center; gap: 4px; }
 .caixa-dem { background: var(--superficie-2); border-radius: 12px; padding: 10px 12px; }
 .caixa-dem b { display: block; font-size: 15px; }
 

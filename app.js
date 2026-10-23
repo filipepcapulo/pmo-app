@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.1.0';
+const VERSAO_WEB = '2.2.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -741,12 +741,14 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
         <input id="fa-titulo" class="campo" type="text" value="${esc(f.titulo)}" placeholder="O que será feito" autocomplete="off">
         <label for="fa-cons">Consultor *</label>
         <select id="fa-cons" class="campo">${opt('', 'Escolha…', !f.consultorId)}${ops.consultores.map(c => opt(c.id, c.nome, c.id === f.consultorId)).join('')}</select>
-        <label>${editando ? 'Data *' : f.exigirData ? 'Data de vencimento * — uma agenda por dia' : 'Data(s) * — uma agenda por dia'}</label>
+        <label>${editando ? 'Data *' : f.exigirData ? 'Data(s) de vencimento * — uma agenda por dia' : 'Data(s) * — uma agenda por dia'}</label>
+        ${editando ? `<input id="fa-data" class="campo" type="date" value="${esc(f.datas[0] || '')}">` : `
         <div class="linha-datas">
-          <input id="fa-data" class="campo" type="date" value="${esc(f.datas[f.datas.length - 1] || '')}">
-          ${editando || !f.datas.length ? '' : '<button class="btn contorno pq" data-x="add-data" type="button">+ dia</button>'}
+          <input id="fa-data" class="campo" type="date" value="" aria-label="${f.datas.length ? 'Adicionar data' : 'Escolher data'}" ${f.datas.length >= 15 ? 'disabled' : ''}>
+          ${f.datas.length ? `<button class="btn contorno pq" data-x="add-data" type="button" ${f.datas.length >= 15 ? 'disabled' : ''}>+ dia útil</button>` : ''}
         </div>
-        ${!editando && f.datas.length > 1 ? `<div class="chips" style="flex-wrap:wrap">${[...f.datas].sort().map(d => `<button class="chip sel" type="button" data-x="rem-data" data-d="${d}">${esc(dataTitulo(d))} ${IC.x}</button>`).join('')}</div>` : ''}
+        <div class="pequeno" style="margin-top:4px">${f.datas.length ? 'Escolha outra data no calendário para incluir mais dias (uma agenda por dia).' : 'Escolha a data no calendário. Dá para incluir vários dias.'}</div>
+        ${f.datas.length ? `<div class="chips" style="flex-wrap:wrap">${[...f.datas].sort().map(d => `<button class="chip sel" type="button" data-x="rem-data" data-d="${d}" aria-label="Remover ${esc(dataTitulo(d))}">${esc(dataTitulo(d))} ${IC.x}</button>`).join('')}</div>` : ''}`}
         <label>Período *</label>
         <div class="chips seg">${PERIODOS_RAPIDOS.map(([v, t]) => `<button type="button" class="chip${f.periodo === v ? ' sel' : ''}" data-x="periodo" data-v="${v}">${t}<small>${v}</small></button>`).join('')}
           <button type="button" class="chip${periodoOutro || f.outroPeriodo ? ' sel' : ''}" data-x="periodo-outro">Outro</button></div>
@@ -773,7 +775,12 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
     liga('fa-parc', v => { f.parceiroId = v; }, 'change');
     liga('fa-apont', v => { f.apontamento = v; }, 'change');
     liga('fa-per', v => { f.periodo = v; }, 'change');
-    liga('fa-data', v => { if (!v) return; if (editando || f.datas.length <= 1) f.datas = [v]; else f.datas[f.datas.length - 1] = v; f.datas = [...new Set(f.datas)]; }, 'change');
+    liga('fa-data', v => {
+      if (!v) return;
+      if (editando) { f.datas = [v]; return; }
+      if (!f.datas.includes(v) && f.datas.length < 15) f.datas.push(v); // cada data escolhida vira mais uma agenda
+      acoes.desenhar();
+    }, 'change');
     liga('fa-pasta', v => acoes.escolherPasta(v), 'change');
     liga('fa-dem', v => {
       f.paiId = v;
@@ -801,7 +808,7 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
       while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
       f.datas.push(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`);
     }
-    if (x === 'rem-data') { f.datas = f.datas.filter(d => d !== b.dataset.d); if (!f.datas.length && !f.exigirData) f.datas = [isoHoje()]; }
+    if (x === 'rem-data') { f.datas = f.datas.filter(d => d !== b.dataset.d); }
     acoes.desenhar();
   };
 }
@@ -860,7 +867,7 @@ function telaHistorico(app) {
 
 // ---------------------------------------------------------------- permissões (administrador)
 
-const NOMES_MODULOS = { agenda: 'Agenda dos Consultores', ociosidade: 'Ociosidade', demandas: 'Demandas', backlog: 'Backlog Base', comite: 'Comitê de Personalizações', backlogdev: 'Backlog Desenvolvimento' };
+const NOMES_MODULOS = { agenda: 'Agenda dos Consultores', ociosidade: 'Ociosidade', demandas: 'Demandas', backlog: 'Backlog Base', backlogdev: 'Backlog Desenvolvimento' };
 
 async function telaPermissoes(app) {
   const ui = { lista: null, erro: '', busca: '' };
@@ -1714,16 +1721,7 @@ MODULOS.push(moduloTarefas({
   mostrarPrioridade: true,
 }));
 
-MODULOS.push(moduloTarefas({
-  id: 'comite',
-  titulo: 'Comitê de Personalizações',
-  descricao: 'Personalizações em aberto, por prioridade',
-  icone: IC.ferramenta,
-  arquivo: 'app_comite.json',
-  textoVazio: 'Nenhuma personalização em aberto no Comitê.',
-  mostrarEspaco: true,
-  mostrarPrioridade: false,
-}));
+// Comitê de Personalizações retirado do app em 23/10/2026 (substituído pelo Backlog Desenvolvimento)
 
 // ---------------------------------------------------------------- Módulo 6: Backlog Desenvolvimento
 

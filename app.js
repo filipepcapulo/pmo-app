@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.0.2';
+const VERSAO_WEB = '2.1.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -78,6 +78,9 @@ const IC = {
   lapis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   mais: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   alerta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>',
+  kanban: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg>',
+  monitor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+  celular: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
   adicionar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>',
 };
 
@@ -88,6 +91,37 @@ function toast(msg) {
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { t.hidden = true; }, 2200);
 }
+
+// ---------------------------------------------------------------- visualização celular / PC
+
+/*
+ * Ícone no canto superior direito de todas as telas: alterna entre a tela de
+ * celular (coluna estreita) e a de PC (larga). A escolha fica no aparelho; sem
+ * escolha, segue a largura da tela.
+ */
+function modoVisual() {
+  const v = guardar.ler('visual');
+  return v === 'pc' || v === 'celular' ? v : (window.innerWidth >= 900 ? 'pc' : 'celular');
+}
+function botaoVisual() {
+  const pc = modoVisual() === 'pc';
+  const rot = pc ? 'Ver como celular' : 'Ver como PC';
+  return `<button class="icone-btn" data-visual aria-label="${rot}" title="${rot}">${pc ? IC.celular : IC.monitor}</button>`;
+}
+function aplicarVisual() {
+  const m = modoVisual();
+  document.body.classList.toggle('modo-pc', m === 'pc');
+  document.body.classList.toggle('modo-celular', m === 'celular');
+  document.querySelectorAll('[data-visual]').forEach(b => { b.outerHTML = botaoVisual(); });
+}
+document.addEventListener('click', ev => {
+  if (!ev.target.closest('[data-visual]')) return;
+  guardar.gravar('visual', modoVisual() === 'pc' ? 'celular' : 'pc');
+  aplicarVisual();
+  toast(modoVisual() === 'pc' ? 'Visualização de PC' : 'Visualização de celular');
+  if (moduloAtual) redesenhar(moduloAtual, true);
+});
+window.addEventListener('resize', () => { if (!guardar.ler('visual')) aplicarVisual(); });
 
 // ---------------------------------------------------------------- servidor
 
@@ -170,7 +204,7 @@ async function recarregar(m, forcar = false) {
   if (st.carregando && !forcar) return !st.erro; // já está buscando (ex.: pré-carga)
   st.carregando = true; st.erro = null; redesenhar(m);
   try {
-    const json = await lerArquivoServidor(m.arquivo, forcar);
+    const json = m.ler ? await m.ler(forcar) : await lerArquivoServidor(m.arquivo, forcar);
     st.dados = m.interpretar(json);
     guardar.gravar('json.' + m.arquivo, json);
     st.lidoEm = Date.now();
@@ -248,7 +282,7 @@ async function acompanhar(m, id) {
 /** Ao abrir um módulo: se já houver atualização rodando no GitHub, mostra o andamento. */
 async function acompanharSeRodando(m) {
   const st = estadoDe(m);
-  if (st.atualizacao.tipo === 'andamento') return;
+  if (!m.workflow || st.atualizacao.tipo === 'andamento') return;
   try {
     const ativa = (await listarExecucoes(m.workflow, 5)).find(x => !x.terminou);
     if (ativa && st.atualizacao.tipo !== 'andamento') {
@@ -287,6 +321,7 @@ function mostrar() {
       <div class="titulo"><h1>${esc(m.titulo)}</h1><div class="sub" id="sub"></div></div>
       <div id="acoes-barra"></div>
       <button class="icone-btn" id="btn-recarregar" aria-label="Recarregar">${IC.recarregar}</button>
+      ${botaoVisual()}
     </header>
     <div id="abas"></div>
     <div id="aviso"></div>
@@ -311,6 +346,7 @@ function redesenhar(m, inteiro = false) {
   const a = st.atualizacao;
   const rodando = a.tipo === 'andamento';
   $('#fab').className = 'fab' + (rodando ? ' rodando' : '');
+  $('#fab').hidden = !m.workflow; // Backlog Desenvolvimento lê o ClickUp ao vivo
   $('#fab').innerHTML = rodando ? '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Atualizando…' : IC.recarregar + ' Atualizar agora';
   $('#aviso').innerHTML = a.tipo === 'parada' ? '' : `
     <div class="aviso ${a.tipo === 'falhou' ? 'falhou' : a.tipo === 'concluida' ? 'ok' : 'andamento'}">
@@ -402,7 +438,7 @@ function telaLogin(app) {
   const ui = { etapa: 'email', email: guardar.ler('ultimoEmail') || '' };
   const desenhar = (erro = '', info = '') => {
     app.innerHTML = `
-      <header class="barra"><div class="titulo inicio"><h1>PMO BP-MS</h1></div></header>
+      <header class="barra"><div class="titulo inicio"><h1>PMO BP-MS</h1></div>${botaoVisual()}</header>
       <div class="login">
         <h2>Acesso</h2>
         ${ui.etapa === 'email' ? `
@@ -484,6 +520,7 @@ function telaInicio(app) {
     <header class="barra">
       <div class="titulo inicio"><h1>PMO BP-MS</h1><div class="sub">${esc(u.nome || u.email)}</div></div>
       <button class="icone-btn" id="sair" aria-label="Sair">${IC.sair}</button>
+      ${botaoVisual()}
     </header>
     ${ios && !instaladoNaTela() ? `<div class="dica">${IC.adicionar}<div><b>Instale no iPhone:</b> toque em <b>Compartilhar</b> no Safari e depois em <b>Adicionar à Tela de Início</b>. O app abre em tela cheia, como um app normal.</div></div>` : ''}
     <div class="lista-modulos">
@@ -567,6 +604,9 @@ function registrarHistorico(item) {
 
 /**
  * inicial: { id } para editar; ou { pai: {id, nome, local}, consultorId, data, parceiro, cliente } para agendar.
+ * Backlog Desenvolvimento: paiFixo (não troca a demanda: a agenda vira subtarefa do item),
+ * exigirData (começa sem data: o usuário informa a data de vencimento) e etapaPai
+ * (a agenda herda a Etapa da tarefa-pai, Personalização / Customização).
  */
 async function abrirFormAgenda(inicial = {}) {
   const editando = !!inicial.id;
@@ -575,7 +615,9 @@ async function abrirFormAgenda(inicial = {}) {
     op: uuid(), estado: 'carregando', erro: '', resultado: null,
     id: inicial.id || '', paiId: inicial.pai?.id || '', paiNome: inicial.pai?.nome || '', paiLocal: inicial.pai?.local || '',
     pastaId: '', demandas: null, carregandoDemandas: false,
-    titulo: '', consultorId: inicial.consultorId || '', datas: [inicial.data && inicial.data >= isoHoje() ? inicial.data : isoHoje()],
+    paiFixo: !!inicial.paiFixo, exigirData: !!inicial.exigirData, etapaPai: !!inicial.etapaPai,
+    titulo: '', consultorId: inicial.consultorId || '',
+    datas: inicial.exigirData ? [] : [inicial.data && inicial.data >= isoHoje() ? inicial.data : isoHoje()],
     periodo: '08h-12h', agenda: 'Remoto', apontamento: 'OS Experience', parceiroId: '', detalhamento: '', status: '',
   };
   let ops = null;
@@ -598,7 +640,7 @@ async function abrirFormAgenda(inicial = {}) {
       const faltam = [];
       if (!f.titulo.trim()) faltam.push('título');
       if (!f.consultorId) faltam.push('consultor');
-      if (!f.datas.length) faltam.push('data');
+      if (!f.datas.length) faltam.push(f.exigirData ? 'data de vencimento' : 'data');
       if (!f.periodo) faltam.push('período');
       if (!editando && !f.paiId) faltam.push('demanda');
       if (faltam.length) { f.erro = 'Preencha: ' + faltam.join(', ') + '.'; desenhar(); return; }
@@ -608,6 +650,7 @@ async function abrirFormAgenda(inicial = {}) {
         datas: [...f.datas].sort(), periodo: f.periodo, agenda: f.agenda, apontamento: f.apontamento,
         parceiroId: f.parceiroId, detalhamento: f.detalhamento,
       };
+      if (f.etapaPai) dados.etapaPai = true;
       const consultor = (ops.consultores.find(c => c.id === f.consultorId) || {}).nome || '';
       try {
         const r = await api('agendaSalvar', { idOperacao: f.op, dados }, { tempo: 120000 });
@@ -615,6 +658,11 @@ async function abrirFormAgenda(inicial = {}) {
         registrarHistorico({ em: Date.now(), modo: editando ? 'editar' : 'incluir', titulo: dados.titulo, consultor, datas: dados.datas,
           periodo: dados.periodo, demanda: f.paiNome, situacao: r.situacao,
           resultados: r.resultados.map(x => ({ id: x.id, url: x.url, data: x.data, situacao: x.situacao, erro: x.erro, naoConfirmados: x.naoConfirmados })) });
+        if (r.situacao === 'ok' || r.situacao === 'parcial') {
+          // Backlog Desenvolvimento relê o ClickUp para o cartão mudar de coluna
+          const bd = MODULOS.find(m => m.id === 'backlogdev');
+          if (bd && estados[bd.id]) { estadoDe(bd).lidoEm = 0; if (moduloAtual === bd) recarregar(bd, true); }
+        }
         if (r.agendaAtualizando) {
           const ag = MODULOS.find(m => m.id === 'agenda');
           if (ag) { const st = estadoDe(ag); st.lidoEm = 0; setTimeout(() => { if (moduloAtual === ag) acompanharSeRodando(ag); }, 4000); }
@@ -628,7 +676,7 @@ async function abrirFormAgenda(inicial = {}) {
       desenhar();
     },
     voltar() { f.estado = 'editando'; f.resultado = null; desenhar(); },
-    novo() { f.op = uuid(); f.estado = 'editando'; f.resultado = null; f.titulo = ''; f.detalhamento = ''; desenhar(); },
+    novo() { f.op = uuid(); f.estado = 'editando'; f.resultado = null; f.titulo = ''; f.detalhamento = ''; if (f.exigirData) f.datas = []; desenhar(); },
   };
   desenhar();
   try {
@@ -674,7 +722,7 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
     let demanda;
     if (editando || f.paiId && f.paiNome) {
       demanda = `<div class="caixa-dem"><div class="pequeno">${esc(f.paiLocal)}</div><b>${esc(f.paiNome || 'Demanda')}</b>
-        ${!editando ? '<button class="btn texto" data-x="trocar-dem" style="padding:4px 0">Trocar demanda</button>' : ''}</div>`;
+        ${!editando && !f.paiFixo ? '<button class="btn texto" data-x="trocar-dem" style="padding:4px 0">Trocar demanda</button>' : ''}</div>`;
     } else {
       const grupos = {};
       (f.demandas || []).forEach(d => { (grupos[d.lista] = grupos[d.lista] || []).push(d); });
@@ -693,10 +741,10 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
         <input id="fa-titulo" class="campo" type="text" value="${esc(f.titulo)}" placeholder="O que será feito" autocomplete="off">
         <label for="fa-cons">Consultor *</label>
         <select id="fa-cons" class="campo">${opt('', 'Escolha…', !f.consultorId)}${ops.consultores.map(c => opt(c.id, c.nome, c.id === f.consultorId)).join('')}</select>
-        <label>${editando ? 'Data *' : 'Data(s) * — uma agenda por dia'}</label>
+        <label>${editando ? 'Data *' : f.exigirData ? 'Data de vencimento * — uma agenda por dia' : 'Data(s) * — uma agenda por dia'}</label>
         <div class="linha-datas">
           <input id="fa-data" class="campo" type="date" value="${esc(f.datas[f.datas.length - 1] || '')}">
-          ${editando ? '' : '<button class="btn contorno pq" data-x="add-data" type="button">+ dia</button>'}
+          ${editando || !f.datas.length ? '' : '<button class="btn contorno pq" data-x="add-data" type="button">+ dia</button>'}
         </div>
         ${!editando && f.datas.length > 1 ? `<div class="chips" style="flex-wrap:wrap">${[...f.datas].sort().map(d => `<button class="chip sel" type="button" data-x="rem-data" data-d="${d}">${esc(dataTitulo(d))} ${IC.x}</button>`).join('')}</div>` : ''}
         <label>Período *</label>
@@ -753,7 +801,7 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
       while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
       f.datas.push(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`);
     }
-    if (x === 'rem-data') { f.datas = f.datas.filter(d => d !== b.dataset.d); if (!f.datas.length) f.datas = [isoHoje()]; }
+    if (x === 'rem-data') { f.datas = f.datas.filter(d => d !== b.dataset.d); if (!f.datas.length && !f.exigirData) f.datas = [isoHoje()]; }
     acoes.desenhar();
   };
 }
@@ -791,7 +839,7 @@ function telaHistorico(app) {
   app.innerHTML = `
     <header class="barra"><button class="icone-btn" data-nav="voltar" aria-label="Voltar">${IC.voltar}</button>
       <div class="titulo"><h1>Agendamentos feitos</h1><div class="sub">Neste aparelho</div></div>
-      ${pode('agendar') ? `<button class="icone-btn" id="novo" aria-label="Agendar">${IC.mais}</button>` : ''}</header>
+      ${pode('agendar') ? `<button class="icone-btn" id="novo" aria-label="Agendar">${IC.mais}</button>` : ''}${botaoVisual()}</header>
     <main class="conteudo">
       ${h.length ? h.map(x => {
         const [t, c] = rot[x.situacao] || [x.situacao, 'parcial'];
@@ -812,7 +860,7 @@ function telaHistorico(app) {
 
 // ---------------------------------------------------------------- permissões (administrador)
 
-const NOMES_MODULOS = { agenda: 'Agenda dos Consultores', ociosidade: 'Ociosidade', demandas: 'Demandas', backlog: 'Backlog Base', comite: 'Comitê de Personalizações' };
+const NOMES_MODULOS = { agenda: 'Agenda dos Consultores', ociosidade: 'Ociosidade', demandas: 'Demandas', backlog: 'Backlog Base', comite: 'Comitê de Personalizações', backlogdev: 'Backlog Desenvolvimento' };
 
 async function telaPermissoes(app) {
   const ui = { lista: null, erro: '', busca: '' };
@@ -843,7 +891,7 @@ async function telaPermissoes(app) {
   app.innerHTML = `
     <header class="barra"><button class="icone-btn" data-nav="voltar" aria-label="Voltar">${IC.voltar}</button>
       <div class="titulo"><h1>Permissões</h1><div class="sub">Acesso ao app por e-mail</div></div>
-      <button class="icone-btn" id="novo" aria-label="Incluir e-mail">${IC.mais}</button></header>
+      <button class="icone-btn" id="novo" aria-label="Incluir e-mail">${IC.mais}</button>${botaoVisual()}</header>
     <main class="conteudo" id="conteudo"></main>`;
   $('[data-nav="voltar"]').onclick = () => irPara('');
   $('#novo').onclick = () => folhaUsuario(null, carregar);
@@ -1535,6 +1583,8 @@ MODULOS.push({
 
 // ---------------------------------------------------------------- Módulos 4 e 5: Backlog Base e Comitê
 
+const COLACAO = new Intl.Collator('pt-BR', { sensitivity: 'base' });
+
 function interpretarTarefas(json) {
   const r = JSON.parse(json);
   const grupos = (r.grupos || []).map(g => ({
@@ -1547,13 +1597,19 @@ function interpretarTarefas(json) {
       usuarioCliente: o.usuario_cliente || '', detalhamento: o.detalhamento || '', criado: o.criado || '',
       diasFila: numOuNull(o.dias_fila), inicio: o.inicio || '', fim: o.fim || '', atrasada: !!o.atrasada,
       horasPlanejadas: numOuNull(o.horas_planejadas), horasRealizadas: Number(o.horas_realizadas) || 0, horasAgendadas: Number(o.horas_agendadas) || 0,
+      // Backlog Desenvolvimento: ordem da prioridade (1 urgente … 5 sem) e criação em ms, para o Kanban
+      prioridadeOrdem: numOuNull(o.prioridade_ordem) ?? 5, criadoMs: Number(o.criado_ms) || 0,
       subtarefas: (o.subtarefas || []).map(a => ({
         nome: a.nome || '', consultores: txts(a.consultores), data: a.data || '', horas: Number(a.horas) || 0, periodo: a.periodo || '',
         status: a.status || '', statusCor: a.status_cor || '', realizada: !!a.realizada, detalhamento: a.detalhamento || '', url: a.url || '',
+        planejamento: !!a.planejamento, consultorIds: txts(a.consultor_ids),
       })),
     })),
   }));
-  return { titulo: r.titulo || '', geradoEm: r.gerado_em || '', hoje: r.hoje || '', grupos, qtd: soma(grupos, g => g.itens.length) };
+  // colunas do Kanban (consultores de desenvolvimento), em ordem alfabética
+  const colunas = (r.colunas || []).map(c => ({ id: String(c.id), nome: c.nome || '' }))
+    .sort((a, b) => COLACAO.compare(a.nome, b.nome));
+  return { titulo: r.titulo || '', geradoEm: r.gerado_em || '', hoje: r.hoje || '', grupos, colunas, qtd: soma(grupos, g => g.itens.length) };
 }
 
 function cartaoTarefa(t, cfg, ui) {
@@ -1635,7 +1691,7 @@ function moduloTarefas(cfg) {
         case 'agendar-tar': {
           for (const g of st.dados.grupos) {
             const t = g.itens.find(x => x.id === el.dataset.id);
-            if (t) { abrirFormAgenda({ pai: { id: t.id, nome: t.nome, local: [t.pasta, t.lista].filter(Boolean).join(' › ') }, parceiro: t.parceiro, cliente: t.pasta }); return false; }
+            if (t) { abrirFormAgenda(cfg.agendaNoItem ? pedidoBacklog(t) : { pai: { id: t.id, nome: t.nome, local: [t.pasta, t.lista].filter(Boolean).join(' › ') }, parceiro: t.parceiro, cliente: t.pasta }); return false; }
           }
           return false;
         }
@@ -1669,11 +1725,255 @@ MODULOS.push(moduloTarefas({
   mostrarPrioridade: false,
 }));
 
+// ---------------------------------------------------------------- Módulo 6: Backlog Desenvolvimento
+
+/*
+ * Tarefas do PMO BP-MS com Etapa "Personalização / Customização" e status
+ * pendente ou em andamento. Os dados vêm AO VIVO do ClickUp pelo servidor do
+ * app (ação "backlogDev", a mesma do APK) — não depende de workflow do GitHub.
+ *
+ * Abas: Lista (agrupada por prioridade) e Kanban ("A distribuir" + uma coluna
+ * por consultor, em ordem alfabética). Arrastar um cartão até a coluna de um
+ * consultor (segurar no celular; clicar e arrastar no PC) abre o formulário de
+ * agenda com o consultor já escolhido; a data de vencimento e os demais campos
+ * obrigatórios têm de ser informados. "Agendar" sempre cria a subtarefa dentro
+ * do item do backlog.
+ */
+
+const FILA = '_fila';
+
+function pedidoBacklog(t, consultorId = '') {
+  return {
+    pai: { id: t.id, nome: t.nome, local: [t.pasta, t.lista].filter(Boolean).join(' › ') },
+    consultorId, parceiro: t.parceiro, cliente: t.pasta,
+    paiFixo: true, exigirData: true, etapaPai: true,
+  };
+}
+
+function itemBacklog(d, id) {
+  for (const g of (d && d.grupos) || []) { const t = g.itens.find(x => x.id === id); if (t) return t; }
+  return null;
+}
+
+/** Cada item vai para os consultores com agenda em aberto; sem agenda em aberto -> "A distribuir". */
+function montarColunas(d, busca) {
+  const t = semAcento((busca || '').trim());
+  const ids = new Set(d.colunas.map(c => c.id));
+  const itens = d.grupos.flatMap(g => g.itens)
+    .filter(x => !t || [x.nome, x.pasta, x.lista, x.parceiro, x.status, x.prioridade, x.responsaveis.join(' ')].some(v => semAcento(v).includes(t)))
+    .sort((a, b) => a.prioridadeOrdem - b.prioridadeOrdem || a.criadoMs - b.criadoMs);
+  const por = new Map([[FILA, []], ...d.colunas.map(c => [c.id, []])]);
+  for (const it of itens) {
+    const abertas = it.subtarefas.filter(a => !a.realizada && !a.planejamento);
+    const destinos = new Set(abertas.flatMap(a => a.consultorIds).filter(c => ids.has(c)));
+    if (!destinos.size) por.get(FILA).push({ item: it, proxima: null });
+    for (const c of destinos) {
+      const prox = abertas.filter(a => a.consultorIds.includes(c)).map(a => a.data).filter(Boolean).sort()[0] || null;
+      por.get(c).push({ item: it, proxima: prox });
+    }
+  }
+  return [{ id: FILA, nome: 'A distribuir', itens: por.get(FILA) }, ...d.colunas.map(c => ({ id: c.id, nome: c.nome, itens: por.get(c.id) }))];
+}
+
+function cartaoKanban(x, colId) {
+  const t = x.item;
+  const local = [t.pasta, t.lista].filter(Boolean).join(' / ');
+  const meta = [t.criado ? 'Criada ' + dataCurta(t.criado) : '', t.fim ? 'Vence ' + dataCurta(t.fim) + (t.atrasada ? ' · atrasada' : '') : ''].filter(Boolean).join(' · ');
+  return `<div class="kb-card" role="button" tabindex="0" data-a="kb-detalhe" data-kb="${esc(t.id)}" data-col="${esc(colId)}">
+    ${local ? `<div class="local">${esc(local)}</div>` : ''}
+    <div class="kb-nome">${esc(t.nome)}</div>
+    <div class="linha-selos" style="flex-wrap:wrap">${selo(t.prioridade || 'Sem prioridade', t.prioridadeCor || '#b5bcc2')}${selo(t.status, t.statusCor)}</div>
+    ${x.proxima ? `<div class="pequeno" style="margin-top:4px">Próxima agenda: ${esc(dataCurta(x.proxima))}</div>` : ''}
+    ${meta ? `<div class="pequeno${t.atrasada ? ' atraso-txt' : ''}" style="margin-top:2px">${esc(meta)}</div>` : ''}
+  </div>`;
+}
+
+function quadroKanban(st) {
+  const cols = montarColunas(st.dados, st.ui.busca);
+  return `<div class="kanban" data-rola="kanban">${cols.map(c => `
+    <div class="kb-col${c.id === FILA ? ' fila' : ''}" data-col="${esc(c.id)}">
+      <div class="kb-cab"><b>${esc(c.nome)}</b><span class="contador">${c.itens.length}</span></div>
+      <div class="kb-itens">${c.itens.length ? c.itens.map(x => cartaoKanban(x, c.id)).join('')
+        : `<div class="pequeno kb-vazio">${c.id === FILA ? 'Nada a distribuir' : 'Arraste uma tarefa para cá'}</div>`}</div>
+    </div>`).join('')}</div>`;
+}
+
+function folhaBacklog(t, colunas) {
+  const subs = t.subtarefas;
+  abrirFolha(`<h3>${esc(t.nome)}</h3><div class="corpo">
+      ${t.pasta || t.lista ? `<div class="pequeno">${esc([t.pasta, t.lista].filter(Boolean).join(' / '))}</div>` : ''}
+      <div class="linha-selos" style="flex-wrap:wrap;margin:6px 0">${selo(t.prioridade || 'Sem prioridade', t.prioridadeCor || '#b5bcc2')}${selo(t.status, t.statusCor)}</div>
+      <div style="font-size:13px">${esc([t.parceiro, t.responsaveis.join(', ') || 'Sem responsável'].filter(Boolean).join(' · '))}</div>
+      ${t.criado ? `<div class="pequeno">Criada ${esc(dataCurta(t.criado))}${t.diasFila > 0 ? ` (${t.diasFila} dias)` : ''}</div>` : ''}
+      ${t.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(t.detalhamento)}</div>` : ''}
+      ${subs.length ? `<div class="rotulo">Subtarefas (${subs.length})</div>${subs.map(a => `<div class="pequeno" style="margin-top:2px">${a.realizada ? '✓ ' : ''}${esc([a.data ? dataCurta(a.data) : '', a.consultores.join(', '), a.nome].filter(Boolean).join(' · '))}</div>`).join('')}` : ''}
+      ${pode('agendar') ? `<div class="rotulo">Agendar para</div>
+        <div class="chips" style="flex-wrap:wrap">${colunas.map(c => `<button class="chip" data-kbc="${esc(c.id)}">${esc(c.nome)}</button>`).join('')}
+          <button class="chip" data-kbc="">Outro consultor…</button></div>` : ''}
+    </div>
+    <div class="rodape-f"><button class="btn contorno" data-f="fechar">Fechar</button>
+      ${t.url ? `<a class="btn primario" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener">Abrir no ClickUp</a>` : ''}</div>`, f => {
+    f.onclick = ev => {
+      if (ev.target.closest('[data-f="fechar"]')) { fecharFolha(); return; }
+      const b = ev.target.closest('[data-kbc]');
+      if (b) abrirFormAgenda(pedidoBacklog(t, b.dataset.kbc));
+    };
+  });
+}
+
+// --- arrastar e soltar (pointer events: mouse arrasta direto; toque, depois de segurar)
+const kb = { el: null, ativo: false, tipo: '', origem: '', itemId: '', x0: 0, y0: 0, px: 0, py: 0, dx: 0, dy: 0, timer: 0, rolar: 0, fantasma: null, ultimo: 0 };
+
+function kbColunaEm(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const col = el && el.closest('.kb-col');
+  if (col) return col.dataset.col;
+  // fora de uma coluna (espaço entre elas / abaixo): a mais próxima até 48 px na horizontal
+  let melhor = null, dist = 49;
+  document.querySelectorAll('.kb-col').forEach(c => {
+    const r = c.getBoundingClientRect();
+    if (y < r.top) return;
+    const d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+    if (d < dist) { dist = d; melhor = c.dataset.col; }
+  });
+  return melhor;
+}
+function kbMover() {
+  if (!kb.fantasma) return;
+  kb.fantasma.style.transform = `translate(${kb.px - kb.dx}px, ${kb.py - kb.dy}px) rotate(2deg)`;
+  const alvo = kbColunaEm(kb.px, kb.py);
+  document.querySelectorAll('.kb-col').forEach(c => {
+    c.classList.toggle('kb-alvo', c.dataset.col === alvo && alvo !== FILA && alvo !== kb.origem);
+  });
+}
+function kbRolarBorda() {
+  const q = $('.kanban');
+  if (!q || !kb.ativo) return;
+  const r = q.getBoundingClientRect();
+  if (kb.px < r.left + 40) q.scrollLeft -= 18;
+  else if (kb.px > r.right - 40) q.scrollLeft += 18;
+  if (kb.py < 90) window.scrollBy(0, -12);
+  else if (kb.py > window.innerHeight - 50) window.scrollBy(0, 12);
+  kbMover();
+}
+function kbIniciar() {
+  clearTimeout(kb.timer);
+  if (!kb.el || !kb.el.isConnected) { kbCancelar(); return; }
+  kb.ativo = true;
+  const r = kb.el.getBoundingClientRect();
+  kb.dx = kb.x0 - r.left; kb.dy = kb.y0 - r.top;
+  const f = kb.el.cloneNode(true);
+  f.classList.add('kb-fantasma');
+  f.removeAttribute('data-a');
+  f.style.width = r.width + 'px';
+  document.body.appendChild(f);
+  kb.fantasma = f;
+  kb.el.classList.add('kb-apagado');
+  document.body.classList.add('kb-arrastando');
+  try { if (navigator.vibrate) navigator.vibrate(15); } catch { /* sem vibração */ }
+  kbMover();
+  kb.rolar = setInterval(kbRolarBorda, 16);
+}
+function kbCancelar() {
+  clearTimeout(kb.timer); clearInterval(kb.rolar);
+  if (kb.fantasma) kb.fantasma.remove();
+  if (kb.el) kb.el.classList.remove('kb-apagado');
+  document.querySelectorAll('.kb-alvo').forEach(c => c.classList.remove('kb-alvo'));
+  document.body.classList.remove('kb-arrastando');
+  kb.el = null; kb.ativo = false; kb.fantasma = null;
+}
+function kbSoltar() {
+  const destino = kbColunaEm(kb.px, kb.py), origem = kb.origem, itemId = kb.itemId;
+  kbCancelar();
+  kb.ultimo = Date.now(); // o "click" que vem depois do arrasto não abre o detalhe
+  if (!destino || destino === FILA || destino === origem) return;
+  const m = moduloAtual;
+  if (!m || m.id !== 'backlogdev') return;
+  const t = itemBacklog(estadoDe(m).dados, itemId);
+  if (t) abrirFormAgenda(pedidoBacklog(t, destino));
+}
+document.addEventListener('pointerdown', ev => {
+  const card = ev.target.closest('.kb-card');
+  if (!card || !pode('agendar') || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+  kbCancelar();
+  Object.assign(kb, { el: card, tipo: ev.pointerType, origem: card.dataset.col, itemId: card.dataset.kb, x0: ev.clientX, y0: ev.clientY, px: ev.clientX, py: ev.clientY });
+  if (ev.pointerType !== 'mouse') kb.timer = setTimeout(kbIniciar, 380);
+});
+document.addEventListener('pointermove', ev => {
+  if (!kb.el) return;
+  kb.px = ev.clientX; kb.py = ev.clientY;
+  if (!kb.ativo) {
+    const dist = Math.hypot(ev.clientX - kb.x0, ev.clientY - kb.y0);
+    if (kb.tipo === 'mouse') { if (dist > 6) kbIniciar(); } else if (dist > 10) kbCancelar(); // virou rolagem
+    return;
+  }
+  ev.preventDefault();
+  kbMover();
+}, { passive: false });
+document.addEventListener('pointerup', () => { if (kb.ativo) kbSoltar(); else kbCancelar(); });
+document.addEventListener('pointercancel', () => { if (kb.el) kbCancelar(); });
+document.addEventListener('touchmove', ev => { if (kb.ativo) ev.preventDefault(); }, { passive: false }); // segura a rolagem durante o arrasto
+document.addEventListener('contextmenu', ev => { if (ev.target.closest('.kb-card')) ev.preventDefault(); });
+
+const baseBacklogDev = moduloTarefas({
+  id: 'backlogdev',
+  titulo: 'Backlog Desenvolvimento',
+  descricao: 'Personalizações pendentes e em andamento, com Kanban por consultor',
+  icone: IC.kanban,
+  arquivo: 'app_backlog_dev.json', // só a chave do cache no aparelho (os dados vêm ao vivo)
+  textoVazio: 'Nenhuma personalização pendente ou em andamento.',
+  mostrarEspaco: false,
+  mostrarPrioridade: true,
+  agendaNoItem: true,
+});
+
+MODULOS.push({
+  ...baseBacklogDev,
+  workflow: null,
+  etapa: '',
+  ler: async forcar => (await api('backlogDev', { forcar: !!forcar }, { tempo: 90000 })).conteudo,
+  uiInicial: () => ({ ...baseBacklogDev.uiInicial(), aba: 0 }),
+  desenhar(st, ctx) {
+    const { cont, abas, inteiro } = ctx;
+    const ui = st.ui;
+    if (ui.aba === 0) baseBacklogDev.desenhar(st, ctx);
+    abas.innerHTML = `<nav class="abas"><button class="${ui.aba === 0 ? 'ativa' : ''}" data-a="aba" data-v="0">Lista</button><button class="${ui.aba === 1 ? 'ativa' : ''}" data-a="aba" data-v="1">Kanban</button></nav>`;
+    if (ui.aba === 0) return;
+    ctx.acoes.innerHTML = '';
+    const topo = `<div class="secao">
+        ${campoBusca(ui.busca, 'Buscar cliente, tarefa, status ou pessoa')}
+        ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
+        <div class="pequeno" style="margin-top:8px">${pode('agendar')
+          ? 'Arraste um cartão até a coluna do consultor para criar a agenda (no celular, segure o cartão antes de arrastar). Toque para ver os detalhes.'
+          : 'Toque no cartão para ver os detalhes.'}</div>
+      </div>`;
+    const focado = document.activeElement && document.activeElement.id === 'busca';
+    if (inteiro || !focado || !$('#quadro-kb')) {
+      trocarHTML(cont, topo + '<div id="quadro-kb"></div>');
+      ligarBusca(st, () => { trocarHTML($('#quadro-kb'), quadroKanban(st)); });
+    }
+    trocarHTML($('#quadro-kb'), quadroKanban(st));
+  },
+  acao(nome, el, st, ev) {
+    const ui = st.ui;
+    if (nome === 'aba') { ui.aba = +el.dataset.v; window.scrollTo(0, 0); redesenhar(this, true); return false; }
+    if (nome === 'kb-detalhe') {
+      if (Date.now() - kb.ultimo < 500) return false;
+      const t = itemBacklog(st.dados, el.dataset.kb);
+      if (t) folhaBacklog(t, st.dados.colunas);
+      return false;
+    }
+    if (nome === 'limpar-busca' && ui.aba === 1) { ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); redesenhar(this, true); return false; }
+    return baseBacklogDev.acao(nome, el, st, ev);
+  },
+});
+
 // ---------------------------------------------------------------- início
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* segue sem modo offline */ });
 }
+aplicarVisual();
 mostrar();
 /** Pré-carrega os módulos em segundo plano para abrirem na hora. */
 async function preCarregar() {

@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.2.0';
+const VERSAO_WEB = '2.2.1';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -1614,8 +1614,10 @@ function interpretarTarefas(json) {
     })),
   }));
   // colunas do Kanban (consultores de desenvolvimento), em ordem alfabética
-  const colunas = (r.colunas || []).map(c => ({ id: String(c.id), nome: c.nome || '' }))
-    .sort((a, b) => COLACAO.compare(a.nome, b.nome));
+  const colunas = (r.colunas || []).map(c => ({ id: String(c.id), nome: c.nome || '' }));
+  // desenvolvedores que o app garante no Kanban mesmo que o servidor não mande a coluna
+  for (const c of DEVS_EXTRAS) if (!colunas.some(x => x.id === c.id)) colunas.push({ ...c });
+  colunas.sort((a, b) => COLACAO.compare(a.nome, b.nome));
   return { titulo: r.titulo || '', geradoEm: r.gerado_em || '', hoje: r.hoje || '', grupos, colunas, qtd: soma(grupos, g => g.itens.length) };
 }
 
@@ -1731,7 +1733,7 @@ MODULOS.push(moduloTarefas({
  * app (ação "backlogDev", a mesma do APK) — não depende de workflow do GitHub.
  *
  * Abas: Lista (agrupada por prioridade) e Kanban ("A distribuir" + uma coluna
- * por consultor, em ordem alfabética). Arrastar um cartão até a coluna de um
+ * por consultor, em ordem alfabética + "Em Validação" no fim, à direita). Arrastar um cartão até a coluna de um
  * consultor (segurar no celular; clicar e arrastar no PC) abre o formulário de
  * agenda com o consultor já escolhido; a data de vencimento e os demais campos
  * obrigatórios têm de ser informados. "Agendar" sempre cria a subtarefa dentro
@@ -1739,6 +1741,9 @@ MODULOS.push(moduloTarefas({
  */
 
 const FILA = '_fila';
+const VALIDACAO = '_validacao';
+const DEVS_EXTRAS = [{ id: '176686823', nome: 'Iago Proença' }];
+const emValidacao = t => /valida/.test(semAcento(t.status || ''));
 
 function pedidoBacklog(t, consultorId = '') {
   return {
@@ -1760,8 +1765,10 @@ function montarColunas(d, busca) {
   const itens = d.grupos.flatMap(g => g.itens)
     .filter(x => !t || [x.nome, x.pasta, x.lista, x.parceiro, x.status, x.prioridade, x.responsaveis.join(' ')].some(v => semAcento(v).includes(t)))
     .sort((a, b) => a.prioridadeOrdem - b.prioridadeOrdem || a.criadoMs - b.criadoMs);
-  const por = new Map([[FILA, []], ...d.colunas.map(c => [c.id, []])]);
+  const por = new Map([[FILA, []], ...d.colunas.map(c => [c.id, []]), [VALIDACAO, []]]);
   for (const it of itens) {
+    // status "Em Validação": só na última coluna, à direita
+    if (emValidacao(it)) { por.get(VALIDACAO).push({ item: it, proxima: null }); continue; }
     const abertas = it.subtarefas.filter(a => !a.realizada && !a.planejamento);
     const destinos = new Set(abertas.flatMap(a => a.consultorIds).filter(c => ids.has(c)));
     if (!destinos.size) por.get(FILA).push({ item: it, proxima: null });
@@ -1770,7 +1777,8 @@ function montarColunas(d, busca) {
       por.get(c).push({ item: it, proxima: prox });
     }
   }
-  return [{ id: FILA, nome: 'A distribuir', itens: por.get(FILA) }, ...d.colunas.map(c => ({ id: c.id, nome: c.nome, itens: por.get(c.id) }))];
+  return [{ id: FILA, nome: 'A distribuir', itens: por.get(FILA) }, ...d.colunas.map(c => ({ id: c.id, nome: c.nome, itens: por.get(c.id) })),
+    { id: VALIDACAO, nome: 'Em Validação', itens: por.get(VALIDACAO) }];
 }
 
 function cartaoKanban(x, colId) {
@@ -1789,11 +1797,44 @@ function cartaoKanban(x, colId) {
 function quadroKanban(st) {
   const cols = montarColunas(st.dados, st.ui.busca);
   return `<div class="kanban" data-rola="kanban">${cols.map(c => `
-    <div class="kb-col${c.id === FILA ? ' fila' : ''}" data-col="${esc(c.id)}">
+    <div class="kb-col${c.id === FILA ? ' fila' : c.id === VALIDACAO ? ' validacao' : ''}" data-col="${esc(c.id)}">
       <div class="kb-cab"><b>${esc(c.nome)}</b><span class="contador">${c.itens.length}</span></div>
       <div class="kb-itens">${c.itens.length ? c.itens.map(x => cartaoKanban(x, c.id)).join('')
-        : `<div class="pequeno kb-vazio">${c.id === FILA ? 'Nada a distribuir' : 'Arraste uma tarefa para cá'}</div>`}</div>
+        : `<div class="pequeno kb-vazio">${c.id === FILA ? 'Nada a distribuir' : c.id === VALIDACAO ? 'Nada em validação' : 'Arraste uma tarefa para cá'}</div>`}</div>
     </div>`).join('')}</div>`;
+}
+
+/**
+ * Barra de rolagem lateral do Kanban no topo, logo abaixo das abas Lista / Kanban.
+ * Desenhada pelo app (trilho + alça) para aparecer sempre, inclusive no iPhone,
+ * onde a barra nativa só surge durante a rolagem. Arrastar a alça ou tocar no trilho rola o quadro.
+ */
+function ligarRolagemKb() {
+  const barra = $('#kb-rol'), q = $('.kanban');
+  if (!barra || !q) return;
+  const alca = barra.firstElementChild;
+  const medir = () => {
+    const sobra = q.scrollWidth - q.clientWidth;
+    barra.hidden = sobra <= 1;
+    if (barra.hidden) return;
+    const w = barra.clientWidth, a = Math.max(36, w * q.clientWidth / q.scrollWidth);
+    alca.style.width = a + 'px';
+    alca.style.transform = `translateX(${(w - a) * q.scrollLeft / sobra}px)`;
+  };
+  q.onscroll = medir;
+  barra.onpointerdown = ev => {
+    ev.preventDefault();
+    const sobra = q.scrollWidth - q.clientWidth, w = barra.clientWidth, a = alca.offsetWidth;
+    const r = barra.getBoundingClientRect();
+    const naAlca = ev.target === alca;
+    const x0 = ev.clientX, s0 = naAlca ? q.scrollLeft : sobra * Math.min(1, Math.max(0, (ev.clientX - r.left - a / 2) / (w - a)));
+    q.scrollLeft = s0;
+    try { barra.setPointerCapture(ev.pointerId); } catch { /* segue sem captura */ }
+    barra.onpointermove = e => { q.scrollLeft = s0 + (e.clientX - x0) * sobra / Math.max(1, w - a); };
+    barra.onpointerup = barra.onpointercancel = () => { barra.onpointermove = null; };
+  };
+  medir();
+  if (!ligarRolagemKb.ouvindo) { ligarRolagemKb.ouvindo = true; window.addEventListener('resize', () => ligarRolagemKb()); }
 }
 
 function folhaBacklog(t, colunas) {
@@ -1841,7 +1882,7 @@ function kbMover() {
   kb.fantasma.style.transform = `translate(${kb.px - kb.dx}px, ${kb.py - kb.dy}px) rotate(2deg)`;
   const alvo = kbColunaEm(kb.px, kb.py);
   document.querySelectorAll('.kb-col').forEach(c => {
-    c.classList.toggle('kb-alvo', c.dataset.col === alvo && alvo !== FILA && alvo !== kb.origem);
+    c.classList.toggle('kb-alvo', c.dataset.col === alvo && alvo !== FILA && alvo !== VALIDACAO && alvo !== kb.origem);
   });
 }
 function kbRolarBorda() {
@@ -1884,7 +1925,7 @@ function kbSoltar() {
   const destino = kbColunaEm(kb.px, kb.py), origem = kb.origem, itemId = kb.itemId;
   kbCancelar();
   kb.ultimo = Date.now(); // o "click" que vem depois do arrasto não abre o detalhe
-  if (!destino || destino === FILA || destino === origem) return;
+  if (!destino || destino === FILA || destino === VALIDACAO || destino === origem) return;
   const m = moduloAtual;
   if (!m || m.id !== 'backlogdev') return;
   const t = itemBacklog(estadoDe(m).dados, itemId);
@@ -1935,7 +1976,8 @@ MODULOS.push({
     const { cont, abas, inteiro } = ctx;
     const ui = st.ui;
     if (ui.aba === 0) baseBacklogDev.desenhar(st, ctx);
-    abas.innerHTML = `<nav class="abas"><button class="${ui.aba === 0 ? 'ativa' : ''}" data-a="aba" data-v="0">Lista</button><button class="${ui.aba === 1 ? 'ativa' : ''}" data-a="aba" data-v="1">Kanban</button></nav>`;
+    const nav = `<nav class="abas"><button class="${ui.aba === 0 ? 'ativa' : ''}" data-a="aba" data-v="0">Lista</button><button class="${ui.aba === 1 ? 'ativa' : ''}" data-a="aba" data-v="1">Kanban</button></nav>`;
+    abas.innerHTML = ui.aba === 1 ? `<div class="abas-kb">${nav}<div class="kb-rolagem" id="kb-rol" hidden><i></i></div></div>` : nav;
     if (ui.aba === 0) return;
     ctx.acoes.innerHTML = '';
     const topo = `<div class="secao">
@@ -1948,9 +1990,10 @@ MODULOS.push({
     const focado = document.activeElement && document.activeElement.id === 'busca';
     if (inteiro || !focado || !$('#quadro-kb')) {
       trocarHTML(cont, topo + '<div id="quadro-kb"></div>');
-      ligarBusca(st, () => { trocarHTML($('#quadro-kb'), quadroKanban(st)); });
+      ligarBusca(st, () => { trocarHTML($('#quadro-kb'), quadroKanban(st)); ligarRolagemKb(); });
     }
     trocarHTML($('#quadro-kb'), quadroKanban(st));
+    ligarRolagemKb();
   },
   acao(nome, el, st, ev) {
     const ui = st.ui;

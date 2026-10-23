@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.2.1';
+const VERSAO_WEB = '2.3.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -554,7 +554,8 @@ function telaInicio(app) {
  * uma agenda. Regras da skill agendar-atendimento-clickup: título, consultor,
  * data, período e parceiro obrigatórios; observações vão no Detalhamento;
  * Etapa "Atendimento avulso", Agendamento "Agendar", Experience "Não lançado"
- * e Apontamento "OS Experience" por padrão; vários dias = uma subtarefa por dia.
+ * e Apontamento "OS Experience" por padrão; vários dias = uma subtarefa por dia,
+ * cada dia com o período geral ou um período próprio (um envio ao servidor por período).
  * O servidor grava, lê a tarefa de volta e confere campo a campo — o resultado
  * (ok / parcial / erro) aparece no fim e fica no histórico do aparelho.
  */
@@ -619,6 +620,8 @@ async function abrirFormAgenda(inicial = {}) {
     titulo: '', consultorId: inicial.consultorId || '',
     datas: inicial.exigirData ? [] : [inicial.data && inicial.data >= isoHoje() ? inicial.data : isoHoje()],
     periodo: '08h-12h', agenda: 'Remoto', apontamento: 'OS Experience', parceiroId: '', detalhamento: '', status: '',
+    // período próprio por dia (vazio = usa o período geral) e id de operação por período (não duplica ao repetir)
+    periodosDia: {}, opsPeriodo: {},
   };
   let ops = null;
   abrirFolha('<h3>' + (editando ? 'Editar agenda' : 'Agendar') + '</h3><div class="corpo" id="fa"></div><div class="rodape-f" id="fa-rod"></div>', raiz => {
@@ -641,7 +644,8 @@ async function abrirFormAgenda(inicial = {}) {
       if (!f.titulo.trim()) faltam.push('título');
       if (!f.consultorId) faltam.push('consultor');
       if (!f.datas.length) faltam.push(f.exigirData ? 'data de vencimento' : 'data');
-      if (!f.periodo) faltam.push('período');
+      const perDe = d => (!editando && f.periodosDia[d]) || f.periodo;
+      if (f.datas.some(d => !perDe(d))) faltam.push('período');
       if (!editando && !f.paiId) faltam.push('demanda');
       if (faltam.length) { f.erro = 'Preencha: ' + faltam.join(', ') + '.'; desenhar(); return; }
       f.estado = 'salvando'; f.erro = ''; desenhar();
@@ -651,12 +655,37 @@ async function abrirFormAgenda(inicial = {}) {
         parceiroId: f.parceiroId, detalhamento: f.detalhamento,
       };
       if (f.etapaPai) dados.etapaPai = true;
+      // um envio por período: os dias com o mesmo período vão juntos
+      const grupos = new Map();
+      for (const d of dados.datas) { const p = perDe(d); if (!grupos.has(p)) grupos.set(p, []); grupos.get(p).push(d); }
+      const periodoTxt = grupos.size > 1 ? [...grupos].map(([p, ds]) => `${ds.map(dataCurta).join(', ')}: ${p}`).join(' | ') : [...grupos.keys()][0];
       const consultor = (ops.consultores.find(c => c.id === f.consultorId) || {}).nome || '';
       try {
-        const r = await api('agendaSalvar', { idOperacao: f.op, dados }, { tempo: 120000 });
+        let r;
+        if (grupos.size === 1) {
+          dados.periodo = [...grupos.keys()][0];
+          r = await api('agendaSalvar', { idOperacao: f.op, dados }, { tempo: 120000 });
+        } else {
+          const partes = [];
+          for (const [p, ds] of grupos) {
+            const op = f.opsPeriodo[p] || (f.opsPeriodo[p] = uuid());
+            try { partes.push(await api('agendaSalvar', { idOperacao: op, dados: { ...dados, datas: ds, periodo: p } }, { tempo: 120000 })); }
+            catch (e) {
+              partes.push({ situacao: e.codigo === 'REDE' ? 'incerto' : 'erro', erro: `${p}: ${mensagemAmigavel(e)}`,
+                resultados: ds.map(d => ({ data: d, situacao: 'erro', erro: mensagemAmigavel(e) })) });
+            }
+          }
+          const sit = partes.map(x => x.situacao);
+          r = {
+            situacao: sit.every(s => s === 'ok') ? 'ok' : sit.every(s => s === 'erro') ? 'erro' : sit.every(s => s === 'erro' || s === 'incerto') ? 'incerto' : 'parcial',
+            erro: partes.map(x => x.erro).filter(Boolean).join(' '),
+            resultados: partes.flatMap(x => x.resultados || []).map(x => ({ ...x, periodo: x.periodo || perDe(x.data) })).sort((a, b) => String(a.data).localeCompare(String(b.data))),
+            agendaAtualizando: partes.some(x => x.agendaAtualizando),
+          };
+        }
         f.resultado = r; f.estado = 'resultado';
         registrarHistorico({ em: Date.now(), modo: editando ? 'editar' : 'incluir', titulo: dados.titulo, consultor, datas: dados.datas,
-          periodo: dados.periodo, demanda: f.paiNome, situacao: r.situacao,
+          periodo: periodoTxt, demanda: f.paiNome, situacao: r.situacao,
           resultados: r.resultados.map(x => ({ id: x.id, url: x.url, data: x.data, situacao: x.situacao, erro: x.erro, naoConfirmados: x.naoConfirmados })) });
         if (r.situacao === 'ok' || r.situacao === 'parcial') {
           // Backlog Desenvolvimento relê o ClickUp para o cartão mudar de coluna
@@ -671,12 +700,16 @@ async function abrirFormAgenda(inicial = {}) {
         f.estado = 'resultado';
         f.resultado = { situacao: e.codigo === 'REDE' ? 'incerto' : 'erro', erro: mensagemAmigavel(e), resultados: [] };
         registrarHistorico({ em: Date.now(), modo: editando ? 'editar' : 'incluir', titulo: dados.titulo, consultor, datas: dados.datas,
-          periodo: dados.periodo, demanda: f.paiNome, situacao: f.resultado.situacao, erro: f.resultado.erro, resultados: [] });
+          periodo: periodoTxt, demanda: f.paiNome, situacao: f.resultado.situacao, erro: f.resultado.erro, resultados: [] });
       }
       desenhar();
     },
     voltar() { f.estado = 'editando'; f.resultado = null; desenhar(); },
-    novo() { f.op = uuid(); f.estado = 'editando'; f.resultado = null; f.titulo = ''; f.detalhamento = ''; if (f.exigirData) f.datas = []; desenhar(); },
+    novo() {
+      f.op = uuid(); f.opsPeriodo = {}; f.estado = 'editando'; f.resultado = null; f.titulo = ''; f.detalhamento = '';
+      if (f.exigirData) { f.datas = []; f.periodosDia = {}; }
+      desenhar();
+    },
   };
   desenhar();
   try {
@@ -733,6 +766,8 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
               ${Object.entries(grupos).map(([l, ds]) => `<optgroup label="${esc(l)}">${ds.map(d => opt(d.id, d.nome, d.id === f.paiId)).join('')}</optgroup>`).join('')}</select>`) : ''}`;
     }
     const periodoOutro = f.periodo && !PERIODOS_RAPIDOS.some(p => p[0] === f.periodo);
+    const multi = !editando && f.datas.length > 1;
+    const listaPeriodos = [...new Set([...PERIODOS_RAPIDOS.map(p => p[0]), ...(ops.periodos || [])])];
     corpo.innerHTML = `
       ${f.aviso ? `<div class="aviso andamento" style="margin:0 0 8px">${esc(f.aviso)}</div>` : ''}
       <fieldset ${salvando ? 'disabled' : ''} class="form-ag">
@@ -748,11 +783,23 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
           ${f.datas.length ? `<button class="btn contorno pq" data-x="add-data" type="button" ${f.datas.length >= 15 ? 'disabled' : ''}>+ dia útil</button>` : ''}
         </div>
         <div class="pequeno" style="margin-top:4px">${f.datas.length ? 'Escolha outra data no calendário para incluir mais dias (uma agenda por dia).' : 'Escolha a data no calendário. Dá para incluir vários dias.'}</div>
-        ${f.datas.length ? `<div class="chips" style="flex-wrap:wrap">${[...f.datas].sort().map(d => `<button class="chip sel" type="button" data-x="rem-data" data-d="${d}" aria-label="Remover ${esc(dataTitulo(d))}">${esc(dataTitulo(d))} ${IC.x}</button>`).join('')}</div>` : ''}`}
-        <label>Período *</label>
+        ${f.datas.length === 1 ? `<div class="chips" style="flex-wrap:wrap">${f.datas.map(d => `<button class="chip sel" type="button" data-x="rem-data" data-d="${d}" aria-label="Remover ${esc(dataTitulo(d))}">${esc(dataTitulo(d))} ${IC.x}</button>`).join('')}</div>` : ''}`}
+        <label>${multi ? 'Período * — vale para todos os dias' : 'Período *'}</label>
         <div class="chips seg">${PERIODOS_RAPIDOS.map(([v, t]) => `<button type="button" class="chip${f.periodo === v ? ' sel' : ''}" data-x="periodo" data-v="${v}">${t}<small>${v}</small></button>`).join('')}
           <button type="button" class="chip${periodoOutro || f.outroPeriodo ? ' sel' : ''}" data-x="periodo-outro">Outro</button></div>
         ${periodoOutro || f.outroPeriodo ? `<select id="fa-per" class="campo" style="margin-top:8px">${opt('', 'Escolha o horário…', !f.periodo)}${ops.periodos.map(p => opt(p, `${p} (${horas(horasPeriodo(p))})`, p === f.periodo)).join('')}</select>` : ''}
+        ${multi ? `<label>Período por dia</label>
+        <div class="pequeno" style="margin-top:-2px">Troque o horário de um dia específico, se precisar.</div>
+        <div class="dias-per">${[...f.datas].sort().map(d => {
+          const proprio = f.periodosDia[d] || '';
+          return `<div class="dia-per${proprio && proprio !== f.periodo ? ' proprio' : ''}">
+            <span class="d">${esc(dataTitulo(d))}</span>
+            <select class="campo" data-per-dia="${d}" aria-label="Período de ${esc(dataTitulo(d))}">
+              ${opt('', f.periodo ? `Igual aos demais (${f.periodo})` : 'Escolha o horário…', !proprio)}
+              ${listaPeriodos.map(p => opt(p, `${p} (${horas(horasPeriodo(p))})`, p === proprio)).join('')}</select>
+            <button class="rem-dia" type="button" data-x="rem-data" data-d="${d}" aria-label="Remover ${esc(dataTitulo(d))}">${IC.x}</button>
+          </div>`;
+        }).join('')}</div>` : ''}
         <label>Tipo de agenda</label>
         <div class="chips" style="flex-wrap:wrap">${ops.agendas.map(a => `<button type="button" class="chip${f.agenda === a ? ' sel' : ''}" data-x="agenda" data-v="${esc(a)}">${esc(a)}</button>`).join('')}</div>
         <label for="fa-parc">Parceiro *</label>
@@ -774,7 +821,12 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
     liga('fa-cons', v => { f.consultorId = v; }, 'change');
     liga('fa-parc', v => { f.parceiroId = v; }, 'change');
     liga('fa-apont', v => { f.apontamento = v; }, 'change');
-    liga('fa-per', v => { f.periodo = v; }, 'change');
+    liga('fa-per', v => { f.periodo = v; acoes.desenhar(); }, 'change');
+    corpo.querySelectorAll('[data-per-dia]').forEach(el => el.addEventListener('change', () => {
+      if (el.value && el.value !== f.periodo) f.periodosDia[el.dataset.perDia] = el.value;
+      else delete f.periodosDia[el.dataset.perDia];
+      acoes.desenhar();
+    }));
     liga('fa-data', v => {
       if (!v) return;
       if (editando) { f.datas = [v]; return; }
@@ -799,7 +851,10 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
     if (x === 'voltar') { acoes.voltar(); return; }
     if (x === 'novo') { acoes.novo(); return; }
     if (x === 'trocar-dem') { f.paiId = ''; f.paiNome = ''; f.paiLocal = ''; f.pastaId = ''; f.demandas = null; }
-    if (x === 'periodo') { f.periodo = b.dataset.v; f.outroPeriodo = false; }
+    if (x === 'periodo') {
+      f.periodo = b.dataset.v; f.outroPeriodo = false;
+      for (const d of Object.keys(f.periodosDia)) if (f.periodosDia[d] === f.periodo) delete f.periodosDia[d];
+    }
     if (x === 'periodo-outro') { f.outroPeriodo = true; if (PERIODOS_RAPIDOS.some(p => p[0] === f.periodo)) f.periodo = ''; }
     if (x === 'agenda') f.agenda = b.dataset.v;
     if (x === 'add-data') {
@@ -808,7 +863,7 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
       while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
       f.datas.push(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`);
     }
-    if (x === 'rem-data') { f.datas = f.datas.filter(d => d !== b.dataset.d); }
+    if (x === 'rem-data') { f.datas = f.datas.filter(d => d !== b.dataset.d); delete f.periodosDia[b.dataset.d]; }
     acoes.desenhar();
   };
 }
@@ -823,7 +878,7 @@ function resultadoAgendaHTML(r, editando) {
   const linhas = (r.resultados || []).map(x => `
     <div class="res-linha ${x.situacao}">
       <span class="res-ic">${x.situacao === 'ok' ? IC.ok : x.situacao === 'erro' ? IC.x : IC.alerta}</span>
-      <div><b>${esc(dataTitulo(x.data))}</b>
+      <div><b>${esc(dataTitulo(x.data))}</b>${x.periodo ? ` <span class="pequeno">· ${esc(x.periodo)}</span>` : ''}
         <div class="pequeno">${x.situacao === 'ok' ? `Confirmado no ClickUp (${x.conferidos} itens conferidos)`
           : x.situacao === 'erro' ? esc(x.erro || 'Erro') : 'Não confirmado: ' + esc((x.naoConfirmados || []).join(', '))}</div>
         ${(x.avisos || []).length ? `<div class="pequeno">${esc(x.avisos.join(' '))}</div>` : ''}
@@ -1837,15 +1892,28 @@ function ligarRolagemKb() {
   if (!ligarRolagemKb.ouvindo) { ligarRolagemKb.ouvindo = true; window.addEventListener('resize', () => ligarRolagemKb()); }
 }
 
-function folhaBacklog(t, colunas) {
-  const subs = t.subtarefas;
+/** Subtarefa (agenda) no detalhe do Kanban: data · consultor · período, com botão Editar. */
+function linhaSubKb(a, destaque) {
+  const id = a.url ? idTarefa(a.url) : '';
+  return `<div class="sub-kb${destaque ? ' destaque' : ''}${a.realizada ? ' feita' : ''}">
+    <div class="l"><div class="t">${a.realizada ? '✓ ' : ''}${esc(a.nome || 'Agenda')}</div>
+      <div class="pequeno">${esc([a.data ? dataCurta(a.data) : 'Sem data', a.consultores.join(', ') || 'Sem consultor', a.periodo].filter(Boolean).join(' · '))}</div>
+      ${a.status ? `<div style="margin-top:3px">${selo(a.status, a.statusCor)}</div>` : ''}</div>
+    ${id && pode('editar') ? `<button class="btn contorno pq" type="button" data-kbe="${esc(id)}">${IC.lapis.replace('<svg', '<svg width="14" height="14"')} Editar</button>` : ''}
+  </div>`;
+}
+
+function folhaBacklog(t, colunas, colId = '') {
+  // as agendas do consultor da coluna aparecem primeiro e destacadas
+  const doCons = a => !!colId && a.consultorIds.includes(colId);
+  const subs = [...t.subtarefas].sort((a, b) => (doCons(b) - doCons(a)) || String(a.data || '9').localeCompare(String(b.data || '9')));
   abrirFolha(`<h3>${esc(t.nome)}</h3><div class="corpo">
       ${t.pasta || t.lista ? `<div class="pequeno">${esc([t.pasta, t.lista].filter(Boolean).join(' / '))}</div>` : ''}
       <div class="linha-selos" style="flex-wrap:wrap;margin:6px 0">${selo(t.prioridade || 'Sem prioridade', t.prioridadeCor || '#b5bcc2')}${selo(t.status, t.statusCor)}</div>
       <div style="font-size:13px">${esc([t.parceiro, t.responsaveis.join(', ') || 'Sem responsável'].filter(Boolean).join(' · '))}</div>
       ${t.criado ? `<div class="pequeno">Criada ${esc(dataCurta(t.criado))}${t.diasFila > 0 ? ` (${t.diasFila} dias)` : ''}</div>` : ''}
       ${t.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(t.detalhamento)}</div>` : ''}
-      ${subs.length ? `<div class="rotulo">Subtarefas (${subs.length})</div>${subs.map(a => `<div class="pequeno" style="margin-top:2px">${a.realizada ? '✓ ' : ''}${esc([a.data ? dataCurta(a.data) : '', a.consultores.join(', '), a.nome].filter(Boolean).join(' · '))}</div>`).join('')}` : ''}
+      ${subs.length ? `<div class="rotulo">Subtarefas (${subs.length})</div>${subs.map(a => linhaSubKb(a, doCons(a))).join('')}` : ''}
       ${pode('agendar') ? `<div class="rotulo">Agendar para</div>
         <div class="chips" style="flex-wrap:wrap">${colunas.map(c => `<button class="chip" data-kbc="${esc(c.id)}">${esc(c.nome)}</button>`).join('')}
           <button class="chip" data-kbc="">Outro consultor…</button></div>` : ''}
@@ -1854,6 +1922,8 @@ function folhaBacklog(t, colunas) {
       ${t.url ? `<a class="btn primario" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener">Abrir no ClickUp</a>` : ''}</div>`, f => {
     f.onclick = ev => {
       if (ev.target.closest('[data-f="fechar"]')) { fecharFolha(); return; }
+      const e = ev.target.closest('[data-kbe]');
+      if (e) { abrirFormAgenda({ id: e.dataset.kbe }); return; }
       const b = ev.target.closest('[data-kbc]');
       if (b) abrirFormAgenda(pedidoBacklog(t, b.dataset.kbc));
     };
@@ -1984,7 +2054,7 @@ MODULOS.push({
         ${campoBusca(ui.busca, 'Buscar cliente, tarefa, status ou pessoa')}
         ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
         <div class="pequeno" style="margin-top:8px">${pode('agendar')
-          ? 'Arraste um cartão até a coluna do consultor para criar a agenda (no celular, segure o cartão antes de arrastar). Toque para ver os detalhes.'
+          ? 'Arraste um cartão até a coluna do consultor para criar a agenda (no celular, segure o cartão antes de arrastar). Toque no cartão para ver os detalhes e editar as agendas já lançadas.'
           : 'Toque no cartão para ver os detalhes.'}</div>
       </div>`;
     const focado = document.activeElement && document.activeElement.id === 'busca';
@@ -2001,7 +2071,7 @@ MODULOS.push({
     if (nome === 'kb-detalhe') {
       if (Date.now() - kb.ultimo < 500) return false;
       const t = itemBacklog(st.dados, el.dataset.kb);
-      if (t) folhaBacklog(t, st.dados.colunas);
+      if (t) folhaBacklog(t, st.dados.colunas, el.dataset.col);
       return false;
     }
     if (nome === 'limpar-busca' && ui.aba === 1) { ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); redesenhar(this, true); return false; }

@@ -9,10 +9,14 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.3.0';
+const VERSAO_WEB = '2.4.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
+// Módulo Reembolso KM: só para este e-mail (o servidor confere de novo a cada pedido).
+const DONO_REEMBOLSO = 'filipe.capulo@sankhya.com.br';
+// App completo do Reembolso KM (pede o login Google da Sankhya ao abrir).
+const LINK_REEMBOLSO = 'https://script.google.com/a/macros/sankhya.com.br/s/AKfycbycMfLfRVlf4YBWUiH6tEe2MLIRhiyR1RA48h8otwbdrtHYs8Bved0TaqX2b4uZuA7B/exec';
 
 // ---------------------------------------------------------------- utilidades
 
@@ -81,6 +85,7 @@ const IC = {
   kanban: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg>',
   monitor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
   celular: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
+  carro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><path d="M5 12h14"/><circle cx="8" cy="17" r="1.8"/><circle cx="16" cy="17" r="1.8"/></svg>',
   adicionar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>',
 };
 
@@ -134,7 +139,8 @@ const sessao = {
   get usuario() { return guardar.ler('usuario') || null; },
 };
 const pode = p => !!(sessao.usuario && sessao.usuario[p]);
-const temModulo = id => !!(sessao.usuario && (sessao.usuario.modulos || []).includes(id));
+const ehDonoReembolso = () => !!(sessao.usuario && String(sessao.usuario.email || '').toLowerCase() === DONO_REEMBOLSO);
+const temModulo = id => id === 'reembolso' ? ehDonoReembolso() : !!(sessao.usuario && (sessao.usuario.modulos || []).includes(id));
 
 function limparSessaoLocal() {
   try { Object.keys(localStorage).filter(k => k.startsWith('pmo.') && k !== 'pmo.ultimoEmail').forEach(k => localStorage.removeItem(k)); } catch { /* ignora */ }
@@ -312,6 +318,7 @@ function mostrar() {
   window.scrollTo(0, 0);
   if (r === 'permissoes' && pode('admin')) { moduloAtual = null; telaPermissoes(app); return; }
   if (r === 'historico') { moduloAtual = null; telaHistorico(app); return; }
+  if (r === 'notificacoes') { moduloAtual = null; telaNotificacoes(app); return; }
   const m = MODULOS.find(x => x.id === r && temModulo(x.id));
   moduloAtual = m || null;
   if (!m) { telaInicio(app); return; }
@@ -515,6 +522,7 @@ function telaInicio(app) {
   const meus = MODULOS.filter(m => temModulo(m.id));
   const extras = [];
   if (pode('agendar') || pode('editar')) extras.push({ id: 'historico', titulo: 'Agendamentos feitos', descricao: 'O que você gravou no ClickUp e se deu certo', icone: IC.ok });
+  if (tiposNotificacao().length) extras.push({ id: 'notificacoes', titulo: 'Notificações', descricao: guardar.ler('push.tipos') ? 'Ativas neste aparelho' : 'Avisos no celular (ociosidade, reembolso)', icone: IC.sino });
   if (pode('admin')) extras.push({ id: 'permissoes', titulo: 'Permissões', descricao: 'Quem pode acessar o app e o quê', icone: IC.chave });
   app.innerHTML = `
     <header class="barra">
@@ -539,6 +547,7 @@ function telaInicio(app) {
       <div class="rodape-f"><button class="btn contorno" id="nao">Cancelar</button><button class="btn primario" id="sim">Sair</button></div>`, f => {
       $('#nao', f).onclick = fecharFolha;
       $('#sim', f).onclick = async () => {
+        try { await cancelarPushAparelho(); } catch { /* segue saindo */ }
         try { await api('sair', {}, { tempo: 8000 }); } catch { /* sai mesmo sem internet */ }
         limparSessaoLocal();
         irPara(''); mostrar();
@@ -1670,8 +1679,6 @@ function interpretarTarefas(json) {
   }));
   // colunas do Kanban (consultores de desenvolvimento), em ordem alfabética
   const colunas = (r.colunas || []).map(c => ({ id: String(c.id), nome: c.nome || '' }));
-  // desenvolvedores que o app garante no Kanban mesmo que o servidor não mande a coluna
-  for (const c of DEVS_EXTRAS) if (!colunas.some(x => x.id === c.id)) colunas.push({ ...c });
   colunas.sort((a, b) => COLACAO.compare(a.nome, b.nome));
   return { titulo: r.titulo || '', geradoEm: r.gerado_em || '', hoje: r.hoje || '', grupos, colunas, qtd: soma(grupos, g => g.itens.length) };
 }
@@ -1797,7 +1804,6 @@ MODULOS.push(moduloTarefas({
 
 const FILA = '_fila';
 const VALIDACAO = '_validacao';
-const DEVS_EXTRAS = [{ id: '176686823', nome: 'Iago Proença' }];
 const emValidacao = t => /valida/.test(semAcento(t.status || ''));
 
 function pedidoBacklog(t, consultorId = '') {
@@ -2078,6 +2084,178 @@ MODULOS.push({
     return baseBacklogDev.acao(nome, el, st, ev);
   },
 });
+
+// ---------------------------------------------------------------- Módulo: Reembolso KM (só o dono)
+
+/*
+ * Lê as agendas PENDENTES (sem classificação presencial/remoto) da planilha base
+ * do App Reembolso KM pelo servidor. A classificação continua no app do
+ * Reembolso KM (botão "Classificar"), que grava o KM e as regras de cada cliente.
+ */
+function interpretarReembolso(json) {
+  const r = JSON.parse(json);
+  const pendentes = (r.pendentes || []).map(p => ({
+    data: p.data || '', inicio: p.inicio || '', fim: p.fim || '', titulo: p.titulo || '',
+    cliente: p.cliente || '', local: p.local || '', meet: p.meet || '',
+  }));
+  const hoje = isoHoje();
+  return {
+    geradoEm: r.gerado_em || '', link: r.link || LINK_REEMBOLSO, pendentes,
+    ateHoje: pendentes.filter(p => !p.data || p.data <= hoje),
+    proximos: pendentes.filter(p => p.data && p.data > hoje),
+  };
+}
+
+function cartaoReembolso(p) {
+  const hora = [p.inicio, p.fim].filter(Boolean).join(' – ');
+  return `<div class="cartao">
+    <div class="topo" style="align-items:flex-start">
+      <span style="flex:1;min-width:0"><b style="display:block;font-weight:600">${esc(p.titulo || '(sem título)')}</b>
+        <span class="pequeno">${esc([dataCurta(p.data), hora].filter(Boolean).join(' · '))}</span>
+        ${p.cliente ? `<span class="pequeno" style="display:block">Cliente: <b>${esc(p.cliente)}</b></span>` : ''}
+        ${p.local ? `<span class="pequeno" style="display:block">${esc(p.local)}</span>` : ''}</span>
+    </div>
+    ${p.meet ? `<div class="acoes" style="margin-top:8px"><a class="btn contorno pq" style="text-decoration:none" href="${esc(p.meet)}" target="_blank" rel="noopener">🎥 Google Meet</a></div>` : ''}
+  </div>`;
+}
+
+MODULOS.push({
+  id: 'reembolso',
+  titulo: 'Reembolso KM',
+  descricao: 'Agendas a classificar como presencial ou remoto',
+  icone: IC.carro,
+  arquivo: 'app_reembolso.json',
+  uiInicial: () => ({ verProximos: false }),
+  async ler() { return JSON.stringify((await api('reembolso')).dados); },
+  interpretar: interpretarReembolso,
+  desenhar(st, { cont, abas, acoes }) {
+    const d = st.dados, ui = st.ui;
+    abas.innerHTML = '';
+    acoes.innerHTML = '';
+    const resumo = (t, n, c) => `<div class="resumo-o" style="background:${mistura(c, 10)};color:${c}"><b>${n}</b><span>${t}</span></div>`;
+    trocarHTML(cont, `
+      <div class="secao" style="padding:16px">
+        <div class="numeros">${resumo('A classificar', d.ateHoje.length, d.ateHoje.length ? COR_PARCIAL : COR_COMPLETO)}${resumo('Próximos dias', d.proximos.length, 'var(--texto-2)')}</div>
+        <a class="btn primario largo" style="text-decoration:none;margin-top:12px" href="${esc(d.link)}" target="_blank" rel="noopener">Classificar no Reembolso KM</a>
+        ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
+      </div>
+      <div class="divisor"></div>
+      ${d.ateHoje.length ? `<div class="sec-t" style="color:${COR_PARCIAL}">A classificar</div>${d.ateHoje.map(cartaoReembolso).join('')}`
+        : '<div class="vazio" style="font-size:17px;color:var(--texto)">Nenhuma agenda para classificar. 🎉</div>'}
+      ${d.proximos.length ? `<button class="sec-t botao${ui.verProximos ? ' aberto' : ''}" data-a="proximos"><span>Próximos dias (${d.proximos.length})</span>${IC.baixo}</button>
+        ${ui.verProximos ? d.proximos.map(cartaoReembolso).join('') : ''}` : ''}`);
+  },
+  acao(nome, el, st) {
+    if (nome === 'proximos') { st.ui.verProximos = !st.ui.verProximos; return; }
+    return false;
+  },
+});
+
+// ---------------------------------------------------------------- Notificações (push)
+
+/*
+ * Cada aparelho se inscreve no servidor com os tipos que quer receber. Quem envia
+ * é o GitHub Actions (workflow notificar.yml): Ociosidade depois do relatório
+ * diário; Reembolso KM às 18h, se houver agendas a classificar.
+ * Android: funciona no Chrome (melhor com o app instalado na tela inicial).
+ * iPhone: só com o app instalado na Tela de Início (iOS 16.4 ou mais novo).
+ */
+function tiposNotificacao() {
+  const t = [];
+  if (temModulo('ociosidade')) t.push({ id: 'ociosidade', titulo: 'Ociosidade', sub: '1 vez por dia (dias úteis), com o resumo de quem está sem agenda ou com horas livres' });
+  if (temModulo('reembolso')) t.push({ id: 'reembolso', titulo: 'Reembolso KM', sub: 'Todo dia às 18h, se houver agendas a classificar como presencial ou remoto' });
+  return t;
+}
+const pushSuportado = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+function bytesDaChave(b64u) {
+  const b = (b64u + '='.repeat((4 - b64u.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(b), c => c.charCodeAt(0));
+}
+
+async function inscricaoAtual() {
+  if (!pushSuportado()) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+
+async function ativarPush(tipos) {
+  if (!pushSuportado()) throw new Error('Este navegador não aceita notificações.');
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error('As notificações estão bloqueadas para o app. Libere nas configurações do navegador (Chrome › Configurações do site › Notificações).');
+  const reg = await navigator.serviceWorker.ready;
+  const { chave } = await api('pushChave');
+  let sub = await reg.pushManager.getSubscription();
+  if (sub && sub.options && sub.options.applicationServerKey) {
+    const atual = new Uint8Array(sub.options.applicationServerKey), nova = bytesDaChave(chave);
+    if (atual.length !== nova.length || atual.some((x, i) => x !== nova[i])) { await sub.unsubscribe(); sub = null; }
+  }
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytesDaChave(chave) });
+  await api('pushInscrever', { inscricao: sub.toJSON(), tipos, aparelho: nomeAparelho() });
+  guardar.gravar('push.tipos', tipos);
+}
+
+async function cancelarPushAparelho() {
+  const sub = await inscricaoAtual();
+  guardar.apagar('push.tipos');
+  if (!sub) return;
+  try { await api('pushCancelar', { endpoint: sub.endpoint }, { tempo: 8000 }); } finally { await sub.unsubscribe().catch(() => {}); }
+}
+
+function telaNotificacoes(app) {
+  const disponiveis = tiposNotificacao();
+  const ui = { tipos: new Set(guardar.ler('push.tipos') || disponiveis.map(t => t.id)), ativo: !!guardar.ler('push.tipos'), ocupado: '', erro: '', info: '' };
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const chk = (on, id, txt, sub) => `<button type="button" class="opcao" data-t="${id}"><span class="check ${on ? 'on' : ''}">${on ? IC.ok : ''}</span><span class="n">${esc(txt)}<span class="pequeno" style="display:block;white-space:normal">${esc(sub)}</span></span></button>`;
+  const spin = t => `<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> ${t}`;
+  const desenhar = () => {
+    let corpo;
+    if (!pushSuportado()) {
+      corpo = `<div class="dica">${IC.alerta}<div>${ios && !instaladoNaTela()
+        ? 'No iPhone, as notificações só funcionam com o app instalado: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>, e abra o app por lá.'
+        : 'Este navegador não aceita notificações. No Android, abra o app no <b>Chrome</b>.'}</div></div>`;
+    } else {
+      const negado = Notification.permission === 'denied';
+      corpo = `
+        <div class="secao"><div class="muted">${ui.ativo ? 'Notificações <b>ativas</b> neste aparelho.' : 'Escolha o que quer receber neste aparelho e toque em Ativar.'}</div></div>
+        <div class="secao" style="padding-top:0"><div class="form-ag">${disponiveis.map(t => chk(ui.tipos.has(t.id), t.id, t.titulo, t.sub)).join('')}</div></div>
+        ${negado ? `<div class="dica">${IC.alerta}<div>As notificações estão bloqueadas para este app. Libere em <b>Chrome › Configurações do site › Notificações</b> e volte aqui.</div></div>` : ''}
+        ${!ios && !instaladoNaTela() ? `<div class="dica">${IC.adicionar}<div>Dica: no Chrome, toque em <b>⋮ › Instalar app</b> (ou Adicionar à tela inicial) para receber os avisos como um app normal.</div></div>` : ''}
+        <div class="secao" style="display:grid;gap:10px">
+          <button class="btn primario largo" id="n-ativar" ${ui.ocupado || !ui.tipos.size ? 'disabled' : ''}>${ui.ocupado === 'ativar' ? spin('Ativando…') : ui.ativo ? 'Salvar escolhas' : 'Ativar notificações'}</button>
+          ${ui.ativo ? `<button class="btn contorno largo" id="n-teste" ${ui.ocupado ? 'disabled' : ''}>${ui.ocupado === 'teste' ? 'Enviando…' : 'Enviar notificação de teste'}</button>
+            <button class="btn texto" id="n-desativar" style="color:var(--vermelho)" ${ui.ocupado ? 'disabled' : ''}>Desativar neste aparelho</button>` : ''}
+          ${ui.info ? `<div class="muted">${esc(ui.info)}</div>` : ''}
+          <div class="erro-txt">${esc(ui.erro)}</div>
+        </div>`;
+    }
+    $('#conteudo').innerHTML = corpo;
+    const lista = $('#conteudo .form-ag');
+    if (lista) lista.onclick = ev => { const b = ev.target.closest('[data-t]'); if (!b || ui.ocupado) return; alternar(ui.tipos, b.dataset.t); desenhar(); };
+    const fazer = (qual, fn) => async () => {
+      ui.ocupado = qual; ui.erro = ''; ui.info = ''; desenhar();
+      try { await fn(); } catch (e) { ui.erro = mensagemAmigavel(e); }
+      ui.ocupado = ''; desenhar();
+    };
+    const at = $('#n-ativar');
+    if (at) at.onclick = fazer('ativar', async () => { await ativarPush([...ui.tipos]); ui.ativo = true; toast('Notificações ativas'); });
+    const te = $('#n-teste');
+    if (te) te.onclick = fazer('teste', async () => {
+      const sub = await inscricaoAtual();
+      if (!sub) { ui.ativo = false; guardar.apagar('push.tipos'); throw new Error('Este aparelho não está mais inscrito. Toque em Ativar de novo.'); }
+      await api('pushTeste', { endpoint: sub.endpoint });
+      ui.info = 'Teste enviado. Ele passa pelo GitHub e costuma chegar em 1 ou 2 minutos.';
+    });
+    const de = $('#n-desativar');
+    if (de) de.onclick = fazer('desativar', async () => { await cancelarPushAparelho(); ui.ativo = false; toast('Notificações desativadas'); });
+  };
+  app.innerHTML = `
+    <header class="barra"><button class="icone-btn" data-nav="voltar" aria-label="Voltar">${IC.voltar}</button>
+      <div class="titulo"><h1>Notificações</h1><div class="sub">Avisos neste aparelho</div></div>${botaoVisual()}</header>
+    <main class="conteudo" id="conteudo"></main>`;
+  $('[data-nav="voltar"]').onclick = () => irPara('');
+  desenhar();
+}
 
 // ---------------------------------------------------------------- início
 

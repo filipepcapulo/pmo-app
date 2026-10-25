@@ -9,14 +9,12 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.4.0';
+const VERSAO_WEB = '2.5.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
 // Módulo Reembolso KM: só para este e-mail (o servidor confere de novo a cada pedido).
 const DONO_REEMBOLSO = 'filipe.capulo@sankhya.com.br';
-// App completo do Reembolso KM (pede o login Google da Sankhya ao abrir).
-const LINK_REEMBOLSO = 'https://script.google.com/a/macros/sankhya.com.br/s/AKfycbycMfLfRVlf4YBWUiH6tEe2MLIRhiyR1RA48h8otwbdrtHYs8Bved0TaqX2b4uZuA7B/exec';
 
 // ---------------------------------------------------------------- utilidades
 
@@ -319,9 +317,11 @@ function mostrar() {
   if (r === 'permissoes' && pode('admin')) { moduloAtual = null; telaPermissoes(app); return; }
   if (r === 'historico') { moduloAtual = null; telaHistorico(app); return; }
   if (r === 'notificacoes') { moduloAtual = null; telaNotificacoes(app); return; }
-  const m = MODULOS.find(x => x.id === r && temModulo(x.id));
+  const [r0, r1] = r.split('/'); // ex.: reembolso/relatorio (link da notificação)
+  const m = MODULOS.find(x => x.id === r0 && temModulo(x.id));
   moduloAtual = m || null;
   if (!m) { telaInicio(app); return; }
+  if (r1 && m.aoRota) m.aoRota(r1);
   app.innerHTML = `
     <header class="barra">
       <button class="icone-btn" data-nav="voltar" aria-label="Voltar">${IC.voltar}</button>
@@ -2088,68 +2088,601 @@ MODULOS.push({
 // ---------------------------------------------------------------- Módulo: Reembolso KM (só o dono)
 
 /*
- * Lê as agendas PENDENTES (sem classificação presencial/remoto) da planilha base
- * do App Reembolso KM pelo servidor. A classificação continua no app do
- * Reembolso KM (botão "Classificar"), que grava o KM e as regras de cada cliente.
+ * v2.5.0: o Reembolso KM inteiro mora aqui (o app antigo virou só o motor que lê
+ * a Google Agenda). Abas: Pendentes (classificar presencial/remoto/ignorar),
+ * Agenda (mês, filtros, editar, visita manual), Clientes (cadastro, sugestões,
+ * "não é cliente"), Relatório (PDF para baixar/compartilhar) e Ajustes.
+ * Tudo passa pelo servidor (ações rkm*), que confere o e-mail a cada pedido.
  */
-function interpretarReembolso(json) {
-  const r = JSON.parse(json);
-  const pendentes = (r.pendentes || []).map(p => ({
-    data: p.data || '', inicio: p.inicio || '', fim: p.fim || '', titulo: p.titulo || '',
-    cliente: p.cliente || '', local: p.local || '', meet: p.meet || '',
-  }));
-  const hoje = isoHoje();
-  return {
-    geradoEm: r.gerado_em || '', link: r.link || LINK_REEMBOLSO, pendentes,
-    ateHoje: pendentes.filter(p => !p.data || p.data <= hoje),
-    proximos: pendentes.filter(p => p.data && p.data > hoje),
-  };
+const RKM_ST = { PENDENTE: 'Pendente', PRESENCIAL: 'Presencial', REMOTO: 'Remoto/Interno', IGNORADO: 'Ignorado' };
+const RKM_HEX = { PENDENTE: '#c1650a', PRESENCIAL: '#1f7a45', REMOTO: '#2c4e8c', IGNORADO: '#87909e' };
+const RKM_OBS_SISTEMA = ['Ignorado automaticamente', 'Não é cliente', 'Sem cliente cadastrado'];
+const RKM_ABAS = [['pendentes', 'Pendentes'], ['agenda', 'Agenda'], ['clientes', 'Clientes'], ['relatorio', 'Relatório'], ['ajustes', 'Ajustes']];
+const RKM_MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const RKM_DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+
+const rkmI = (ic, t = 18) => `<span style="display:inline-flex;width:${t}px;height:${t}px;flex:none">${ic}</span>`;
+const rkmKm = n => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString('pt-BR') + ' km';
+const rkmBrl = n => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const rkmBr = iso => { const p = String(iso || '').split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso || ''); };
+function rkmNum(v) {
+  if (typeof v === 'number') return v;
+  let s = String(v ?? '').trim().replace(/[^\d,.-]/g, '');
+  if (!s) return null;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+function rkmDia(iso) {
+  const d = parseDia(iso); if (!d) return iso || '';
+  const h = isoHoje(), o = new Date(); o.setDate(o.getDate() - 1);
+  const ontem = `${o.getFullYear()}-${pad2(o.getMonth() + 1)}-${pad2(o.getDate())}`;
+  return (iso === h ? 'Hoje · ' : iso === ontem ? 'Ontem · ' : '') + `${RKM_DIAS[d.getDay()]}, ${d.getDate()} de ${RKM_MESES[d.getMonth()]}`;
+}
+function rkmSyncTexto(s) { return s ? `Agenda sincronizada em ${rkmBr(s.slice(0, 10)).slice(0, 5)} às ${s.slice(11, 16)}` : 'Agenda ainda não sincronizada'; }
+function rkmMesIso(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; }
+function rkmPeriodo(preset) {
+  const d = new Date();
+  const ini = (a, m) => `${a}-${pad2(m + 1)}-01`, fim = (a, m) => { const u = new Date(a, m + 1, 0); return `${u.getFullYear()}-${pad2(u.getMonth() + 1)}-${pad2(u.getDate())}`; };
+  if (preset === 'atu') return [ini(d.getFullYear(), d.getMonth()), fim(d.getFullYear(), d.getMonth())];
+  const a = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+  return [ini(a.getFullYear(), a.getMonth()), fim(a.getFullYear(), a.getMonth())];
 }
 
-function cartaoReembolso(p) {
-  const hora = [p.inicio, p.fim].filter(Boolean).join(' – ');
-  return `<div class="cartao">
-    <div class="topo" style="align-items:flex-start">
-      <span style="flex:1;min-width:0"><b style="display:block;font-weight:600">${esc(p.titulo || '(sem título)')}</b>
-        <span class="pequeno">${esc([dataCurta(p.data), hora].filter(Boolean).join(' · '))}</span>
-        ${p.cliente ? `<span class="pequeno" style="display:block">Cliente: <b>${esc(p.cliente)}</b></span>` : ''}
-        ${p.local ? `<span class="pequeno" style="display:block">${esc(p.local)}</span>` : ''}</span>
+function interpretarReembolso(json) {
+  const r = JSON.parse(json);
+  if (!r.inicio) throw new Error('Dados antigos'); // cache da v2.4.0
+  return { geradoEm: r.gerado_em || '', ...r.inicio, ateHoje: r.pend.ateHoje || [], proximos: r.pend.proximos || [] };
+}
+
+function rkmCliente(st, id) { return (st.dados.clientes || []).find(c => c.id === id) || null; }
+function rkmNomeCli(c) { return c ? c.nome + (c.unidade ? ' – ' + c.unidade : '') : ''; }
+function rkmOpcoesCli(st, sel, novo = true) {
+  const op = (v, t, s) => `<option value="${esc(v)}"${s ? ' selected' : ''}>${esc(t)}</option>`;
+  return op('', '— escolha o cliente —', !sel) +
+    (st.dados.clientes || []).filter(c => c.ativo || c.id === sel).map(c => op(c.id, `${rkmNomeCli(c)} (${rkmKm(c.km)})`, c.id === sel)).join('') +
+    (novo ? op('__novo', '+ Cadastrar novo cliente…', false) : '');
+}
+function rkmSugNome(t) { return String(t || '').split(/\s+[-–|:]\s+|\s*[-–]\s+/)[0].replace(/^\[.*?\]\s*/, '').trim().slice(0, 40); }
+function rkmMeet(e) { return e.meet ? `<a class="btn contorno pq" style="text-decoration:none;margin-top:8px" href="${esc(e.meet)}" target="_blank" rel="noopener" data-link>🎥 Google Meet</a>` : ''; }
+
+/** Chama o servidor com aviso de erro; devolve null se falhar. */
+async function rkmApi(acao, dados, msgOk) {
+  try {
+    const r = await api(acao, dados);
+    if (msgOk) toast(msgOk);
+    return r;
+  } catch (e) { toast(mensagemAmigavel(e)); return null; }
+}
+
+// ---------- Pendentes
+
+function rkmCartaoPend(st, e, futuro) {
+  const c = rkmCliente(st, e.clienteId), id = esc(e.chave), oc = st.ui.ocupado[e.chave];
+  const hora = e.inicio ? e.inicio + (e.fim ? ' – ' + e.fim : '') : 'Dia inteiro';
+  return `<div class="cartao" style="${oc ? 'opacity:.5' : ''}">
+    <div style="font-weight:600;font-size:15px">${esc(e.titulo || '(sem título)')}</div>
+    <div class="pequeno">${esc(hora)}${e.local ? ' · ' + esc(e.local) : ''}</div>
+    ${e.descricao ? `<div class="pequeno" style="margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(e.descricao)}</div>` : ''}
+    ${rkmMeet(e)}
+    ${futuro ? `<div class="acoes" style="margin-top:8px"><button class="btn contorno pq" data-a="rkm-evento" data-k="${id}">Classificar</button></div>` : `
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+      <select class="campo" data-rkm-cli="${id}" style="flex:1;padding:9px 10px;font-size:15px" ${oc ? 'disabled' : ''}>${rkmOpcoesCli(st, e.clienteId)}</select>
+      ${c ? `<span class="selo" style="background:${mistura(c.km ? 'var(--verde)' : 'var(--laranja)', 15)};font-size:12px">${c.km ? rkmKm(c.km) : 'sem KM'}</span>` : ''}
     </div>
-    ${p.meet ? `<div class="acoes" style="margin-top:8px"><a class="btn contorno pq" style="text-decoration:none" href="${esc(p.meet)}" target="_blank" rel="noopener">🎥 Google Meet</a></div>` : ''}
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn primario" style="flex:1" data-a="rkm-classe" data-s="PRESENCIAL" data-k="${id}" ${oc ? 'disabled' : ''}>🚗 Presencial</button>
+      <button class="btn contorno" style="flex:1;color:var(--azul)" data-a="rkm-classe" data-s="REMOTO" data-k="${id}" ${oc ? 'disabled' : ''}>💻 Remoto/Interno</button>
+    </div>
+    <div style="text-align:center"><button class="btn texto pequeno" data-a="rkm-classe" data-s="IGNORADO" data-k="${id}" ${oc ? 'disabled' : ''}>Ignorar (não é trabalho / não conta)</button></div>`}
   </div>`;
 }
+
+function rkmDesenharPend(st) {
+  const d = st.dados, ui = st.ui;
+  const semKm = (d.clientes || []).filter(c => c.ativo && !c.km).length;
+  const sync = ui.sync;
+  const resumo = (t, n, c) => `<div class="resumo-o" style="background:${mistura(c, 10)};color:${c}"><b>${n}</b><span>${t}</span></div>`;
+  let h = `<div class="secao">
+    <div class="numeros">${resumo('A classificar', d.ateHoje.length, d.ateHoje.length ? COR_PARCIAL : COR_COMPLETO)}${resumo('Próximos dias', d.proximos.length, 'var(--texto-2)')}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+      <div class="pequeno" style="flex:1">${esc(rkmSyncTexto(d.ultimaSync))}${sync.estado === 'esperando' ? '<br><b style="color:var(--verde)">Sincronizando… a agenda atualiza em até 5 min.</b>' : ''}</div>
+      <button class="btn contorno pq" data-a="rkm-sync" ${sync.estado === 'esperando' ? 'disabled' : ''}>${sync.estado === 'esperando' ? '<span class="spinner p"></span>' : rkmI(IC.recarregar, 16)} Sincronizar</button>
+    </div>
+    ${d.syncErro && d.syncErro.slice(0, 19) > (d.ultimaSync || '') ? `<div class="erro-txt">Última sincronização falhou: ${esc(d.syncErro.slice(20))}</div>` : ''}
+    ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
+  </div>`;
+  if (semKm) h += `<div class="dica">${IC.alerta}<div>${semKm} cliente(s) sem KM cadastrado. <a href="#" data-a="rkm-aba" data-v="clientes">Completar</a></div></div>`;
+  h += '<div class="divisor" style="margin-top:12px"></div>';
+  if (!d.ateHoje.length) {
+    h += `<div class="vazio" style="text-align:center"><div style="font-size:34px">✅</div><b style="color:var(--texto)">Tudo classificado!</b>
+      <div class="pequeno" style="margin-top:6px">Nenhuma agenda aguardando. Quando quiser, gere o relatório do período.</div>
+      <button class="btn contorno" style="margin-top:12px" data-a="rkm-aba" data-v="relatorio">Ir para o relatório</button></div>`;
+  } else {
+    let dia = '';
+    d.ateHoje.forEach(e => {
+      if (e.data !== dia) { dia = e.data; h += `<div class="sec-t" style="color:${COR_PARCIAL}">${esc(rkmDia(e.data))}</div>`; }
+      h += rkmCartaoPend(st, e, false);
+    });
+  }
+  if (d.proximos.length) {
+    h += `<button class="sec-t botao${ui.verProximos ? ' aberto' : ''}" data-a="rkm-proximos"><span>Próximos dias (${d.proximos.length})</span>${IC.baixo}</button>`;
+    if (ui.verProximos) h += d.proximos.map(e => rkmCartaoPend(st, e, true)).join('');
+  }
+  return h + '<div style="height:24px"></div>';
+}
+
+async function rkmClassificar(m, st, e, status, clienteId, km = null, obs = null) {
+  if (status === 'PRESENCIAL' && !clienteId) { toast('Escolha o cliente da visita.'); return false; }
+  const c = rkmCliente(st, clienteId);
+  if (status === 'PRESENCIAL' && c && !c.km && km == null) {
+    toast(`Informe o KM de ${c.nome} para continuar.`);
+    rkmFolhaCliente(m, st, c, null, nc => { if (nc && nc.km) rkmClassificar(m, st, e, status, nc.id); });
+    return false;
+  }
+  // resposta imediata: o cartão sai da lista e o servidor grava em segundo plano
+  const antes = { ateHoje: st.dados.ateHoje, proximos: st.dados.proximos };
+  st.dados.ateHoje = st.dados.ateHoje.filter(x => x.chave !== e.chave);
+  st.dados.proximos = st.dados.proximos.filter(x => x.chave !== e.chave);
+  toast(status === 'PRESENCIAL' ? 'Marcado como presencial' : status === 'REMOTO' ? 'Marcado como remoto/interno' : status === 'IGNORADO' ? 'Ignorado' : 'Salvo');
+  redesenhar(m);
+  const r = await rkmApi('rkmClassificar', { chave: e.chave, status, clienteId: clienteId || '', km, obs });
+  if (!r) { Object.assign(st.dados, antes); redesenhar(m); recarregar(m, true); return false; }
+  st.dados.pendentes = r.pendentes;
+  if (st.ui.mesDados) st.ui.mesDados = null; // agenda do mês volta a ser lida
+  return true;
+}
+
+// ---------- folhas (evento, cliente, visita manual)
+
+function rkmFolhaEvento(m, st, e) {
+  let status = e.status || 'PENDENTE';
+  const c0 = rkmCliente(st, e.clienteId);
+  const kmProprio = e.kmManual != null && e.status === 'PRESENCIAL' && (!c0 || e.kmManual !== c0.km) ? String(e.kmManual).replace('.', ',') : '';
+  const obs = RKM_OBS_SISTEMA.includes(e.obs) ? '' : (e.obs || '');
+  abrirFolha(`<h3>${esc(e.titulo || '(sem título)')}</h3>
+    <div class="corpo">
+      <div class="pequeno">${esc(rkmDia(e.data))}${e.inicio ? ' · ' + esc(e.inicio) + (e.fim ? '–' + esc(e.fim) : '') : ''}${e.local ? ' · ' + esc(e.local) : ''}</div>
+      ${rkmMeet(e)}
+      ${e.descricao ? `<div class="pequeno" style="margin-top:6px">${esc(e.descricao)}</div>` : ''}
+      <fieldset class="form-ag">
+        <label>Classificação</label>
+        <div class="chips" id="rk-seg">${['PRESENCIAL', 'REMOTO', 'IGNORADO', 'PENDENTE'].map(s => `<button type="button" class="chip${s === status ? ' sel' : ''}" data-s="${s}">${RKM_ST[s]}</button>`).join('')}</div>
+        <label for="rk-cli">Cliente</label>
+        <select id="rk-cli" class="campo">${rkmOpcoesCli(st, e.clienteId)}</select>
+        <div id="rk-kmw"><label for="rk-km">KM desta visita</label>
+        <input id="rk-km" class="campo" inputmode="decimal" value="${esc(kmProprio)}"><div class="pequeno" id="rk-kmh" style="margin-top:4px"></div></div>
+        <label for="rk-obs">Observação (sai no PDF)</label>
+        <input id="rk-obs" class="campo" value="${esc(obs)}">
+      </fieldset>
+    </div>
+    <div class="rodape-f">${e.origem === 'MANUAL' ? '<button class="btn contorno" id="rk-del" style="color:var(--vermelho)">Excluir</button>' : ''}
+      <button class="btn contorno" id="rk-canc">Cancelar</button><button class="btn primario" id="rk-salvar">Salvar</button></div>`, f => {
+    const upd = () => {
+      const c = rkmCliente(st, $('#rk-cli', f).value);
+      $('#rk-kmw', f).hidden = status !== 'PRESENCIAL';
+      $('#rk-km', f).placeholder = c ? String(c.km).replace('.', ',') : '';
+      $('#rk-kmh', f).textContent = c ? `Em branco = ${rkmKm(c.km)} (cadastro do cliente).` : '';
+    };
+    upd();
+    $('#rk-seg', f).onclick = ev => { const b = ev.target.closest('[data-s]'); if (!b) return; status = b.dataset.s; f.querySelectorAll('#rk-seg .chip').forEach(x => x.classList.toggle('sel', x === b)); upd(); };
+    $('#rk-cli', f).onchange = ev => {
+      if (ev.target.value === '__novo') {
+        ev.target.value = e.clienteId || '';
+        rkmFolhaCliente(m, st, null, { nome: rkmSugNome(e.titulo), palavras: rkmSugNome(e.titulo) }, nc => rkmFolhaEvento(m, st, { ...e, clienteId: nc.id, status }));
+        return;
+      }
+      upd();
+    };
+    $('#rk-canc', f).onclick = fecharFolha;
+    $('#rk-salvar', f).onclick = async ev => {
+      const cli = $('#rk-cli', f).value;
+      if (status === 'PRESENCIAL' && !cli) { toast('Escolha o cliente.'); return; }
+      const kmv = $('#rk-km', f).value.trim();
+      ev.target.disabled = true; ev.target.innerHTML = '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Salvando…';
+      const r = await rkmApi('rkmClassificar', { chave: e.chave, status, clienteId: cli, km: status === 'PRESENCIAL' && kmv ? rkmNum(kmv) : null, obs: $('#rk-obs', f).value });
+      if (!r) { ev.target.disabled = false; ev.target.textContent = 'Salvar'; return; }
+      fecharFolha(); toast('Salvo');
+      st.dados.pendentes = r.pendentes; st.ui.mesDados = null;
+      recarregar(m, true); rkmCarregarMes(m, st);
+    };
+    const del = $('#rk-del', f);
+    if (del) del.onclick = async () => {
+      if (!confirm('Excluir esta visita manual?')) return;
+      del.disabled = true;
+      if (await rkmApi('rkmManualExcluir', { chave: e.chave }, 'Visita excluída')) { fecharFolha(); st.ui.mesDados = null; rkmCarregarMes(m, st); }
+      else del.disabled = false;
+    };
+  });
+}
+
+function rkmFolhaCliente(m, st, c, pre, depois) {
+  const x = c || { nome: '', unidade: '', km: '', palavras: '', ativo: true, obs: '', ...(pre || {}) };
+  abrirFolha(`<h3>${c ? 'Editar cliente' : 'Novo cliente'}</h3>
+    <div class="corpo"><fieldset class="form-ag">
+      <label for="kc-nome">Nome do cliente *</label><input id="kc-nome" class="campo" value="${esc(x.nome)}" autocomplete="off">
+      <label for="kc-uni">Unidade (opcional)</label><input id="kc-uni" class="campo" value="${esc(x.unidade)}" placeholder="Ex.: Dourados, Matriz…">
+      <label for="kc-km">KM a considerar por visita</label><input id="kc-km" class="campo" inputmode="decimal" value="${x.km === '' || x.km == null ? '' : String(x.km).replace('.', ',')}" placeholder="Ex.: 24 (ida e volta)">
+      <div class="pequeno" style="margin-top:4px">Use o total que a empresa reembolsa por visita (normalmente ida + volta).</div>
+      <label for="kc-pal">Palavras-chave na agenda</label><input id="kc-pal" class="campo" value="${esc(x.palavras)}" placeholder="Ex.: Semalo, SML">
+      <div class="pequeno" style="margin-top:4px">Separadas por vírgula. Se o título da agenda tiver uma delas, o cliente já vem escolhido.</div>
+      <label for="kc-obs">Observação</label><input id="kc-obs" class="campo" value="${esc(x.obs)}">
+      ${c ? `<button type="button" class="opcao" id="kc-ativo" style="margin-top:8px"><span class="check ${x.ativo ? 'on' : ''}">${x.ativo ? IC.ok : ''}</span><span class="n">Ativo</span></button>` : ''}
+    </fieldset></div>
+    <div class="rodape-f">${c ? '<button class="btn contorno" id="kc-del" style="color:var(--vermelho)">Excluir</button>' : ''}
+      <button class="btn contorno" id="kc-canc">Cancelar</button><button class="btn primario" id="kc-salvar">Salvar</button></div>`, f => {
+    let ativo = x.ativo !== false;
+    setTimeout(() => { const i = x.nome ? $('#kc-km', f) : $('#kc-nome', f); if (i) i.focus(); }, 150);
+    const at = $('#kc-ativo', f);
+    if (at) at.onclick = () => { ativo = !ativo; const ck = $('.check', at); ck.classList.toggle('on', ativo); ck.innerHTML = ativo ? IC.ok : ''; };
+    $('#kc-canc', f).onclick = fecharFolha;
+    $('#kc-salvar', f).onclick = async ev => {
+      const obj = { id: c ? c.id : '', nome: $('#kc-nome', f).value.trim(), unidade: $('#kc-uni', f).value.trim(), km: rkmNum($('#kc-km', f).value) || 0,
+        palavras: $('#kc-pal', f).value.trim(), obs: $('#kc-obs', f).value, ativo };
+      if (!obj.nome) { toast('Informe o nome.'); return; }
+      if (!obj.km && !confirm('Salvar sem KM? A visita entrará com 0 km.')) return;
+      ev.target.disabled = true;
+      const r = await rkmApi('rkmClienteSalvar', { cliente: obj });
+      if (!r) { ev.target.disabled = false; return; }
+      st.dados.clientes = r.clientes; st.dados.pendentes = r.pendentes; st.ui.sug = null;
+      fecharFolha();
+      toast(r.trazidos ? `Cliente salvo · ${r.trazidos} agenda(s) foram para Pendentes` : 'Cliente salvo');
+      if (r.trazidos) recarregar(m, true);
+      redesenhar(m);
+      if (depois) depois(r.cliente);
+    };
+    const del = $('#kc-del', f);
+    if (del) del.onclick = async () => {
+      if (!confirm(`Excluir ${c.nome}? (Se já tiver visitas no histórico, ele será só inativado.)`)) return;
+      del.disabled = true;
+      const r = await rkmApi('rkmClienteExcluir', { id: c.id });
+      if (!r) { del.disabled = false; return; }
+      st.dados.clientes = r.clientes; fecharFolha(); toast(r.inativado ? 'Cliente inativado (tem histórico)' : 'Cliente excluído'); redesenhar(m);
+    };
+  });
+}
+
+function rkmFolhaManual(m, st) {
+  abrirFolha(`<h3>Visita manual</h3>
+    <div class="corpo"><div class="pequeno">Para deslocamentos que não estão na agenda.</div><fieldset class="form-ag">
+      <label for="vm-data">Data *</label><input id="vm-data" class="campo" type="date" value="${isoHoje()}">
+      <label for="vm-hora">Hora</label><input id="vm-hora" class="campo" type="time">
+      <label for="vm-cli">Cliente *</label><select id="vm-cli" class="campo">${rkmOpcoesCli(st, '', false)}</select>
+      <label for="vm-tit">Descrição</label><input id="vm-tit" class="campo" placeholder="Ex.: Visita técnica">
+      <label for="vm-km">KM (em branco = cadastro do cliente)</label><input id="vm-km" class="campo" inputmode="decimal">
+      <label for="vm-obs">Observação</label><input id="vm-obs" class="campo">
+    </fieldset></div>
+    <div class="rodape-f"><button class="btn contorno" id="vm-canc">Cancelar</button><button class="btn primario" id="vm-salvar">Adicionar</button></div>`, f => {
+    $('#vm-canc', f).onclick = fecharFolha;
+    $('#vm-salvar', f).onclick = async ev => {
+      const v = { data: $('#vm-data', f).value, inicio: $('#vm-hora', f).value, clienteId: $('#vm-cli', f).value, titulo: $('#vm-tit', f).value.trim(),
+        km: $('#vm-km', f).value.trim() ? rkmNum($('#vm-km', f).value) : '', obs: $('#vm-obs', f).value };
+      if (!v.clienteId) { toast('Escolha o cliente.'); return; }
+      ev.target.disabled = true;
+      if (await rkmApi('rkmManualSalvar', { visita: v }, 'Visita adicionada')) {
+        fecharFolha(); st.ui.mes = v.data.slice(0, 7); st.ui.mesDados = null; rkmCarregarMes(m, st);
+      } else ev.target.disabled = false;
+    };
+  });
+}
+
+// ---------- Agenda do mês
+
+async function rkmCarregarMes(m, st) {
+  const ui = st.ui, mes = ui.mes;
+  const [a, mm] = mes.split('-').map(Number);
+  const ult = new Date(a, mm, 0).getDate();
+  ui.mesCarregando = true; redesenhar(m);
+  try {
+    const r = await api('rkmAgenda', { de: `${mes}-01`, ate: `${mes}-${pad2(ult)}` });
+    if (ui.mes === mes) { ui.mesDados = r.itens; ui.mesErro = ''; }
+  } catch (e) { ui.mesErro = mensagemAmigavel(e); }
+  ui.mesCarregando = false; redesenhar(m);
+}
+
+function rkmDesenharAgenda(st) {
+  const ui = st.ui, lista = ui.mesDados;
+  const [a, mm] = ui.mes.split('-').map(Number);
+  let h = `<div class="secao"><div style="display:flex;align-items:center;gap:8px">
+      <button class="btn contorno pq" data-a="rkm-mes" data-v="-1" aria-label="Mês anterior">‹</button>
+      <b style="flex:1;text-align:center;text-transform:capitalize">${RKM_MESES[mm - 1]} ${a}</b>
+      <button class="btn contorno pq" data-a="rkm-mes" data-v="1" aria-label="Próximo mês">›</button></div>`;
+  if (!lista) {
+    return h + (ui.mesErro ? `<div class="erro-txt">${esc(ui.mesErro)}</div><button class="btn contorno" data-a="rkm-mes" data-v="0">Tentar de novo</button>` : '<div class="centro"><div class="spinner"></div></div>') + '</div>';
+  }
+  const cnt = { TODOS: lista.length, PENDENTE: 0, PRESENCIAL: 0, REMOTO: 0, IGNORADO: 0 };
+  let km = 0, val = 0;
+  lista.forEach(e => { cnt[e.status] = (cnt[e.status] || 0) + 1; if (e.status === 'PRESENCIAL') { km += e.km; val += e.valor; } });
+  const filtros = [['TODOS', 'Todos'], ['PENDENTE', 'Pendentes'], ['PRESENCIAL', 'Presenciais'], ['REMOTO', 'Remotos'], ['IGNORADO', 'Ignorados']];
+  h += `<div class="chips" data-rola="rkm-f">${filtros.map(([k, t]) => `<button class="chip${ui.filtro === k ? ' sel' : ''}" data-a="rkm-filtro" data-v="${k}">${t} · ${cnt[k] || 0}</button>`).join('')}</div>
+    <div class="numeros" style="margin-top:10px"><div class="num"><b>${cnt.PRESENCIAL}</b><span>Presenciais</span></div><div class="num"><b>${rkmKm(km)}</b><span>KM</span></div>
+      <div class="num"><b style="color:var(--verde)">${rkmBrl(val)}</b><span>Reembolso</span></div></div>
+    <button class="btn contorno largo" style="margin-top:10px" data-a="rkm-manual">${rkmI(IC.mais)} Visita manual</button>
+    ${ui.mesCarregando ? '<div class="pequeno" style="margin-top:6px">Atualizando…</div>' : ''}</div><div class="divisor"></div>`;
+  const vis = lista.filter(e => ui.filtro === 'TODOS' || e.status === ui.filtro);
+  if (!vis.length) return h + '<div class="vazio">Nada por aqui neste mês.</div>';
+  let dia = '';
+  vis.forEach(e => {
+    if (e.data !== dia) { dia = e.data; h += `<div class="sec-t">${esc(rkmDia(e.data))}</div>`; }
+    h += `<button class="cartao" style="display:flex;gap:10px;width:calc(100% - 24px);text-align:left;align-items:flex-start" data-a="rkm-evento" data-k="${esc(e.chave)}">
+      <span class="pequeno" style="width:42px;flex:none;padding-top:2px">${esc(e.inicio || '—')}</span>
+      <span style="flex:1;min-width:0"><b style="display:block;font-weight:600;word-break:break-word">${esc(e.titulo)}${e.removido ? ' <span class="pequeno">(removido da agenda)</span>' : ''}${e.origem === 'MANUAL' ? ' <span class="pequeno">(manual)</span>' : ''}</b>
+        <span class="pequeno">${e.cliente ? esc(e.cliente + (e.unidade ? ' – ' + e.unidade : '')) : 'sem cliente'}${e.status === 'PRESENCIAL' ? ' · <b>' + rkmKm(e.km) + '</b>' : ''}</span></span>
+      ${selo(RKM_ST[e.status] || e.status, RKM_HEX[e.status])}
+    </button>`;
+  });
+  return h + '<div style="height:24px"></div>';
+}
+
+// ---------- Clientes
+
+async function rkmCarregarSug(m, st) {
+  st.ui.sugCarregando = true;
+  try { st.ui.sug = await api('rkmSugestoes'); } catch (e) { st.ui.sug = { erro: mensagemAmigavel(e) }; }
+  st.ui.sugCarregando = false; redesenhar(m);
+}
+
+function rkmListaClientes(st) {
+  const q = semAcento(st.ui.busca || '');
+  const l = (st.dados.clientes || []).filter(c => !q || semAcento(`${c.nome} ${c.unidade} ${c.palavras}`).includes(q));
+  if (!(st.dados.clientes || []).length) return '<div class="vazio" style="text-align:center"><div style="font-size:30px">📍</div><b>Nenhum cliente cadastrado</b><div class="pequeno" style="margin-top:6px">Cadastre o cliente (ou cada unidade) com o KM por visita. As palavras-chave fazem o app reconhecer o cliente pelo título da agenda.</div></div>';
+  if (!l.length) return '<div class="vazio">Nenhum cliente encontrado.</div>';
+  return l.map(c => `<button class="cartao" style="display:flex;gap:10px;width:calc(100% - 24px);text-align:left;align-items:center" data-a="rkm-cli" data-id="${esc(c.id)}">
+    <span style="flex:1;min-width:0"><b style="display:block">${esc(c.nome)}${c.unidade ? ` <span class="pequeno" style="font-weight:400">– ${esc(c.unidade)}</span>` : ''}${c.ativo ? '' : ' <span class="selo" style="background:var(--superficie-2)">inativo</span>'}</b>
+      <span class="pequeno">${c.palavras ? '🔎 ' + esc(c.palavras) : 'reconhece pelo nome'}</span></span>
+    <span class="selo" style="background:${mistura(c.km ? 'var(--verde)' : 'var(--laranja)', 15)};font-size:12px">${c.km ? rkmKm(c.km) : 'sem KM'}</span></button>`).join('');
+}
+
+function rkmDesenharClientes(st) {
+  const ui = st.ui, s = ui.sug;
+  let h = `<div class="secao" style="display:flex;gap:8px;align-items:center"><div style="flex:1">${campoBusca(ui.busca || '', 'Buscar cliente…')}</div>
+    <button class="btn primario" data-a="rkm-novo-cli">${rkmI(IC.mais, 16)} Novo</button></div><div id="rkm-lista-cli">${rkmListaClientes(st)}</div>`;
+  if (!s) h += ui.sugCarregando ? '<div class="secao pequeno">Buscando possíveis clientes na agenda…</div>' : '';
+  else if (s.erro) h += `<div class="secao erro-txt">${esc(s.erro)}</div>`;
+  else {
+    if (s.sugestoes.length) {
+      h += `<div class="sec-t">Possíveis clientes na sua agenda</div><div class="secao pequeno" style="padding-top:0">Títulos no padrão <b>Nome - assunto</b> que ainda não têm cadastro. Só as agendas de clientes cadastrados vão para Pendentes.</div>` +
+        s.sugestoes.map((x, i) => `<div class="cartao" style="display:flex;gap:8px;align-items:center"><span style="flex:1;min-width:0"><b style="display:block;word-break:break-word">${esc(x.nome)}</b><span class="pequeno">${x.qtd} agenda(s)</span></span>
+          <button class="btn texto pq" data-a="rkm-nao-cli" data-i="${i}">Não é cliente</button><button class="btn contorno pq" data-a="rkm-sug-add" data-i="${i}">+ Cadastrar</button></div>`).join('');
+    }
+    if (s.naoClientes.length) {
+      h += `<button class="sec-t botao${ui.verNao ? ' aberto' : ''}" data-a="rkm-ver-nao"><span>Marcados como não cliente (${s.naoClientes.length})</span>${IC.baixo}</button>` +
+        (ui.verNao ? s.naoClientes.map((x, i) => `<div class="cartao" style="display:flex;gap:8px;align-items:center"><span style="flex:1">${esc(x)}</span><button class="btn texto pq" data-a="rkm-desfazer" data-i="${i}">Desfazer</button></div>`).join('') : '');
+    }
+  }
+  return h + '<div style="height:24px"></div>';
+}
+
+// ---------- Relatório
+
+async function rkmCarregarRel(m, st) {
+  const ui = st.ui;
+  if (!ui.relDe || !ui.relAte || ui.relDe > ui.relAte) { ui.rel = { erro: 'Período inválido.' }; redesenhar(m); return; }
+  const chave = ui.relDe + ui.relAte;
+  ui.relCarregando = chave; redesenhar(m);
+  try { const r = await api('rkmRelatorio', { de: ui.relDe, ate: ui.relAte }); if (ui.relCarregando === chave) ui.rel = r; }
+  catch (e) { ui.rel = { erro: mensagemAmigavel(e) }; }
+  if (ui.relCarregando === chave) ui.relCarregando = ''; redesenhar(m);
+}
+
+function rkmDesenharRel(st) {
+  const ui = st.ui, r = ui.rel;
+  const presets = [['ant', 'Mês anterior'], ['atu', 'Mês atual'], ['per', 'Período']];
+  let h = `<div class="secao"><div class="chips" style="margin-top:0">${presets.map(([k, t]) => `<button class="chip${ui.relPreset === k ? ' sel' : ''}" data-a="rkm-preset" data-v="${k}">${t}</button>`).join('')}</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><input id="rkm-de" class="campo" type="date" value="${esc(ui.relDe)}"><span class="pequeno">até</span><input id="rkm-ate" class="campo" type="date" value="${esc(ui.relAte)}"></div></div>`;
+  if (!r || ui.relCarregando) return h + '<div class="centro"><div class="spinner"></div></div>';
+  if (r.erro) return h + `<div class="secao erro-txt">${esc(r.erro)}</div>`;
+  h += `<div class="secao" style="padding-top:0"><div class="numeros"><div class="num"><b>${r.itens.length}</b><span>Visitas</span></div><div class="num"><b>${rkmKm(r.totalKm)}</b><span>KM</span></div>
+    <div class="num"><b style="color:var(--verde)">${rkmBrl(r.totalValor)}</b><span>Reembolso</span></div></div></div>`;
+  if (!r.valorKm) h += `<div class="dica">${IC.alerta}<div>Valor por KM não definido — o PDF sai só com KM. <a href="#" data-a="rkm-aba" data-v="ajustes">Definir</a></div></div>`;
+  h += r.pendentes
+    ? `<div class="dica">${IC.alerta}<div style="flex:1"><b>${r.pendentes}</b> agenda(s) do período ainda sem classificação. <a href="#" data-a="rkm-aba" data-v="pendentes">Classificar</a></div></div>`
+    : `<div class="dica">${IC.ok}<div>Todas as agendas do período estão classificadas.</div></div>`;
+  h += `<div class="secao"><button class="btn primario largo" data-a="rkm-pdf" ${ui.gerandoPdf ? 'disabled' : ''}>${ui.gerandoPdf ? '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Gerando PDF…' : rkmI(IC.compartilhar) + ' Baixar / compartilhar PDF'}</button></div>`;
+  if (r.itens.length) {
+    h += '<div class="sec-t">Visitas presenciais</div>' + r.itens.map(i => `<div class="cartao" style="display:flex;gap:10px">
+      <span class="pequeno" style="width:42px;flex:none">${rkmBr(i.data).slice(0, 5)}</span>
+      <span style="flex:1;min-width:0"><b>${esc(i.cliente)}</b>${i.unidade ? ' – ' + esc(i.unidade) : ''}<span class="pequeno" style="display:block">${esc(i.titulo)}</span></span>
+      <span style="text-align:right;white-space:nowrap"><b>${rkmKm(i.km)}</b>${r.valorKm ? `<span class="pequeno" style="display:block">${rkmBrl(i.valor)}</span>` : ''}</span></div>`).join('');
+  }
+  if ((r.historico || []).length) {
+    h += '<div class="sec-t">Gerados anteriormente</div>' + r.historico.map(x => `<div class="cartao" style="display:flex;gap:10px;align-items:center">
+      <span style="flex:1"><b>${rkmBr(x.de)} a ${rkmBr(x.ate)}</b><span class="pequeno" style="display:block">${esc(rkmBr(x.geradoEm.slice(0, 10)))} ${esc(x.geradoEm.slice(11))}${x.para ? ' · ' + esc(x.para) : ''}</span></span>
+      <span style="text-align:right"><b>${rkmKm(x.totalKm)}</b><span class="pequeno" style="display:block">${rkmBrl(x.totalRS)}</span></span></div>`).join('');
+  }
+  return h + '<div style="height:24px"></div>';
+}
+
+async function rkmBaixarPdf(m, st) {
+  const ui = st.ui;
+  ui.gerandoPdf = true; redesenhar(m);
+  const g = await rkmApi('rkmPdf', { de: ui.relDe, ate: ui.relAte });
+  ui.gerandoPdf = false; redesenhar(m);
+  if (!g) return;
+  const bin = atob(g.base64), arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  const blob = new Blob([arr], { type: 'application/pdf' });
+  let arq = null;
+  try { arq = new File([blob], g.nome, { type: 'application/pdf' }); } catch { /* navegador antigo */ }
+  const salvar = () => { const u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = g.nome; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(u); }, 4000); };
+  if (arq && navigator.canShare && navigator.canShare({ files: [arq] })) {
+    try { await navigator.share({ files: [arq], title: g.nome }); } catch (e) { if (e && e.name !== 'AbortError') salvar(); }
+  } else salvar();
+  toast(`PDF gerado: ${rkmKm(g.totalKm)} · ${rkmBrl(g.totalValor)}`);
+  rkmCarregarRel(m, st);
+}
+
+// ---------- Ajustes
+
+function rkmDesenharAjustes(st) {
+  const a = { ...(st.dados.ajustes || {}) };
+  if (a.valorKm) a.valorKm = String(a.valorKm).replace('.', ',');
+  const inp = (k, rot, attrs = '', dica = '') => `<label for="aj-${k}">${rot}</label><input id="aj-${k}" data-aj="${k}" class="campo" value="${esc(a[k] || '')}" ${attrs}>${dica ? `<div class="pequeno" style="margin-top:4px">${dica}</div>` : ''}`;
+  const chk = (k, rot) => `<button type="button" class="opcao" data-aj-chk="${k}"><span class="check ${String(a[k]).toUpperCase() === 'S' ? 'on' : ''}">${String(a[k]).toUpperCase() === 'S' ? IC.ok : ''}</span><span class="n" style="white-space:normal">${rot}</span></button>`;
+  let horas = '';
+  for (let i = 6; i <= 22; i++) horas += `<option value="${i}"${String(i) === String(a.horaNotificacao || 18) ? ' selected' : ''}>${pad2(i)}:00</option>`;
+  return `<div class="secao"><fieldset class="form-ag" id="rkm-aj">
+    <div class="sec-t" style="padding:4px 0 0">Relatório</div>
+    ${inp('nome', 'Seu nome (sai no PDF)')}${inp('cargo', 'Cargo / área')}${inp('empresa', 'Empresa')}${inp('valorKm', 'Valor por KM (R$)', 'inputmode="decimal"')}
+    <div class="sec-t" style="padding:18px 0 0">Agenda</div>
+    ${inp('syncInicio', 'Considerar agendas a partir de', 'type="date"')}
+    ${inp('ignorarPalavras', 'Ignorar automaticamente títulos com', '', 'Separe por vírgula. Ex.: Particular, Webinar. Esses entram como "Ignorado" (dá para mudar).')}
+    ${chk('incluirDiaInteiro', 'Incluir eventos de dia inteiro')}
+    <div class="sec-t" style="padding:18px 0 0">Aviso no celular</div>
+    <label for="aj-horaNotificacao">Horário do aviso diário</label><select id="aj-horaNotificacao" data-aj="horaNotificacao" class="campo">${horas}</select>
+    ${chk('notificarFimSemana', 'Avisar também no fim de semana')}
+    <div class="pequeno" style="margin-top:6px">O aviso só sai se houver agendas a classificar. No dia 1º chega o lembrete para gerar o relatório do mês anterior. Ative em <a href="#/notificacoes">Notificações</a> (web) ou no menu Notificações do APK.</div>
+  </fieldset>
+  <button class="btn primario largo" style="margin-top:16px" data-a="rkm-salvar-aj" ${st.ui.salvandoAj ? 'disabled' : ''}>${st.ui.salvandoAj ? 'Salvando…' : 'Salvar ajustes'}</button>
+  <div class="pequeno" style="margin-top:14px">Dados na planilha base: <a href="${esc(st.dados.planilha || '#')}" target="_blank" rel="noopener">abrir planilha</a>. A agenda é lida da conta ${esc(st.dados.email || '')} a cada 2 h (ou ao tocar em Sincronizar).</div>
+  </div>`;
+}
+
+// ---------- módulo
 
 MODULOS.push({
   id: 'reembolso',
   titulo: 'Reembolso KM',
-  descricao: 'Agendas a classificar como presencial ou remoto',
+  descricao: 'Classificar agendas, clientes, relatório de KM',
   icone: IC.carro,
-  arquivo: 'app_reembolso.json',
-  uiInicial: () => ({ verProximos: false }),
-  async ler() { return JSON.stringify((await api('reembolso')).dados); },
-  interpretar: interpretarReembolso,
-  desenhar(st, { cont, abas, acoes }) {
-    const d = st.dados, ui = st.ui;
-    abas.innerHTML = '';
-    acoes.innerHTML = '';
-    const resumo = (t, n, c) => `<div class="resumo-o" style="background:${mistura(c, 10)};color:${c}"><b>${n}</b><span>${t}</span></div>`;
-    trocarHTML(cont, `
-      <div class="secao" style="padding:16px">
-        <div class="numeros">${resumo('A classificar', d.ateHoje.length, d.ateHoje.length ? COR_PARCIAL : COR_COMPLETO)}${resumo('Próximos dias', d.proximos.length, 'var(--texto-2)')}</div>
-        <a class="btn primario largo" style="text-decoration:none;margin-top:12px" href="${esc(d.link)}" target="_blank" rel="noopener">Classificar no Reembolso KM</a>
-        ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
-      </div>
-      <div class="divisor"></div>
-      ${d.ateHoje.length ? `<div class="sec-t" style="color:${COR_PARCIAL}">A classificar</div>${d.ateHoje.map(cartaoReembolso).join('')}`
-        : '<div class="vazio" style="font-size:17px;color:var(--texto)">Nenhuma agenda para classificar. 🎉</div>'}
-      ${d.proximos.length ? `<button class="sec-t botao${ui.verProximos ? ' aberto' : ''}" data-a="proximos"><span>Próximos dias (${d.proximos.length})</span>${IC.baixo}</button>
-        ${ui.verProximos ? d.proximos.map(cartaoReembolso).join('') : ''}` : ''}`);
+  arquivo: 'app_reembolso_v25.json',
+  uiInicial: () => {
+    const [de, ate] = rkmPeriodo('ant');
+    return { aba: 'pendentes', verProximos: false, ocupado: {}, sync: { estado: '' }, mes: rkmMesIso(new Date()), mesDados: null, filtro: 'TODOS',
+      busca: '', sug: null, verNao: false, relPreset: 'ant', relDe: de, relAte: ate, rel: null, relCarregando: '', ajSujo: {} };
   },
-  acao(nome, el, st) {
-    if (nome === 'proximos') { st.ui.verProximos = !st.ui.verProximos; return; }
+  async ler() {
+    const [inicio, pend] = await Promise.all([api('rkmInicio'), api('rkmPendentes')]);
+    delete inicio.ok; delete pend.ok;
+    return JSON.stringify({ gerado_em: new Date().toISOString(), inicio, pend });
+  },
+  interpretar: interpretarReembolso,
+  aoRota(sub) { if (RKM_ABAS.some(([k]) => k === sub)) estadoDe(this).ui.aba = sub; },
+  desenhar(st, { cont, abas, acoes, inteiro }) {
+    const ui = st.ui;
+    acoes.innerHTML = '';
+    abas.innerHTML = `<nav class="abas" style="overflow-x:auto">${RKM_ABAS.map(([k, t]) => `<button class="${ui.aba === k ? 'ativa' : ''}" style="flex:1 0 auto;padding:12px 7px;font-size:14px" data-a="rkm-aba" data-v="${k}">${t}${k === 'pendentes' && st.dados.ateHoje.length ? ` (${st.dados.ateHoje.length})` : ''}</button>`).join('')}</nav>`;
+    if (ui.aba === 'clientes') {
+      const focado = document.activeElement && document.activeElement.id === 'busca';
+      if (!focado || inteiro || !$('#rkm-lista-cli')) { trocarHTML(cont, rkmDesenharClientes(st)); ligarBusca(st, () => { $('#rkm-lista-cli').innerHTML = rkmListaClientes(st); }); }
+      if (!ui.sug && !ui.sugCarregando) rkmCarregarSug(this, st);
+      return;
+    }
+    if (ui.aba === 'ajustes') {
+      // não apaga o que está sendo digitado
+      if (cont.querySelector('#rkm-aj') && !inteiro && !ui.ajRedesenhar) return;
+      ui.ajRedesenhar = false;
+      trocarHTML(cont, rkmDesenharAjustes(st));
+      cont.querySelectorAll('[data-aj-chk]').forEach(b => { b.onclick = () => { const ck = $('.check', b), on = !ck.classList.contains('on'); ck.classList.toggle('on', on); ck.innerHTML = on ? IC.ok : ''; }; });
+      return;
+    }
+    const html = ui.aba === 'agenda' ? rkmDesenharAgenda(st) : ui.aba === 'relatorio' ? rkmDesenharRel(st) : rkmDesenharPend(st);
+    trocarHTML(cont, html);
+    if (ui.aba === 'agenda' && !ui.mesDados && !ui.mesCarregando && !ui.mesErro) rkmCarregarMes(this, st);
+    if (ui.aba === 'relatorio') {
+      if (!ui.rel && !ui.relCarregando) rkmCarregarRel(this, st);
+      const de = $('#rkm-de'), ate = $('#rkm-ate');
+      if (de) de.onchange = ate.onchange = () => { ui.relPreset = 'per'; ui.relDe = de.value; ui.relAte = ate.value; rkmCarregarRel(this, st); };
+    }
+    if (ui.aba === 'pendentes') {
+      cont.onchange = ev => {
+        const sel = ev.target.closest('[data-rkm-cli]'); if (!sel) return;
+        const e = st.dados.ateHoje.find(x => x.chave === sel.dataset.rkmCli); if (!e) return;
+        if (sel.value === '__novo') {
+          sel.value = e.clienteId || '';
+          rkmFolhaCliente(this, st, null, { nome: rkmSugNome(e.titulo), palavras: rkmSugNome(e.titulo) }, nc => { e.clienteId = nc.id; redesenhar(this); });
+          return;
+        }
+        e.clienteId = sel.value; redesenhar(this);
+      };
+    } else cont.onchange = null;
+  },
+  acao(nome, el, st, ev) {
+    const ui = st.ui, m = this;
+    if (ev.target.closest('[data-link]')) return false;
+    const evento = k => [...st.dados.ateHoje, ...st.dados.proximos, ...(ui.mesDados || [])].find(x => x.chave === k);
+    switch (nome) {
+      case 'rkm-aba':
+        ev.preventDefault(); ui.aba = el.dataset.v; ui.ajRedesenhar = true;
+        if (ui.aba === 'relatorio') ui.rel = null;
+        if (ui.aba === 'clientes') ui.sug = null;
+        if (ui.aba === 'agenda') ui.mesErro = '';
+        window.scrollTo(0, 0); redesenhar(m, true); return false;
+      case 'rkm-proximos': ui.verProximos = !ui.verProximos; return;
+      case 'rkm-classe': {
+        const e = evento(el.dataset.k); if (!e) return false;
+        rkmClassificar(m, st, e, el.dataset.s, e.clienteId);
+        return false;
+      }
+      case 'rkm-evento': { const e = evento(el.dataset.k); if (e) rkmFolhaEvento(m, st, { kmManual: null, ...e }); return false; }
+      case 'rkm-sync': rkmSincronizar(m, st); return false;
+      case 'rkm-mes': {
+        const d = parseDia(ui.mes + '-01'); d.setMonth(d.getMonth() + Number(el.dataset.v));
+        ui.mes = rkmMesIso(d); ui.mesDados = null; ui.mesErro = ''; rkmCarregarMes(m, st); return false;
+      }
+      case 'rkm-filtro': ui.filtro = el.dataset.v; return;
+      case 'rkm-manual': rkmFolhaManual(m, st); return false;
+      case 'rkm-novo-cli': rkmFolhaCliente(m, st, null, {}, null); return false;
+      case 'rkm-cli': rkmFolhaCliente(m, st, rkmCliente(st, el.dataset.id), null, null); return false;
+      case 'limpar-busca': ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); $('#rkm-lista-cli').innerHTML = rkmListaClientes(st); return false;
+      case 'rkm-sug-add': { const x = ui.sug.sugestoes[+el.dataset.i]; rkmFolhaCliente(m, st, null, { nome: x.nome, palavras: x.nome }, null); return false; }
+      case 'rkm-nao-cli': {
+        const x = ui.sug.sugestoes[+el.dataset.i]; el.disabled = true;
+        rkmApi('rkmNaoCliente', { nome: x.nome }, `"${x.nome}" não é cliente`).then(r => { if (r) { st.dados.pendentes = r.pendentes; rkmCarregarSug(m, st); } else el.disabled = false; });
+        return false;
+      }
+      case 'rkm-desfazer': {
+        const x = ui.sug.naoClientes[+el.dataset.i]; el.disabled = true;
+        rkmApi('rkmDesfazerNaoCliente', { nome: x }, 'Desfeito · voltou para as sugestões').then(r => { if (r) { rkmCarregarSug(m, st); recarregar(m, true); } else el.disabled = false; });
+        return false;
+      }
+      case 'rkm-ver-nao': ui.verNao = !ui.verNao; redesenhar(m, true); return false;
+      case 'rkm-preset':
+        ui.relPreset = el.dataset.v;
+        if (ui.relPreset !== 'per') [ui.relDe, ui.relAte] = rkmPeriodo(ui.relPreset);
+        rkmCarregarRel(m, st); return false;
+      case 'rkm-pdf': rkmBaixarPdf(m, st); return false;
+      case 'rkm-salvar-aj': rkmSalvarAjustes(m, st); return false;
+    }
     return false;
   },
 });
+
+async function rkmSalvarAjustes(m, st) {
+  const f = {};
+  document.querySelectorAll('[data-aj]').forEach(i => { f[i.dataset.aj] = i.value.trim(); });
+  document.querySelectorAll('[data-aj-chk]').forEach(b => { f[b.dataset.ajChk] = $('.check', b).classList.contains('on') ? 'S' : 'N'; });
+  st.ui.salvandoAj = true; st.ui.ajRedesenhar = true; redesenhar(m);
+  const r = await rkmApi('rkmAjustes', { ajustes: f }, 'Ajustes salvos');
+  st.ui.salvandoAj = false; st.ui.ajRedesenhar = true;
+  if (r) { st.dados.ajustes = r.ajustes; st.dados.clientes = r.clientes; }
+  redesenhar(m, true);
+}
+
+/** Pede ao motor (conta Sankhya) para ler a agenda e acompanha até a sincronização terminar. */
+async function rkmSincronizar(m, st) {
+  const ui = st.ui;
+  if (ui.sync.estado === 'esperando') return;
+  const r = await rkmApi('rkmSincronizar');
+  if (!r) return;
+  ui.sync = { estado: 'esperando', pedido: r.syncPedido };
+  redesenhar(m);
+  const inicio = Date.now();
+  while (Date.now() - inicio < 7 * 60000) {
+    await espera(20000);
+    let i;
+    try { i = await api('rkmInicio'); } catch { continue; }
+    if ((i.ultimaSync || '') >= r.syncPedido || (i.syncErro || '').slice(0, 19) >= r.syncPedido) {
+      ui.sync = { estado: '' };
+      if ((i.ultimaSync || '') >= r.syncPedido) toast('Agenda sincronizada'); else toast('A sincronização falhou. Veja o aviso em Pendentes.');
+      ui.mesDados = null;
+      await recarregar(m, true);
+      return;
+    }
+  }
+  ui.sync = { estado: '' }; redesenhar(m);
+  toast('O motor ainda não respondeu. A agenda atualiza sozinha de 2 em 2 horas.');
+}
 
 // ---------------------------------------------------------------- Notificações (push)
 
@@ -2163,7 +2696,7 @@ MODULOS.push({
 function tiposNotificacao() {
   const t = [];
   if (temModulo('ociosidade')) t.push({ id: 'ociosidade', titulo: 'Ociosidade', sub: '1 vez por dia (dias úteis), com o resumo de quem está sem agenda ou com horas livres' });
-  if (temModulo('reembolso')) t.push({ id: 'reembolso', titulo: 'Reembolso KM', sub: 'Todo dia às 18h, se houver agendas a classificar como presencial ou remoto' });
+  if (temModulo('reembolso')) t.push({ id: 'reembolso', titulo: 'Reembolso KM', sub: 'No horário dos Ajustes do Reembolso (padrão 18h), se houver agendas a classificar; no dia 1º, lembrete do relatório' });
   return t;
 }
 const pushSuportado = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;

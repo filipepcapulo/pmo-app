@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.5.0';
+const VERSAO_WEB = '2.5.1';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -974,16 +974,18 @@ function resumoPermissao(u) {
   const partes = [m.length === Object.keys(NOMES_MODULOS).length ? 'Todos os módulos' : m.length ? m.map(x => NOMES_MODULOS[x] || x).join(', ') : 'Nenhum módulo'];
   if (u.agendar) partes.push('agenda');
   if (u.editar) partes.push('edita');
+  if (u.notifOciosidade && m.includes('ociosidade')) partes.push('recebe notif. Ociosidade');
   return partes.join(' · ');
 }
 
 function folhaUsuario(u, aoSalvar) {
   const novo = !u;
   const eu = sessao.usuario.email;
-  const d = u ? { ...u, modulos: [...u.modulos] } : { email: '', nome: '', ativo: true, admin: false, agendar: false, editar: false, modulos: ['agenda'] };
+  const d = u ? { ...u, modulos: [...u.modulos], notifOciosidade: !!u.notifOciosidade } : { email: '', nome: '', ativo: true, admin: false, agendar: false, editar: false, modulos: ['agenda'], notifOciosidade: false };
   const chk = (on, attr, txt, sub = '') => `<button type="button" class="opcao" ${attr}><span class="check ${on ? 'on' : ''}">${on ? IC.ok : ''}</span><span class="n">${txt}${sub ? `<span class="pequeno" style="display:block;white-space:normal">${sub}</span>` : ''}</span></button>`;
   const desenhar = (erro = '', ocupado = false) => {
-    const completo = d.admin && d.agendar && d.editar && d.modulos.length === Object.keys(NOMES_MODULOS).length;
+    const completo = d.admin && d.agendar && d.editar && d.notifOciosidade && d.modulos.length === Object.keys(NOMES_MODULOS).length;
+    const temOci = d.modulos.includes('ociosidade');
     $('#fu').innerHTML = `
       <fieldset class="form-ag" ${ocupado ? 'disabled' : ''}>
       <label for="fu-email">E-mail *</label>
@@ -991,13 +993,15 @@ function folhaUsuario(u, aoSalvar) {
       <label for="fu-nome">Nome</label>
       <input id="fu-nome" class="campo" type="text" value="${esc(d.nome)}" placeholder="Opcional">
       <label>Acesso</label>
-      ${chk(completo, 'data-p="completo"', '<b>Permissão completa</b>', 'Todos os módulos, agendar, editar e administrar permissões')}
+      ${chk(completo, 'data-p="completo"', '<b>Permissão completa</b>', 'Todos os módulos, agendar, editar, notificações e administrar permissões')}
       <label>Módulos que pode ver</label>
       ${Object.entries(NOMES_MODULOS).map(([k, t]) => chk(d.modulos.includes(k), `data-m="${k}"`, t)).join('')}
       <label>Ações</label>
       ${chk(d.agendar, 'data-p="agendar"', 'Agendar no ClickUp', 'Criar agendas pelo app')}
       ${chk(d.editar, 'data-p="editar"', 'Editar agendas no ClickUp')}
       ${chk(d.admin, 'data-p="admin"', 'Administrador', 'Pode cadastrar e-mails e mudar permissões')}
+      <label>Notificações</label>
+      ${chk(temOci && d.notifOciosidade, `data-p="notifOciosidade"${temOci ? '' : ' disabled style="opacity:.55"'}`, 'Receber notificação de Ociosidade', temOci ? 'Aviso 1 vez por dia útil, depois do relatório da manhã' : 'Marque antes o módulo Ociosidade')}
       ${chk(!d.ativo, 'data-p="bloquear"', 'Bloquear acesso', 'Desconecta todos os aparelhos e impede novos códigos')}
       </fieldset>
       ${!novo ? `<div class="acoes" style="margin:12px 0 4px">
@@ -1032,11 +1036,12 @@ function folhaUsuario(u, aoSalvar) {
       if (!b) return;
       const p = b.dataset.p, m = b.dataset.m;
       if (m) d.modulos = d.modulos.includes(m) ? d.modulos.filter(x => x !== m) : [...d.modulos, m];
+      if (!d.modulos.includes('ociosidade')) d.notifOciosidade = false; // sem o módulo, sem a notificação
       if (p === 'completo') {
-        const on = !(d.admin && d.agendar && d.editar && d.modulos.length === Object.keys(NOMES_MODULOS).length);
-        Object.assign(d, { admin: on, agendar: on, editar: on, modulos: on ? Object.keys(NOMES_MODULOS) : ['agenda'] });
+        const on = !(d.admin && d.agendar && d.editar && d.notifOciosidade && d.modulos.length === Object.keys(NOMES_MODULOS).length);
+        Object.assign(d, { admin: on, agendar: on, editar: on, notifOciosidade: on, modulos: on ? Object.keys(NOMES_MODULOS) : ['agenda'] });
       }
-      if (p === 'agendar' || p === 'editar' || p === 'admin') d[p] = !d[p];
+      if (p === 'agendar' || p === 'editar' || p === 'admin' || (p === 'notifOciosidade' && d.modulos.includes('ociosidade'))) d[p] = !d[p];
       if (p === 'bloquear') d.ativo = !d.ativo;
       desenhar();
     };
@@ -2695,7 +2700,7 @@ async function rkmSincronizar(m, st) {
  */
 function tiposNotificacao() {
   const t = [];
-  if (temModulo('ociosidade')) t.push({ id: 'ociosidade', titulo: 'Ociosidade', sub: '1 vez por dia (dias úteis), com o resumo de quem está sem agenda ou com horas livres' });
+  if (temModulo('ociosidade') && sessao.usuario && sessao.usuario.notifOciosidade) t.push({ id: 'ociosidade', titulo: 'Ociosidade', sub: '1 vez por dia (dias úteis), com o resumo de quem está sem agenda ou com horas livres' });
   if (temModulo('reembolso')) t.push({ id: 'reembolso', titulo: 'Reembolso KM', sub: 'No horário dos Ajustes do Reembolso (padrão 18h), se houver agendas a classificar; no dia 1º, lembrete do relatório' });
   return t;
 }
@@ -2737,7 +2742,7 @@ async function cancelarPushAparelho() {
 
 function telaNotificacoes(app) {
   const disponiveis = tiposNotificacao();
-  const ui = { tipos: new Set(guardar.ler('push.tipos') || disponiveis.map(t => t.id)), ativo: !!guardar.ler('push.tipos'), ocupado: '', erro: '', info: '' };
+  const ui = { tipos: new Set((guardar.ler('push.tipos') || disponiveis.map(t => t.id)).filter(id => disponiveis.some(t => t.id === id))), ativo: !!guardar.ler('push.tipos'), ocupado: '', erro: '', info: '' };
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const chk = (on, id, txt, sub) => `<button type="button" class="opcao" data-t="${id}"><span class="check ${on ? 'on' : ''}">${on ? IC.ok : ''}</span><span class="n">${esc(txt)}<span class="pequeno" style="display:block;white-space:normal">${esc(sub)}</span></span></button>`;
   const spin = t => `<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> ${t}`;

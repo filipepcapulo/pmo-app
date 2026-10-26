@@ -379,6 +379,14 @@ table.ag-grade tr.aberta td.fds { background: color-mix(in srgb, var(--superfici
 .sub-kb .btn { flex: none; display: inline-flex; align-items: center; gap: 4px; }
 .caixa-dem { background: var(--superficie-2); border-radius: 12px; padding: 10px 12px; }
 .caixa-dem b { display: block; font-size: 15px; }
+.caixa-dem .nova-pai { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--verde); }
+.dem-sug { margin-top: 6px; max-height: 260px; overflow: auto; border: 1px solid var(--linha); border-radius: 10px; background: var(--superficie); }
+.dem-sug:empty { display: none; }
+.dem-op { display: block; width: 100%; text-align: left; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--linha); background: none; color: inherit; font: inherit; cursor: pointer; }
+.dem-op:hover, .dem-op:focus-visible { background: var(--superficie-2); }
+.dem-op.nova { color: var(--verde); font-weight: 700; }
+.dem-grupo { padding: 8px 12px 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--texto-2); }
+.dem-sug .pequeno { padding: 10px 12px; }
 
 .resultado { border-radius: 14px; padding: 16px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; font-size: 14px; margin-bottom: 8px; }
 .resultado > svg { width: 40px; height: 40px; }

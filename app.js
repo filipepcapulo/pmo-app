@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.7.1';
+const VERSAO_WEB = '2.8.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -1392,10 +1392,22 @@ function agendaPorDia(st) {
     <p class="muted" style="padding:0 16px">Toque no consultor para ver o dia por horário · toque numa agenda para ver os detalhes${pode('agendar') ? ' · toque num horário livre para agendar' : ''}.</p>`;
 }
 
+/** v2.8.0 — período da Grade: semana atual (até domingo), +1 ou +2 semanas. */
+const SEMANAS_GRADE = [[0, 'Semana atual'], [1, '+1 semana'], [2, '+2 semanas']];
+function diasDaGrade(d, semanas) {
+  const h = new Date();
+  h.setDate(h.getDate() + ((7 - h.getDay()) % 7) + 7 * semanas); // domingo da semana escolhida
+  const lim = `${h.getFullYear()}-${pad2(h.getMonth() + 1)}-${pad2(h.getDate())}`;
+  return d.dias.filter(dk => dk <= lim);
+}
+
 function agendaGrade(st) {
-  const d = st.dados, ui = st.ui, hoje = isoHoje();
+  const ui = st.ui, hoje = isoHoje();
+  const d = { ...st.dados, dias: diasDaGrade(st.dados, ui.semanas) };
   const larga = ui.abertosGrade.size > 0;
   return `
+    <div class="chips" style="padding:0 16px 8px;margin-top:4px">${SEMANAS_GRADE.map(([n, t]) =>
+      `<button class="chip${ui.semanas === n ? ' sel' : ''}" data-a="semanas" data-v="${n}">${t}</button>`).join('')}</div>
     <div class="grade-wrap" data-rola="grade">
       <table class="grade ag-grade${larga ? ' larga' : ''}">
         <thead><tr><th class="col-nome" style="text-align:left">Consultor</th>
@@ -1456,12 +1468,13 @@ function folhaAgendaItem(c, dk, it) {
 MODULOS.push({
   id: 'agenda',
   titulo: 'Agenda dos Consultores',
-  descricao: 'Carga de trabalho de hoje até os próximos 10 dias',
+  descricao: 'Carga de trabalho da semana atual e das próximas 2 semanas',
   icone: IC.calendario,
   workflow: 'carga_trabalho.yml',
   arquivo: 'app_carga_trabalho.json',
   etapa: 'Buscando as agendas no ClickUp…',
-  uiInicial: () => ({ aba: 0, dia: null, abertos: new Set(), abertosGrade: new Set(), rolarPara: null, centralizarDia: true }),
+  uiInicial: () => ({ aba: 0, dia: null, abertos: new Set(), abertosGrade: new Set(), rolarPara: null, centralizarDia: true,
+    semanas: [0, 1, 2].includes(+guardar.ler('agenda.semanas')) ? +guardar.ler('agenda.semanas') : 0 }),
   interpretar: interpretarAgenda,
   desenhar(st, { cont, abas, acoes }) {
     const d = st.dados, ui = st.ui, hoje = isoHoje();
@@ -1486,6 +1499,7 @@ MODULOS.push({
     switch (nome) {
       case 'aba': ui.aba = +el.dataset.v; if (ui.aba === 0) ui.centralizarDia = true; window.scrollTo(0, 0); return;
       case 'dia': ui.dia = el.dataset.dk; return;
+      case 'semanas': ui.semanas = +el.dataset.v; guardar.gravar('agenda.semanas', ui.semanas); return;
       case 'consultor': alternar(ui.abertos, el.dataset.id); return;
       case 'item': {
         const c = cons(), it = c && diaDe(c, el.dataset.dk).itens[+el.dataset.i];
@@ -1717,7 +1731,7 @@ function listaDemandas(st) {
   const gerente = d.gerentes.includes(ui.gerente) ? ui.gerente : null;
   const filtrando = !!ui.busca.trim() || ui.soAtrasadas;
   const clientes = filtrarDemandas(d, ui.busca, ui.soAtrasadas, gerente);
-  if (!clientes.length) return `<div class="vazio">${filtrando ? 'Nenhuma demanda encontrada.' : 'Nenhuma demanda em andamento.'}</div>`;
+  if (!clientes.length) return `<div class="vazio">${filtrando ? 'Nenhuma demanda encontrada.' : 'Nenhuma demanda aberta na etapa Planejamento.'}</div>`;
   const grupos = new Map();
   clientes.forEach(c => { if (!grupos.has(c.gerente)) grupos.set(c.gerente, []); grupos.get(c.gerente).push(c); });
   let h = '';
@@ -1749,7 +1763,7 @@ function listaDemandas(st) {
 MODULOS.push({
   id: 'demandas',
   titulo: 'Demandas',
-  descricao: 'Demandas em andamento por gerente, cliente, lista e demanda',
+  descricao: 'Demandas na etapa Planejamento por gerente, cliente, lista e demanda',
   icone: IC.lista,
   workflow: 'demandas.yml',
   arquivo: 'app_demandas.json',

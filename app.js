@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.5.1';
+const VERSAO_WEB = '2.6.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -1824,50 +1824,286 @@ function itemBacklog(d, id) {
   return null;
 }
 
-/** Cada item vai para os consultores com agenda em aberto; sem agenda em aberto -> "A distribuir". */
-function montarColunas(d, busca) {
-  const t = semAcento((busca || '').trim());
-  const ids = new Set(d.colunas.map(c => c.id));
-  const itens = d.grupos.flatMap(g => g.itens)
-    .filter(x => !t || [x.nome, x.pasta, x.lista, x.parceiro, x.status, x.prioridade, x.responsaveis.join(' ')].some(v => semAcento(v).includes(t)))
-    .sort((a, b) => a.prioridadeOrdem - b.prioridadeOrdem || a.criadoMs - b.criadoMs);
-  const por = new Map([[FILA, []], ...d.colunas.map(c => [c.id, []]), [VALIDACAO, []]]);
-  for (const it of itens) {
-    // status "Em Validação": só na última coluna, à direita
-    if (emValidacao(it)) { por.get(VALIDACAO).push({ item: it, proxima: null }); continue; }
-    const abertas = it.subtarefas.filter(a => !a.realizada && !a.planejamento);
-    const destinos = new Set(abertas.flatMap(a => a.consultorIds).filter(c => ids.has(c)));
-    if (!destinos.size) por.get(FILA).push({ item: it, proxima: null });
-    for (const c of destinos) {
-      const prox = abertas.filter(a => a.consultorIds.includes(c)).map(a => a.data).filter(Boolean).sort()[0] || null;
-      por.get(c).push({ item: it, proxima: prox });
-    }
-  }
-  return [{ id: FILA, nome: 'A distribuir', itens: por.get(FILA) }, ...d.colunas.map(c => ({ id: c.id, nome: c.nome, itens: por.get(c.id) })),
-    { id: VALIDACAO, nome: 'Em Validação', itens: por.get(VALIDACAO) }];
+/*
+ * v2.6.0 — a demanda é o entregável; quem executa são as subtarefas (agendas).
+ * Uma demanda aparece na coluna de TODOS os consultores que estão em alguma
+ * subtarefa "ativa" dela. Subtarefa ativa = não é de planejamento e o status
+ * dela está no mesmo critério que coloca a demanda no Kanban (os status das
+ * próprias demandas carregadas + não iniciado / pendente / em andamento /
+ * em validação). Consultores fora da lista de desenvolvimento ganham coluna
+ * própria. Sem nenhuma subtarefa ativa -> "Sem ninguém" (com o motivo).
+ */
+const STATUS_KANBAN_BASE = ['nao iniciado', 'pendente', 'em andamento', 'em validacao'];
+const normStatus = s => semAcento(s).trim();
+
+function criterioStatus(d) {
+  const s = new Set(STATUS_KANBAN_BASE);
+  for (const g of d.grupos) for (const it of g.itens) if (it.status) s.add(normStatus(it.status));
+  return s;
+}
+/** Subtarefa conta como "com o consultor" quando o status dela segue o critério do Kanban. */
+function subAtiva(a, crit) {
+  if (a.planejamento || a.realizada) return false;
+  return !a.status || crit.has(normStatus(a.status));
+}
+/** Pares [chave, nome] dos consultores de uma subtarefa (id do ClickUp; sem id, o nome). */
+function consultoresSub(a, porNome) {
+  const ids = a.consultorIds || [], nomes = a.consultores || [];
+  if (ids.length) return ids.map((id, i) => [id, nomes.length === ids.length ? nomes[i] : '']);
+  return nomes.map(n => [porNome.get(semAcento(n)) || 'n:' + n, n]);
 }
 
-function cartaoKanban(x, colId) {
+function filtrarItensBacklog(d, busca) {
+  const t = semAcento((busca || '').trim());
+  return d.grupos.flatMap(g => g.itens)
+    .filter(x => !t || [x.nome, x.pasta, x.lista, x.parceiro, x.status, x.prioridade, x.responsaveis.join(' '),
+      x.subtarefas.flatMap(a => a.consultores).join(' ')].some(v => semAcento(v).includes(t)))
+    .sort((a, b) => a.prioridadeOrdem - b.prioridadeOrdem || a.criadoMs - b.criadoMs);
+}
+
+/** Quem está com cada demanda: Map(chave -> {nome, subs}) só com subtarefas ativas, mais as encerradas. */
+function analisarDemanda(it, crit, porNome, nomes) {
+  const ativos = new Map();
+  const validas = it.subtarefas.filter(a => !a.planejamento);
+  for (const a of validas) {
+    if (!subAtiva(a, crit)) continue;
+    for (const [k, n] of consultoresSub(a, porNome)) {
+      if (!nomes.has(k) && n) nomes.set(k, n);
+      if (!ativos.has(k)) ativos.set(k, []);
+      ativos.get(k).push(a);
+    }
+  }
+  return { ativos, temAgenda: validas.length > 0 };
+}
+
+function contextoBacklog(d) {
+  const crit = criterioStatus(d);
+  const porNome = new Map(d.colunas.map(c => [semAcento(c.nome), c.id]));
+  const nomes = new Map(d.colunas.map(c => [c.id, c.nome]));
+  return { crit, porNome, nomes };
+}
+
+function montarColunas(d, busca) {
+  const ctx = contextoBacklog(d);
+  const itens = filtrarItensBacklog(d, busca);
+  const por = new Map([[FILA, []], ...d.colunas.map(c => [c.id, []]), [VALIDACAO, []]]);
+  const resumo = { total: 0, comAlguem: 0, semNinguem: 0, multi: 0 };
+  for (const it of itens) {
+    const { ativos, temAgenda } = analisarDemanda(it, ctx.crit, ctx.porNome, ctx.nomes);
+    // status "Em Validação": só na última coluna, à direita
+    if (emValidacao(it)) { por.get(VALIDACAO).push({ item: it, proxima: null, outros: [...ativos.keys()] }); continue; }
+    resumo.total++;
+    if (!ativos.size) {
+      resumo.semNinguem++;
+      por.get(FILA).push({ item: it, proxima: null, outros: [], motivo: temAgenda ? 'Sem agenda ativa — parada' : 'Nenhuma agenda criada' });
+      continue;
+    }
+    resumo.comAlguem++;
+    if (ativos.size > 1) resumo.multi++;
+    for (const [c, subs] of ativos) {
+      if (!por.has(c)) por.set(c, []);
+      const prox = subs.map(a => a.data).filter(Boolean).sort()[0] || null;
+      por.get(c).push({ item: it, proxima: prox, outros: [...ativos.keys()].filter(k => k !== c) });
+    }
+  }
+  // consultores que não estão na lista de desenvolvimento, mas estão em subtarefas ativas
+  const extras = [...por.keys()].filter(k => k !== FILA && k !== VALIDACAO && !d.colunas.some(c => c.id === k))
+    .map(k => ({ id: k, nome: ctx.nomes.get(k) || k.replace(/^n:/, ''), extra: true }))
+    .sort((a, b) => COLACAO.compare(a.nome, b.nome));
+  const cols = [{ id: FILA, nome: 'Sem ninguém', itens: por.get(FILA) },
+    ...[...d.colunas, ...extras].map(c => ({ id: c.id, nome: c.nome, extra: !!c.extra, itens: por.get(c.id) })),
+    { id: VALIDACAO, nome: 'Em Validação', itens: por.get(VALIDACAO) }];
+  cols.resumo = resumo;
+  cols.nomes = ctx.nomes;
+  return cols;
+}
+
+function cartaoKanban(x, colId, nomes) {
   const t = x.item;
   const local = [t.pasta, t.lista].filter(Boolean).join(' / ');
   const meta = [t.criado ? 'Criada ' + dataCurta(t.criado) : '', t.fim ? 'Vence ' + dataCurta(t.fim) + (t.atrasada ? ' · atrasada' : '') : ''].filter(Boolean).join(' · ');
+  const outros = (x.outros || []).map(k => nomes.get(k) || k.replace(/^n:/, ''));
   return `<div class="kb-card" role="button" tabindex="0" data-a="kb-detalhe" data-kb="${esc(t.id)}" data-col="${esc(colId)}">
     ${local ? `<div class="local">${esc(local)}</div>` : ''}
     <div class="kb-nome">${esc(t.nome)}</div>
     <div class="linha-selos" style="flex-wrap:wrap">${selo(t.prioridade || 'Sem prioridade', t.prioridadeCor || '#b5bcc2')}${selo(t.status, t.statusCor)}</div>
+    ${x.motivo ? `<div class="kb-motivo">${IC.alerta}${esc(x.motivo)}</div>` : ''}
+    ${outros.length ? `<div class="kb-outros">${IC.pessoa}${colId === VALIDACAO ? '' : 'Também com '}${esc(outros.join(', '))}</div>` : ''}
     ${x.proxima ? `<div class="pequeno" style="margin-top:4px">Próxima agenda: ${esc(dataCurta(x.proxima))}</div>` : ''}
     ${meta ? `<div class="pequeno${t.atrasada ? ' atraso-txt' : ''}" style="margin-top:2px">${esc(meta)}</div>` : ''}
   </div>`;
 }
 
+function resumoKanban(r) {
+  const n = (t, v, c) => `<div class="num"><b style="color:${c}">${v}</b><span>${t}</span></div>`;
+  return `<div class="secao" style="padding-top:4px;padding-bottom:4px"><div class="numeros">${n('Demandas', r.total, 'var(--texto)')}${n('Com consultor', r.comAlguem, 'var(--verde)')}${n('Sem ninguém', r.semNinguem, r.semNinguem ? 'var(--vermelho)' : 'var(--texto-2)')}${n('2+ consultores', r.multi, 'var(--azul)')}</div></div>`;
+}
+
 function quadroKanban(st) {
   const cols = montarColunas(st.dados, st.ui.busca);
-  return `<div class="kanban" data-rola="kanban">${cols.map(c => `
+  return `${resumoKanban(cols.resumo)}<div class="kanban" data-rola="kanban">${cols.map(c => `
     <div class="kb-col${c.id === FILA ? ' fila' : c.id === VALIDACAO ? ' validacao' : ''}" data-col="${esc(c.id)}">
-      <div class="kb-cab"><b>${esc(c.nome)}</b><span class="contador">${c.itens.length}</span></div>
-      <div class="kb-itens">${c.itens.length ? c.itens.map(x => cartaoKanban(x, c.id)).join('')
-        : `<div class="pequeno kb-vazio">${c.id === FILA ? 'Nada a distribuir' : c.id === VALIDACAO ? 'Nada em validação' : 'Arraste uma tarefa para cá'}</div>`}</div>
+      <div class="kb-cab"><b>${esc(c.nome)}</b>${c.extra ? '<span class="kb-tag">fora do dev</span>' : ''}<span class="contador">${c.itens.length}</span></div>
+      <div class="kb-itens">${c.itens.length ? c.itens.map(x => cartaoKanban(x, c.id, cols.nomes)).join('')
+        : `<div class="pequeno kb-vazio">${c.id === FILA ? 'Toda demanda está com alguém' : c.id === VALIDACAO ? 'Nada em validação' : 'Arraste uma tarefa para cá'}</div>`}</div>
     </div>`).join('')}</div>`;
+}
+
+
+// --- Gantt (aba 3): linhas por tarefa (demanda) ou por consultor
+
+/*
+ * Cada agenda (subtarefa, exceto planejamento) é um bloco de um dia na cor do
+ * consultor; concluída fica esmaecida, fora do critério do Kanban fica hachurada.
+ * A barra fina de fundo é o período da demanda (início/1ª agenda até
+ * vencimento/última agenda). "Por consultor": um grupo por consultor com as
+ * demandas que estão com ele (mesma regra do Kanban) e o grupo "Sem ninguém".
+ * Tocar numa linha ou bloco abre o detalhe da demanda (editar / agendar).
+ */
+const GT_ZOOM = { semana: { dias: 28, w: 40, voltar: 7 }, mes: { dias: 70, w: 20, voltar: 14 }, trimestre: { dias: 130, w: 9, voltar: 21 } };
+const GT_CORES = ['#2f7dd1', '#d9822b', '#1f9d63', '#a24bd1', '#d64545', '#15a3a3', '#b8932a', '#c2569b', '#5468d4', '#6b8e23'];
+const GT_DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const GT_MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+const isoDe = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const somaDias = (iso, n) => { const d = parseDia(iso); d.setDate(d.getDate() + n); return isoDe(d); };
+const difDias = (a, b) => Math.round((parseDia(a) - parseDia(b)) / 864e5);
+
+function gtUi(ui) {
+  if (!ui.gt) ui.gt = { modo: 'tarefa', zoom: 'mes', inicio: '' };
+  if (!ui.gt.inicio) { ui.gt.inicio = somaDias(isoHoje(), -GT_ZOOM[ui.gt.zoom].voltar); ui.gt.rolarHoje = true; }
+  return ui.gt;
+}
+
+/** Fundo da trilha: fins de semana sombreados, repetindo a cada 7 dias a partir do 1º dia da janela. */
+function gtFundo(inicio, w) {
+  const s = parseDia(inicio).getDay(), partes = [];
+  for (let i = 0; i < 7; i++) {
+    const dw = (s + i) % 7, c = dw === 0 || dw === 6 ? 'var(--gt-fds)' : 'transparent';
+    partes.push(`${c} ${i * w}px ${(i + 1) * w}px`);
+  }
+  return `background-image:repeating-linear-gradient(90deg, ${partes.join(', ')});background-size:${7 * w}px 100%;background-position:var(--gt-rot) 0`;
+}
+
+function gtCabecalho(g, dias, w, larg) {
+  const hoje = isoHoje();
+  let meses = '', diasH = '';
+  for (let i = 0; i < dias; i++) {
+    const iso = somaDias(g.inicio, i), d = parseDia(iso);
+    if (i === 0 || d.getDate() === 1) meses += `<span class="gt-mes" style="left:${i * w}px">${GT_MESES[d.getMonth()]}/${String(d.getFullYear()).slice(2)}</span>`;
+    const mostra = w >= 18 || d.getDay() === 1;
+    if (mostra) diasH += `<span class="gt-dia${iso === hoje ? ' hoje' : ''}" style="left:${i * w}px;width:${w >= 18 ? w : w * 7}px">${w >= 36 ? GT_DIAS[d.getDay()] + '<br>' : ''}${d.getDate()}</span>`;
+  }
+  return `<div class="gt-linha gt-cab"><div class="gt-rot"></div><div class="gt-trilha" style="width:${larg}px">${meses}<div class="gt-dias">${diasH}</div></div></div>`;
+}
+
+function gtBlocos(subs, g, dias, w, corDe, ctx, chaveItem, col, soDe) {
+  const crit = ctx.crit;
+  return subs.map(a => {
+    if (!a.data) return '';
+    const x = difDias(a.data, g.inicio);
+    if (x < 0 || x >= dias) return '';
+    const cons = consultoresSub(a, ctx.porNome);
+    const k = soDe || (cons[0] && cons[0][0]) || '';
+    const estado = a.realizada ? ' feita' : !subAtiva(a, crit) ? ' fora' : '';
+    const dica = [dataCurta(a.data), a.consultores.join(', ') || 'Sem consultor', a.periodo, a.horas ? horas(a.horas) : '', a.status].filter(Boolean).join(' · ');
+    return `<i class="gt-bloco${estado}" style="left:${x * w + 1}px;width:${Math.max(3, w - 2)}px;background:${corDe(k)}" title="${esc(dica)}" data-a="kb-detalhe" data-kb="${esc(chaveItem)}" data-col="${esc(col)}"></i>`;
+  }).join('');
+}
+
+/** Barra do período da demanda (ou das agendas de um consultor nela). */
+function gtPeriodo(ini, fim, g, dias, w, c, tracejada) {
+  if (!ini && !fim) return '';
+  ini = ini || fim; fim = fim || ini;
+  if (fim < ini) [ini, fim] = [fim, ini];
+  const a = Math.max(0, difDias(ini, g.inicio)), b = Math.min(dias - 1, difDias(fim, g.inicio));
+  if (b < 0 || a > dias - 1) return '';
+  return `<span class="gt-barra${tracejada ? ' tracejada' : ''}" style="left:${a * w}px;width:${(b - a + 1) * w}px;--c:${c}"></span>`;
+}
+
+function gtLinha(rotulo, trilha, larg, extra = '', alvo = '') {
+  return `<div class="gt-linha${extra}"><div class="gt-rot"${alvo}>${rotulo}</div><div class="gt-trilha" style="width:${larg}px">${trilha}</div></div>`;
+}
+
+function gantt(st) {
+  const d = st.dados, g = gtUi(st.ui), z = GT_ZOOM[g.zoom], dias = z.dias, w = z.w, larg = dias * w;
+  const ctx = contextoBacklog(d);
+  const itens = filtrarItensBacklog(d, st.ui.busca);
+  const analise = new Map(itens.map(it => [it.id, analisarDemanda(it, ctx.crit, ctx.porNome, ctx.nomes)]));
+  // cor por consultor (ordem alfabética, estável)
+  const chaves = new Set();
+  for (const it of itens) for (const a of it.subtarefas) if (!a.planejamento) for (const [k, n] of consultoresSub(a, ctx.porNome)) { chaves.add(k); if (n && !ctx.nomes.has(k)) ctx.nomes.set(k, n); }
+  const nomeDe = k => ctx.nomes.get(k) || String(k).replace(/^n:/, '') || 'Sem consultor';
+  const ordem = [...chaves].sort((a, b) => COLACAO.compare(nomeDe(a), nomeDe(b)));
+  const corDe = k => { const i = ordem.indexOf(k); return i < 0 ? '#87909e' : GT_CORES[i % GT_CORES.length]; };
+  const subsDe = it => it.subtarefas.filter(a => !a.planejamento);
+  const datasDe = subs => subs.map(a => a.data).filter(Boolean).sort();
+  const hojeX = difDias(isoHoje(), g.inicio);
+  const linhaHoje = hojeX >= 0 && hojeX < dias ? `<span class="gt-hoje" style="left:${hojeX * w + w / 2}px"></span>` : '';
+  const fundo = gtFundo(g.inicio, w);
+  const rotDemanda = (it, sub) => `<div class="gt-nome">${esc(it.nome)}</div><div class="gt-sub">${esc(sub)}</div>`;
+
+  let linhas = '';
+  if (!itens.length) return '<div class="vazio">Nenhuma demanda encontrada.</div>';
+
+  if (g.modo === 'tarefa') {
+    for (const it of itens) {
+      const { ativos, temAgenda } = analise.get(it.id);
+      const subs = subsDe(it), ds = datasDe(subs);
+      const quem = ativos.size ? [...ativos.keys()].map(nomeDe).join(', ') : (temAgenda ? 'Sem ninguém · sem agenda ativa' : 'Sem ninguém · sem agenda');
+      const trilha = gtPeriodo(it.inicio || ds[0] || '', it.fim || ds[ds.length - 1] || '', g, dias, w, cor(it.statusCor), !ativos.size)
+        + gtBlocos(subs, g, dias, w, k => corDe(k), ctx, it.id, '', '');
+      linhas += gtLinha(rotDemanda(it, [it.pasta, quem].filter(Boolean).join(' · ')), linhaHoje + trilha, larg,
+        ativos.size ? '' : ' sem-ninguem', ` role="button" data-a="kb-detalhe" data-kb="${esc(it.id)}" data-col=""`);
+    }
+  } else {
+    // grupos por consultor (só quem tem subtarefa ativa) + "Sem ninguém"
+    const grupos = new Map(), semNinguem = [];
+    for (const it of itens) {
+      const { ativos } = analise.get(it.id);
+      if (!ativos.size) { semNinguem.push(it); continue; }
+      for (const k of ativos.keys()) { if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(it); }
+    }
+    const ks = [...grupos.keys()].sort((a, b) => COLACAO.compare(nomeDe(a), nomeDe(b)));
+    const daPessoa = (it, k) => subsDe(it).filter(a => consultoresSub(a, ctx.porNome).some(([c]) => c === k));
+    for (const k of ks) {
+      const its = grupos.get(k), c = corDe(k);
+      const todas = its.flatMap(it => daPessoa(it, k));
+      const carga = todas.filter(a => !a.realizada && a.data && a.data >= isoHoje()).reduce((s, a) => s + (a.horas || 0), 0);
+      linhas += gtLinha(`<div class="gt-nome"><span class="gt-ponto" style="background:${c}"></span>${esc(nomeDe(k))}</div><div class="gt-sub">${its.length} demanda${its.length > 1 ? 's' : ''}${carga ? ' · ' + horas(carga) + ' a fazer' : ''}</div>`,
+        linhaHoje + its.map(it => gtBlocos(daPessoa(it, k), g, dias, w, () => c, ctx, it.id, k, k)).join(''), larg, ' gt-grupo');
+      for (const it of its) {
+        const subs = daPessoa(it, k), ds = datasDe(subs), outros = [...analise.get(it.id).ativos.keys()].filter(x => x !== k).map(nomeDe);
+        linhas += gtLinha(rotDemanda(it, [it.pasta, outros.length ? 'também ' + outros.join(', ') : ''].filter(Boolean).join(' · ')),
+          linhaHoje + gtPeriodo(ds[0] || '', ds[ds.length - 1] || '', g, dias, w, c, false) + gtBlocos(subs, g, dias, w, () => c, ctx, it.id, k, k), larg,
+          ' gt-filho', ` role="button" data-a="kb-detalhe" data-kb="${esc(it.id)}" data-col="${esc(k)}"`);
+      }
+    }
+    if (semNinguem.length) {
+      linhas += gtLinha(`<div class="gt-nome"><span class="gt-ponto" style="background:var(--vermelho)"></span>Sem ninguém</div><div class="gt-sub">${semNinguem.length} demanda${semNinguem.length > 1 ? 's' : ''} sem subtarefa ativa</div>`, linhaHoje, larg, ' gt-grupo sem-ninguem');
+      for (const it of semNinguem) {
+        const subs = subsDe(it), ds = datasDe(subs);
+        linhas += gtLinha(rotDemanda(it, [it.pasta, subs.length ? 'sem agenda ativa' : 'sem agenda', it.fim ? 'vence ' + dataCurta(it.fim) : ''].filter(Boolean).join(' · ')),
+          linhaHoje + gtPeriodo(it.inicio || ds[0] || '', it.fim || ds[ds.length - 1] || '', g, dias, w, cor(it.statusCor), true) + gtBlocos(subs, g, dias, w, k => corDe(k), ctx, it.id, '', ''),
+          larg, ' gt-filho', ` role="button" data-a="kb-detalhe" data-kb="${esc(it.id)}" data-col=""`);
+      }
+    }
+  }
+  const legenda = g.modo === 'tarefa' && ordem.length
+    ? `<div class="gt-legenda">${ordem.map(k => `<span><i style="background:${corDe(k)}"></i>${esc(nomeDe(k))}</span>`).join('')}</div>` : '';
+  return `${legenda}<div class="gantt" data-rola="gantt"><div class="gt-corpo" style="${fundo}">
+    ${gtCabecalho(g, dias, w, larg)}${linhas}</div></div>
+    <div class="pequeno gt-nota">Bloco = agenda (subtarefa). Esmaecido = concluída · hachurado = status fora do critério do Kanban. Barra fina = período da demanda; tracejada = sem ninguém.</div>`;
+}
+
+function controlesGantt(ui) {
+  const g = gtUi(ui);
+  const b = (a, v, t, sel) => `<button class="chip${sel ? ' sel' : ''}" data-a="${a}" data-v="${v}">${t}</button>`;
+  const fim = somaDias(g.inicio, GT_ZOOM[g.zoom].dias - 1);
+  return `<div class="chips" style="flex-wrap:wrap">${b('gt-modo', 'tarefa', 'Por tarefa', g.modo === 'tarefa')}${b('gt-modo', 'consultor', 'Por consultor', g.modo === 'consultor')}</div>
+    <div class="chips" style="flex-wrap:wrap">${b('gt-zoom', 'semana', 'Semanas', g.zoom === 'semana')}${b('gt-zoom', 'mes', 'Meses', g.zoom === 'mes')}${b('gt-zoom', 'trimestre', 'Trimestre', g.zoom === 'trimestre')}</div>
+    <div class="chips">${b('gt-nav', '-1', '‹', false)}${b('gt-nav', '0', 'Hoje', false)}${b('gt-nav', '1', '›', false)}
+      <span class="pequeno" style="align-self:center">${esc(dataCurta(g.inicio))} a ${esc(dataCurta(fim))}</span></div>`;
 }
 
 /**
@@ -2010,7 +2246,7 @@ function kbSoltar() {
   const m = moduloAtual;
   if (!m || m.id !== 'backlogdev') return;
   const t = itemBacklog(estadoDe(m).dados, itemId);
-  if (t) abrirFormAgenda(pedidoBacklog(t, destino));
+  if (t) abrirFormAgenda(pedidoBacklog(t, destino.startsWith('n:') ? '' : destino));
 }
 document.addEventListener('pointerdown', ev => {
   const card = ev.target.closest('.kb-card');
@@ -2038,7 +2274,7 @@ document.addEventListener('contextmenu', ev => { if (ev.target.closest('.kb-card
 const baseBacklogDev = moduloTarefas({
   id: 'backlogdev',
   titulo: 'Backlog Desenvolvimento',
-  descricao: 'Personalizações pendentes e em andamento, com Kanban por consultor',
+  descricao: 'Personalizações pendentes e em andamento, com Kanban e Gantt por consultor',
   icone: IC.kanban,
   arquivo: 'app_backlog_dev.json', // só a chave do cache no aparelho (os dados vêm ao vivo)
   textoVazio: 'Nenhuma personalização pendente ou em andamento.',
@@ -2057,15 +2293,32 @@ MODULOS.push({
     const { cont, abas, inteiro } = ctx;
     const ui = st.ui;
     if (ui.aba === 0) baseBacklogDev.desenhar(st, ctx);
-    const nav = `<nav class="abas"><button class="${ui.aba === 0 ? 'ativa' : ''}" data-a="aba" data-v="0">Lista</button><button class="${ui.aba === 1 ? 'ativa' : ''}" data-a="aba" data-v="1">Kanban</button></nav>`;
+    const nav = `<nav class="abas">${['Lista', 'Kanban', 'Gantt'].map((t, i) => `<button class="${ui.aba === i ? 'ativa' : ''}" data-a="aba" data-v="${i}">${t}</button>`).join('')}</nav>`;
     abas.innerHTML = ui.aba === 1 ? `<div class="abas-kb">${nav}<div class="kb-rolagem" id="kb-rol" hidden><i></i></div></div>` : nav;
     if (ui.aba === 0) return;
     ctx.acoes.innerHTML = '';
+    if (ui.aba === 2) {
+      const topoGt = `<div class="secao">
+          ${campoBusca(ui.busca, 'Buscar cliente, tarefa, status ou consultor')}
+          ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
+          ${controlesGantt(ui)}
+        </div>`;
+      const focadoGt = document.activeElement && document.activeElement.id === 'busca';
+      if (inteiro || !focadoGt || !$('#quadro-gt')) {
+        trocarHTML(cont, topoGt + '<div id="quadro-gt"></div>');
+        ligarBusca(st, () => { trocarHTML($('#quadro-gt'), gantt(st)); });
+      }
+      trocarHTML($('#quadro-gt'), gantt(st));
+      // ao abrir / trocar a escala / voltar para hoje: rola até a linha de hoje
+      const gq = $('.gantt'), gh = gq && gq.querySelector('.gt-hoje');
+      if (ui.gt && ui.gt.rolarHoje && gh) { gq.scrollLeft = Math.max(0, gh.offsetLeft - 3 * GT_ZOOM[ui.gt.zoom].w); ui.gt.rolarHoje = false; }
+      return;
+    }
     const topo = `<div class="secao">
         ${campoBusca(ui.busca, 'Buscar cliente, tarefa, status ou pessoa')}
         ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
         <div class="pequeno" style="margin-top:8px">${pode('agendar')
-          ? 'Arraste um cartão até a coluna do consultor para criar a agenda (no celular, segure o cartão antes de arrastar). Toque no cartão para ver os detalhes e editar as agendas já lançadas.'
+          ? 'Cada demanda aparece em todos os consultores com subtarefa ativa; sem nenhuma, fica em "Sem ninguém". Arraste um cartão até a coluna do consultor para criar a agenda (no celular, segure o cartão antes de arrastar). Toque no cartão para ver os detalhes e editar as agendas.'
           : 'Toque no cartão para ver os detalhes.'}</div>
       </div>`;
     const focado = document.activeElement && document.activeElement.id === 'busca';
@@ -2085,7 +2338,14 @@ MODULOS.push({
       if (t) folhaBacklog(t, st.dados.colunas, el.dataset.col);
       return false;
     }
-    if (nome === 'limpar-busca' && ui.aba === 1) { ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); redesenhar(this, true); return false; }
+    if (nome === 'gt-modo' || nome === 'gt-zoom' || nome === 'gt-nav') {
+      const g = gtUi(ui);
+      if (nome === 'gt-modo') { g.modo = el.dataset.v; g.rolarHoje = true; }
+      if (nome === 'gt-zoom') { g.zoom = el.dataset.v; g.inicio = ''; }
+      if (nome === 'gt-nav') g.inicio = +el.dataset.v === 0 ? '' : somaDias(g.inicio, +el.dataset.v * Math.round(GT_ZOOM[g.zoom].dias / 2));
+      redesenhar(this, true); return false;
+    }
+    if (nome === 'limpar-busca' && ui.aba >= 1) { ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); redesenhar(this, true); return false; }
     return baseBacklogDev.acao(nome, el, st, ev);
   },
 });

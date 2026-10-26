@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.6.3';
+const VERSAO_WEB = '2.7.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -607,6 +607,22 @@ function horasPeriodo(p) {
   return Math.max(0, Math.min(8, h));
 }
 
+/** Horário livre tocado → opção do campo Período: a exata ou a maior que cabe dentro dele. */
+function periodoDisponivel(p, ops) {
+  const lista = [...new Set([...PERIODOS_RAPIDOS.map(x => x[0]), ...((ops && ops.periodos) || [])])];
+  if (lista.includes(p)) return p;
+  const m = /(\d{1,2})h(\d{2})?\s*-\s*(\d{1,2})h(\d{2})?/;
+  const fx = q => { const r = m.exec(q || ''); return r ? [+r[1] + (+r[2] || 0) / 60, +r[3] + (+r[4] || 0) / 60] : null; };
+  const alvo = fx(p);
+  if (!alvo) return '';
+  let melhor = '', dur = 0;
+  for (const q of lista) {
+    const f = fx(q);
+    if (f && f[0] >= alvo[0] - 1e-9 && f[1] <= alvo[1] + 1e-9 && f[1] - f[0] > dur) { melhor = q; dur = f[1] - f[0]; }
+  }
+  return melhor;
+}
+
 function registrarHistorico(item) {
   const h = guardar.ler('historico') || [];
   h.unshift(item);
@@ -618,9 +634,11 @@ function registrarHistorico(item) {
  * Backlog Desenvolvimento: paiFixo (não troca a demanda: a agenda vira subtarefa do item),
  * exigirData (começa sem data: o usuário informa a data de vencimento) e etapaPai
  * (a agenda herda a Etapa da tarefa-pai, Personalização / Customização).
+ * Agenda dos Consultores: { copiaDe: id } abre "Alocar mais" (nova agenda com os dados da
+ * existente, para escolher outras datas/horários) e { periodo } já marca o horário livre tocado.
  */
 async function abrirFormAgenda(inicial = {}) {
-  const editando = !!inicial.id;
+  const editando = !!inicial.id, copia = !editando && !!inicial.copiaDe;
   if (!pode(editando ? 'editar' : 'agendar')) { toast('Seu acesso não permite ' + (editando ? 'editar' : 'agendar') + '.'); return; }
   const f = {
     op: uuid(), estado: 'carregando', erro: '', resultado: null,
@@ -628,13 +646,13 @@ async function abrirFormAgenda(inicial = {}) {
     pastaId: '', demandas: null, carregandoDemandas: false,
     paiFixo: !!inicial.paiFixo, exigirData: !!inicial.exigirData, etapaPai: !!inicial.etapaPai,
     titulo: '', consultorId: inicial.consultorId || '',
-    datas: inicial.exigirData ? [] : [inicial.data && inicial.data >= isoHoje() ? inicial.data : isoHoje()],
-    periodo: '08h-12h', agenda: 'Remoto', apontamento: 'OS Experience', parceiroId: '', detalhamento: '', status: '',
+    datas: inicial.exigirData || copia ? [] : [inicial.data && inicial.data >= isoHoje() ? inicial.data : isoHoje()],
+    copia, periodo: '08h-12h', agenda: 'Remoto', apontamento: 'OS Experience', parceiroId: '', detalhamento: '', status: '',
     // período próprio por dia (vazio = usa o período geral) e id de operação por período (não duplica ao repetir)
     periodosDia: {}, opsPeriodo: {},
   };
   let ops = null;
-  abrirFolha('<h3>' + (editando ? 'Editar agenda' : 'Agendar') + '</h3><div class="corpo" id="fa"></div><div class="rodape-f" id="fa-rod"></div>', raiz => {
+  abrirFolha('<h3>' + (editando ? 'Editar agenda' : copia ? 'Alocar mais agendas' : 'Agendar') + '</h3><div class="corpo" id="fa"></div><div class="rodape-f" id="fa-rod"></div>', raiz => {
     raiz.classList.add('alta');
   });
   const folha = $('#folha .folha');
@@ -716,8 +734,9 @@ async function abrirFormAgenda(inicial = {}) {
     },
     voltar() { f.estado = 'editando'; f.resultado = null; desenhar(); },
     novo() {
-      f.op = uuid(); f.opsPeriodo = {}; f.estado = 'editando'; f.resultado = null; f.titulo = ''; f.detalhamento = '';
-      if (f.exigirData) { f.datas = []; f.periodosDia = {}; }
+      f.op = uuid(); f.opsPeriodo = {}; f.estado = 'editando'; f.resultado = null;
+      if (!f.copia) { f.titulo = ''; f.detalhamento = ''; }
+      if (f.exigirData || f.copia) { f.datas = []; f.periodosDia = {}; }
       desenhar();
     },
   };
@@ -734,9 +753,24 @@ async function abrirFormAgenda(inicial = {}) {
       });
       if (t.consultores.length > 1) f.aviso = 'Esta agenda tem mais de um consultor no ClickUp (' + t.consultores.map(c => c.nome).join(', ') + '). Ao salvar, fica só o escolhido.';
       if (t.consultorId && !ops.consultores.some(c => c.id === t.consultorId)) ops = { ...ops, consultores: [...ops.consultores, ...t.consultores.filter(c => c.id === t.consultorId)] };
+    } else if (copia) {
+      const t = (await api('agendaTarefa', { id: inicial.copiaDe })).tarefa;
+      Object.assign(f, {
+        titulo: t.titulo || '', consultorId: inicial.consultorId || t.consultorId || '', periodo: t.periodo || '',
+        agenda: t.agenda || 'Remoto', apontamento: t.apontamento || 'OS Experience', parceiroId: t.parceiroId || '',
+        detalhamento: t.detalhamento || '', paiId: (t.pai && t.pai.id) || t.paiId || inicial.paiId || '',
+        paiNome: (t.pai && t.pai.nome) || '', paiLocal: [t.pasta?.nome, t.lista].filter(Boolean).join(' › '),
+      });
+      f.paiFixo = !!f.paiId;
+      if (!f.paiId) { f.paiNome = ''; f.paiLocal = ''; } else if (!f.paiNome) f.paiNome = 'Mesma demanda da agenda original';
+      f.aviso = `Nova agenda com os dados de “${t.titulo || inicial.copiaNome || 'agenda'}”. Escolha as novas datas e horários (dá para trocar o consultor).`
+        + (f.paiId ? '' : ' Não identifiquei a demanda-pai: escolha o cliente e a demanda abaixo.');
+      if (f.consultorId && !ops.consultores.some(c => c.id === f.consultorId)) ops = { ...ops, consultores: [...ops.consultores, ...(t.consultores || []).filter(c => c.id === f.consultorId)] };
     } else {
       f.parceiroId = parceiroPorNome(ops, inicial.parceiro, inicial.cliente);
+      if (inicial.periodo) f.periodo = periodoDisponivel(inicial.periodo, ops);
     }
+    if (f.periodo && !PERIODOS_RAPIDOS.some(p => p[0] === f.periodo)) f.outroPeriodo = true;
     f.estado = 'editando';
   } catch (e) {
     f.estado = 'falhaCarga'; f.erro = mensagemAmigavel(e);
@@ -757,7 +791,7 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
   } else if (f.estado === 'resultado') {
     corpo.innerHTML = resultadoAgendaHTML(f.resultado, editando);
     rod.innerHTML = f.resultado.situacao === 'ok' || f.resultado.situacao === 'parcial'
-      ? `<button class="btn contorno" data-x="fechar">Fechar</button>${editando ? '' : '<button class="btn primario" data-x="novo">Agendar outro</button>'}`
+      ? `<button class="btn contorno" data-x="fechar">Fechar</button>${editando ? '' : `<button class="btn primario" data-x="novo">${f.copia ? 'Alocar outras datas' : 'Agendar outro'}</button>`}`
       : `<button class="btn contorno" data-x="voltar">Voltar ao formulário</button><button class="btn primario" data-x="salvar">Tentar de novo</button>`;
   } else {
     const salvando = f.estado === 'salvando';
@@ -786,7 +820,7 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
         <input id="fa-titulo" class="campo" type="text" value="${esc(f.titulo)}" placeholder="O que será feito" autocomplete="off">
         <label for="fa-cons">Consultor *</label>
         <select id="fa-cons" class="campo">${opt('', 'Escolha…', !f.consultorId)}${ops.consultores.map(c => opt(c.id, c.nome, c.id === f.consultorId)).join('')}</select>
-        <label>${editando ? 'Data *' : f.exigirData ? 'Data(s) de vencimento * — uma agenda por dia' : 'Data(s) * — uma agenda por dia'}</label>
+        <label>${editando ? 'Data *' : f.exigirData ? 'Data(s) de vencimento * — uma agenda por dia' : f.copia ? 'Novas datas * — uma agenda por dia' : 'Data(s) * — uma agenda por dia'}</label>
         ${editando ? `<input id="fa-data" class="campo" type="date" value="${esc(f.datas[0] || '')}">` : `
         <div class="linha-datas">
           <input id="fa-data" class="campo" type="date" value="" aria-label="${f.datas.length ? 'Adicionar data' : 'Escolher data'}" ${f.datas.length >= 15 ? 'disabled' : ''}>
@@ -797,7 +831,7 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
         <label>${multi ? 'Período * — vale para todos os dias' : 'Período *'}</label>
         <div class="chips seg">${PERIODOS_RAPIDOS.map(([v, t]) => `<button type="button" class="chip${f.periodo === v ? ' sel' : ''}" data-x="periodo" data-v="${v}">${t}<small>${v}</small></button>`).join('')}
           <button type="button" class="chip${periodoOutro || f.outroPeriodo ? ' sel' : ''}" data-x="periodo-outro">Outro</button></div>
-        ${periodoOutro || f.outroPeriodo ? `<select id="fa-per" class="campo" style="margin-top:8px">${opt('', 'Escolha o horário…', !f.periodo)}${ops.periodos.map(p => opt(p, `${p} (${horas(horasPeriodo(p))})`, p === f.periodo)).join('')}</select>` : ''}
+        ${periodoOutro || f.outroPeriodo ? `<select id="fa-per" class="campo" style="margin-top:8px">${opt('', 'Escolha o horário…', !f.periodo)}${[...new Set([...(f.periodo && !ops.periodos.includes(f.periodo) ? [f.periodo] : []), ...ops.periodos])].map(p => opt(p, `${p} (${horas(horasPeriodo(p))})`, p === f.periodo)).join('')}</select>` : ''}
         ${multi ? `<label>Período por dia</label>
         <div class="pequeno" style="margin-top:-2px">Troque o horário de um dia específico, se precisar.</div>
         <div class="dias-per">${[...f.datas].sort().map(d => {
@@ -1145,19 +1179,6 @@ function botaoEditar(url, classe = 'btn contorno pq') {
   return url && pode('editar') ? `<button class="${classe}" data-a="editar" data-id="${esc(idTarefa(url))}">${IC.lapis.replace('<svg', '<svg width="15" height="15"')} Editar</button>` : '';
 }
 
-function cardItem(item, chave, aberto, compacto = false) {
-  const meta = [item.periodo, item.agenda].filter(Boolean).join(' · ');
-  return `<div role="button" tabindex="0" class="card-item${compacto ? ' compacto' : ''}" style="background:${corTurno(item.turno)}" data-a="card" data-k="${esc(chave)}">
-    <div class="cli"><span>${esc(item.cliente)}</span><span>${horas(item.horas)}</span></div>
-    <div class="tar">${esc(item.tarefa)}</div>
-    ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}
-    ${aberto
-      ? (item.detalhamento ? `<div class="det">${esc(item.detalhamento)}</div>` : '') +
-        `<div class="acoes-card">${item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a>` : ''}${botaoEditar(item.url, 'btn-card')}</div>`
-      : (item.detalhamento && !compacto ? '<div class="dica-det">Toque para ver o detalhamento</div>' : '')}
-  </div>`;
-}
-
 function ordemPeriodo(p) { const m = /(\d{1,2})h/.exec(p || ''); return m ? +m[1] : 99; }
 function dataTitulo(dk) {
   const d = parseDia(dk);
@@ -1244,11 +1265,117 @@ function folhaEscolherConsultor(dados) {
   });
 }
 
+/* ---- v2.7.0: Agenda no padrão visual dos demais módulos ----
+ * Por dia: um cartão por consultor (como na Ociosidade); o drilldown abre a linha do
+ * tempo do dia, ordenada pelo horário de execução, com os horários livres clicáveis.
+ * Grade: "Gantt" por consultor (mini-faixa 08h–17h em cada dia); o drilldown mostra as
+ * agendas de cada dia por horário. Tocar numa agenda abre o popup com Editar e
+ * Alocar mais (duplica a agenda para outras datas/horários); tocar num horário
+ * vazio abre o formulário já com o consultor, o dia e o período.
+ */
+const TURNO_COR = { manha: '#d29c0b', tarde: '#3b7dd8', dia: '#8e5cc4', noite: '#55606e' };
+const JANELAS_TRABALHO = [[8, 12], [13, 17]];
+const INICIO_DIA = 8, FIM_DIA = 17;
+
+/** "08h-12h", "08h30 - 12h" → [8, 12] / [8.5, 12] (horas decimais) ou null. */
+function faixaPeriodo(p) {
+  const m = /(\d{1,2})h(\d{2})?\s*-\s*(\d{1,2})h(\d{2})?/.exec(p || '');
+  if (!m) return null;
+  const a = +m[1] + (+m[2] || 0) / 60, b = +m[3] + (+m[4] || 0) / 60;
+  return b > a ? [a, b] : null;
+}
+const horaTxt = h => { const i = Math.floor(h), m = Math.round((h - i) * 60); return pad2(i) + 'h' + (m ? pad2(m) : ''); };
+const periodoDeFaixa = (a, b) => `${horaTxt(a)}-${horaTxt(b)}`;
+
+/** Horários livres do dia (≥ 1h) dentro de 08h–12h e 13h–17h, descontando os períodos ocupados. */
+function vagosDoDia(dc, dk) {
+  if (fimDeSemana(dk) || dc.horas >= 8) return [];
+  const ocup = dc.itens.map(i => faixaPeriodo(i.periodo)).filter(Boolean);
+  const livres = [];
+  for (const [ja, jb] of JANELAS_TRABALHO) {
+    let segs = [[ja, jb]];
+    for (const [x, y] of ocup) segs = segs.flatMap(([s, e]) => (y <= s || x >= e) ? [[s, e]] : [[s, Math.max(s, x)], [Math.min(e, y), e]]);
+    livres.push(...segs.filter(([s, e]) => e - s >= 1 - 1e-9));
+  }
+  return livres;
+}
+
+/** Itens do dia + horários livres, na ordem de execução (sem horário vai para o fim). */
+function linhasDoDia(c, dk) {
+  const dc = diaDe(c, dk);
+  const linhas = dc.itens.map((it, i) => { const f = faixaPeriodo(it.periodo); return { tipo: 'item', it, i, a: f ? f[0] : 99, b: f ? f[1] : 99 }; });
+  if (pode('agendar')) vagosDoDia(dc, dk).forEach(([a, b]) => linhas.push({ tipo: 'livre', a, b }));
+  return linhas.sort((x, y) => x.a - y.a || x.b - y.b || (x.tipo === 'livre') - (y.tipo === 'livre'));
+}
+
+/** Situação do consultor no dia, nas cores da Ociosidade. */
+function cargaDia(h) {
+  if (h <= 0) return { c: COR_SEM, t: 'Sem agenda · 8h livres' };
+  if (h < 8) return { c: COR_PARCIAL, t: `${horas(h)} alocadas · ${horas(8 - h)} livres` };
+  if (h === 8) return { c: COR_COMPLETO, t: `${horas(h)} alocadas` };
+  return { c: 'var(--azul)', t: `${horas(h)} alocadas · ${horas(h - 8)} acima` };
+}
+
+function linhaTempo(c, dk, compacto = false) {
+  const linhas = linhasDoDia(c, dk);
+  if (!linhas.length) return `<div class="pequeno" style="padding:6px 0">${fimDeSemana(dk) ? 'Fim de semana' : 'Sem agenda'}</div>`;
+  const hora = l => l.a === 99 ? '<span class="tl-sem">sem<br>horário</span>' : `${horaTxt(l.a)}<span>${horaTxt(l.b)}</span>`;
+  const horaInline = l => l.a === 99 ? 'Sem horário' : `${horaTxt(l.a)} – ${horaTxt(l.b)}`;
+  return `<div class="tl${compacto ? ' compacto' : ''}">${linhas.map(l => {
+    if (l.tipo === 'livre') {
+      const p = periodoDeFaixa(l.a, l.b);
+      return `<div class="tl-linha">${compacto ? '' : `<div class="tl-hora">${hora(l)}</div>`}
+        <button class="tl-livre" data-a="vago" data-id="${esc(c.id)}" data-dk="${dk}" data-p="${p}">${IC.mais.replace('<svg', '<svg width="15" height="15"')}
+          <span>${compacto ? esc(horaInline(l)) : `Livre · ${horas(l.b - l.a)}`}</span></button></div>`;
+    }
+    const it = l.it;
+    return `<div class="tl-linha">${compacto ? '' : `<div class="tl-hora">${hora(l)}</div>`}
+      <button class="tl-item" style="--t:${TURNO_COR[it.turno] || '#87909e'}" data-a="item" data-id="${esc(c.id)}" data-dk="${dk}" data-i="${l.i}">
+        ${compacto ? `<div class="tl-hc">${esc(horaInline(l))}</div>` : ''}
+        <div class="cli"><span>${esc(it.cliente)}</span><b>${horas(it.horas)}</b></div>
+        <div class="tar">${esc(it.tarefa)}</div>
+        ${!compacto && (it.agenda || it.detalhamento) ? `<div class="meta">${esc([it.agenda, it.detalhamento ? 'Com detalhamento' : ''].filter(Boolean).join(' · '))}</div>` : ''}
+      </button></div>`;
+  }).join('')}</div>`;
+}
+
+/** Mini-faixa 08h–17h do dia, com os períodos ocupados (Grade). */
+function miniFaixa(dc) {
+  const tot = FIM_DIA - INICIO_DIA;
+  const segs = dc.itens.map(it => { const f = faixaPeriodo(it.periodo); return f && { f, cor: TURNO_COR[it.turno] || '#87909e' }; }).filter(Boolean)
+    .map(({ f, cor }) => {
+      const a = Math.max(INICIO_DIA, f[0]), b = Math.min(FIM_DIA, f[1]);
+      return b > a ? `<i style="left:${(a - INICIO_DIA) / tot * 100}%;width:${(b - a) / tot * 100}%;background:${cor}"></i>` : '';
+    }).join('');
+  const semHora = dc.itens.some(it => !faixaPeriodo(it.periodo));
+  return `<span class="mini-faixa${semHora && !segs ? ' sem-hora' : ''}"><i class="almoco"></i>${segs}</span>`;
+}
+
+function cartaoAgenda(c, dk, aberto) {
+  const dc = diaDe(c, dk), k = cargaDia(dc.horas);
+  const clientes = [...new Set(dc.itens.map(i => i.cliente))].join(', ');
+  const pct = Math.max(0, Math.min(100, dc.horas / 8 * 100));
+  return `<div class="cartao ag-cartao">
+    <button class="topo${aberto ? ' aberto' : ''}" data-a="consultor" data-id="${esc(c.id)}" style="align-items:center">
+      ${avatar(c, 34)}
+      <span style="flex:1;min-width:0"><b class="uma-linha" style="display:block;font-weight:600">${esc(c.nome)}</b>
+        <span style="font-size:12px;font-weight:600;color:${k.c}">${k.t}</span></span>
+      ${IC.baixo}
+    </button>
+    <div class="prog" style="background:${mistura(k.c, 15)}"><i style="width:${pct}%;background:${k.c}"></i></div>
+    ${!aberto && clientes ? `<div class="pequeno uma-linha" style="margin-top:8px">${esc(clientes)}</div>` : ''}
+    ${aberto ? `<div style="margin-top:6px">${linhaTempo(c, dk)}
+      <div class="acoes"><button class="btn contorno pq" data-a="exportar" data-id="${esc(c.id)}">${IC.compartilhar.replace('<svg', '<svg width="15" height="15"')} Enviar agenda</button>
+        ${pode('agendar') ? `<button class="btn contorno pq" data-a="agendar" data-id="${esc(c.id)}">${IC.mais.replace('<svg', '<svg width="15" height="15"')} Agendar</button>` : ''}</div>
+    </div>` : ''}
+  </div>`;
+}
+
 function agendaPorDia(st) {
-  const d = st.dados, ui = st.ui, hoje = isoHoje();
-  const dia = ui.dia;
+  const d = st.dados, ui = st.ui, hoje = isoHoje(), dia = ui.dia;
   const total = d.consultores.reduce((s, c) => s + diaDe(c, dia).horas, 0);
-  const sem = d.consultores.filter(c => diaDe(c, dia).horas === 0).length;
+  const cont = f => d.consultores.filter(c => f(diaDe(c, dia).horas)).length;
+  const resumo = (t, n, c) => `<div class="resumo-o" style="background:${mistura(c, 10)};color:${c}"><b>${n}</b><span>${t}</span></div>`;
   return `
     <div class="dias" data-rola="dias">
       ${d.dias.map(dk => `<button class="chip-dia${dk === dia ? ' sel' : ''}${dk === hoje ? ' hoje' : ''}${fimDeSemana(dk) ? ' fds' : ''}" data-a="dia" data-dk="${dk}">
@@ -1256,30 +1383,13 @@ function agendaPorDia(st) {
     </div>
     <div class="secao" style="padding-top:0">
       <h2 class="dia-titulo">${esc(diaExtenso(dia))}</h2>
-      <div class="muted">${horas(total)} alocadas · ${sem} sem agenda</div>
+      <div class="muted">${horas(total)} alocadas na equipe</div>
+      <div class="numeros" style="margin-top:10px">${resumo('Sem agenda', cont(h => h <= 0), COR_SEM)}${resumo('Com horas livres', cont(h => h > 0 && h < 8), COR_PARCIAL)}${resumo('Completos', cont(h => h >= 8), COR_COMPLETO)}</div>
       ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
     </div>
     <div class="divisor"></div>
-    ${d.consultores.map(c => {
-      const dc = diaDe(c, dia);
-      const tem = dc.itens.length > 0;
-      const aberto = tem && ui.abertos.has(c.id);
-      const clientes = [...new Set(dc.itens.map(i => i.cliente))].join(', ');
-      return `<div>
-        <button class="linha-c${aberto ? ' aberto' : ''}" data-a="consultor" data-id="${esc(c.id)}" ${tem ? '' : 'disabled'}>
-          ${avatar(c)}
-          <span class="nome"><b>${esc(c.nome)}</b><span>${tem ? esc(clientes) : 'Sem agenda'}</span></span>
-          ${seloHoras(dc.horas, 'min-width:56px')}
-          ${tem ? IC.baixo : '<span style="width:22px"></span>'}
-        </button>
-        ${aberto ? `<div class="itens-c">
-          ${dc.itens.map((it, i) => { const k = `${c.id}|${dia}|${i}`; return cardItem(it, k, ui.cards.has(k)); }).join('')}
-          <button class="btn texto" data-a="exportar" data-id="${esc(c.id)}">${IC.compartilhar.replace('<svg', '<svg width="16" height="16"')} Enviar agenda</button>
-          ${pode('agendar') ? `<button class="btn texto" data-a="agendar" data-id="${esc(c.id)}">${IC.mais.replace('<svg', '<svg width="16" height="16"')} Agendar</button>` : ''}
-        </div>` : ''}
-        <div class="divisor" style="opacity:.6"></div>
-      </div>`;
-    }).join('')}`;
+    <div style="padding:6px 0 8px">${d.consultores.map(c => cartaoAgenda(c, dia, ui.abertos.has(c.id))).join('')}</div>
+    <p class="muted" style="padding:0 16px">Toque no consultor para ver o dia por horário · toque numa agenda para ver os detalhes${pode('agendar') ? ' · toque num horário livre para agendar' : ''}.</p>`;
 }
 
 function agendaGrade(st) {
@@ -1287,29 +1397,60 @@ function agendaGrade(st) {
   const larga = ui.abertosGrade.size > 0;
   return `
     <div class="grade-wrap" data-rola="grade">
-      <table class="grade${larga ? ' larga' : ''}">
+      <table class="grade ag-grade${larga ? ' larga' : ''}">
         <thead><tr><th class="col-nome" style="text-align:left">Consultor</th>
           ${d.dias.map(dk => `<th class="dia${dk === hoje ? ' hoje' : ''}${fimDeSemana(dk) ? ' fds' : ''}" data-dk="${dk}"><span>${letraDia(dk)} ${numeroDia(dk)}</span></th>`).join('')}
         </tr></thead>
         <tbody>
         ${d.consultores.map(c => {
           const aberto = ui.abertosGrade.has(c.id);
-          return `<tr>
-              <td class="col-nome"><button class="nome-grade${aberto ? ' aberto' : ''}" data-a="grade" data-id="${esc(c.id)}">${avatar(c, 26)}<b>${esc(c.nome)}</b>${IC.baixo}</button></td>
-              ${d.dias.map(dk => `<td class="cel"><button style="width:100%" data-a="grade" data-id="${esc(c.id)}" data-dk="${dk}">${seloHoras(diaDe(c, dk).horas, 'display:block')}</button></td>`).join('')}
-            </tr>
-            ${aberto ? `<tr class="expandida">
-              <td class="col-nome"><button class="btn texto" style="font-size:13px" data-a="exportar" data-id="${esc(c.id)}">Enviar agenda</button></td>
-              ${d.dias.map(dk => `<td class="cel">${diaDe(c, dk).itens.map((it, i) => { const k = `g|${c.id}|${dk}|${i}`; return cardItem(it, k, ui.cards.has(k), true); }).join('')}</td>`).join('')}
-            </tr>` : ''}`;
+          const tot = d.dias.filter(dk => dk >= hoje).reduce((s, dk) => s + diaDe(c, dk).horas, 0);
+          return `<tr class="${aberto ? 'aberta' : ''}">
+              <td class="col-nome"><button class="nome-grade${aberto ? ' aberto' : ''}" data-a="grade" data-id="${esc(c.id)}">${avatar(c, 26)}
+                <span class="n"><b>${esc(c.nome)}</b><small>${horas(tot)} agendadas</small></span>${IC.baixo}</button></td>
+              ${d.dias.map(dk => {
+                const dc = diaDe(c, dk), [fundo, txt] = coresHoras(dc.horas);
+                if (aberto) return `<td class="cel cel-aberta${fimDeSemana(dk) ? ' fds' : ''}">${linhaTempo(c, dk, true)}</td>`;
+                return `<td class="cel${fimDeSemana(dk) ? ' fds' : ''}"><button class="cel-ag" data-a="${dc.horas > 0 || !pode('agendar') ? 'grade' : 'vago-dia'}" data-id="${esc(c.id)}" data-dk="${dk}"
+                  aria-label="${esc(c.nome)}, ${esc(dataTitulo(dk))}: ${horas(dc.horas)}">
+                  <b style="background:${fundo};color:${txt}">${dc.horas > 0 ? horas(dc.horas) : pode('agendar') && !fimDeSemana(dk) ? '+' : '–'}</b>${miniFaixa(dc)}</button></td>`;
+              }).join('')}
+            </tr>`;
         }).join('')}
         </tbody>
       </table>
     </div>
     <div class="legenda">
       ${[[0, 'livre'], [4, '≤7h'], [8, '8h'], [10, '≤12h'], [13, '>12h']].map(([h, r]) => { const [f, t] = coresHoras(h); return `<span style="background:${f};color:${t}">${r}</span>`; }).join('')}
+      <span class="leg-t"><i style="background:${TURNO_COR.manha}"></i>Manhã</span><span class="leg-t"><i style="background:${TURNO_COR.tarde}"></i>Tarde</span><span class="leg-t"><i style="background:${TURNO_COR.dia}"></i>Dia inteiro</span>
     </div>
-    <p class="muted" style="padding:0 16px">Toque no consultor (ou numa célula) para abrir as agendas de cada dia · toque num card para ver o detalhamento.</p>`;
+    <p class="muted" style="padding:0 16px">Faixa de cada dia: 08h–17h. Toque no consultor (ou num dia com horas) para abrir as agendas por horário · toque numa agenda para ver os detalhes${pode('agendar') ? ' · toque num dia ou horário livre para agendar' : ''}.</p>`;
+}
+
+/** Popup de detalhes da agenda, com Editar e Alocar mais. */
+function folhaAgendaItem(c, dk, it) {
+  const id = it.id ? String(it.id) : it.url ? idTarefa(it.url) : '';
+  const ic = (svg, t = 16) => svg.replace('<svg', `<svg width="${t}" height="${t}"`);
+  const botoes = [
+    pode('editar') && id ? `<button class="btn contorno" data-f="editar">${ic(IC.lapis)} Editar</button>` : '',
+    pode('agendar') && id ? `<button class="btn primario" data-f="mais">${ic(IC.mais)} Alocar mais</button>` : '',
+  ].filter(Boolean);
+  abrirFolha(`<h3>${esc(it.tarefa)}</h3><div class="corpo">
+      <div class="pequeno" style="font-weight:700;text-transform:uppercase">${esc(it.cliente)}</div>
+      <div class="linha-selos" style="flex-wrap:wrap;margin:8px 0">${selo(it.periodo || 'Sem horário', TURNO_COR[it.turno] || '#87909e')}${selo(horas(it.horas), '#1f7a45')}${selo(it.agenda, '#2c4e8c')}</div>
+      <div class="ag-quem">${avatar(c, 32)}<div><b>${esc(c.nome)}</b><div class="pequeno">${esc(dataTitulo(dk))}</div></div></div>
+      ${it.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(it.detalhamento)}</div>` : ''}
+      ${it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:14px;font-size:14px;font-weight:700;color:var(--verde)">Abrir no ClickUp</a>` : ''}
+    </div>
+    <div class="rodape-f">${botoes.length ? botoes.join('') : '<button class="btn contorno" data-f="fechar">Fechar</button>'}</div>`, f => {
+    f.onclick = ev => {
+      const b = ev.target.closest('[data-f]');
+      if (!b) return;
+      if (b.dataset.f === 'fechar') fecharFolha();
+      else if (b.dataset.f === 'editar') abrirFormAgenda({ id });
+      else if (b.dataset.f === 'mais') abrirFormAgenda({ copiaDe: id, consultorId: c.id, paiId: it.pai_id || '', copiaNome: it.tarefa });
+    };
+  });
 }
 
 MODULOS.push({
@@ -1320,7 +1461,7 @@ MODULOS.push({
   workflow: 'carga_trabalho.yml',
   arquivo: 'app_carga_trabalho.json',
   etapa: 'Buscando as agendas no ClickUp…',
-  uiInicial: () => ({ aba: 0, dia: null, abertos: new Set(), abertosGrade: new Set(), cards: new Set(), rolarPara: null, centralizarDia: true }),
+  uiInicial: () => ({ aba: 0, dia: null, abertos: new Set(), abertosGrade: new Set(), rolarPara: null, centralizarDia: true }),
   interpretar: interpretarAgenda,
   desenhar(st, { cont, abas, acoes }) {
     const d = st.dados, ui = st.ui, hoje = isoHoje();
@@ -1335,25 +1476,32 @@ MODULOS.push({
     if (ui.aba === 1 && ui.rolarPara) {
       const th = cont.querySelector(`th[data-dk="${ui.rolarPara}"]`);
       const wrap = cont.querySelector('.grade-wrap');
-      if (th && wrap) wrap.scrollTo({ left: th.offsetLeft - 132, behavior: 'smooth' });
+      if (th && wrap) wrap.scrollTo({ left: th.offsetLeft - wrap.querySelector('.col-nome').offsetWidth, behavior: 'smooth' });
       ui.rolarPara = null;
     }
   },
-  acao(nome, el, st, ev) {
-    const ui = st.ui;
+  acao(nome, el, st) {
+    const ui = st.ui, d = st.dados;
+    const cons = () => d.consultores.find(c => c.id === el.dataset.id);
     switch (nome) {
       case 'aba': ui.aba = +el.dataset.v; if (ui.aba === 0) ui.centralizarDia = true; window.scrollTo(0, 0); return;
       case 'dia': ui.dia = el.dataset.dk; return;
       case 'consultor': alternar(ui.abertos, el.dataset.id); return;
-      case 'card': if (ev.target.closest('[data-link]')) return false; alternar(ui.cards, el.dataset.k); return;
+      case 'item': {
+        const c = cons(), it = c && diaDe(c, el.dataset.dk).itens[+el.dataset.i];
+        if (it) folhaAgendaItem(c, el.dataset.dk, it);
+        return false;
+      }
+      case 'vago': abrirFormAgenda({ consultorId: el.dataset.id, data: el.dataset.dk, periodo: el.dataset.p }); return false;
+      case 'vago-dia': abrirFormAgenda({ consultorId: el.dataset.id, data: el.dataset.dk }); return false;
       case 'editar': abrirFormAgenda({ id: el.dataset.id }); return false;
       case 'agendar': abrirFormAgenda({ consultorId: el.dataset.id || '', data: ui.aba === 0 ? ui.dia : isoHoje() }); return false;
       case 'grade':
-        if (el.dataset.dk && !ui.abertosGrade.has(el.dataset.id)) ui.rolarPara = el.dataset.dk;
+        if (!ui.abertosGrade.has(el.dataset.id)) ui.rolarPara = el.dataset.dk || (d.dias.includes(isoHoje()) ? isoHoje() : '');
         alternar(ui.abertosGrade, el.dataset.id);
         return;
-      case 'exportar': folhaExportarAgenda(st.dados.consultores.find(c => c.id === el.dataset.id), st.dados); return false;
-      case 'escolher': folhaEscolherConsultor(st.dados); return false;
+      case 'exportar': folhaExportarAgenda(cons(), d); return false;
+      case 'escolher': folhaEscolherConsultor(d); return false;
     }
     return false;
   },

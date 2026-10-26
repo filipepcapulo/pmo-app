@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.9.0';
+const VERSAO_WEB = '2.9.1';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -2556,7 +2556,7 @@ const alo = { el: null, ativo: false, tipo: '', id: '', x0: 0, y0: 0, px: 0, py:
 const aloCelEm = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest('.alo-cel'); };
 function aloMover() {
   if (!alo.fantasma) return;
-  alo.fantasma.style.transform = `translate(${alo.px - alo.dx}px, ${alo.py - alo.dy}px) rotate(2deg)`;
+  alo.fantasma.style.transform = `translate(${alo.px - alo.dx}px, ${alo.py - alo.dy}px)`;
   const cel = aloCelEm(alo.px, alo.py);
   document.querySelectorAll('.alo-cel.alvo').forEach(c => { if (c !== cel) c.classList.remove('alvo'); });
   if (cel) cel.classList.add('alvo');
@@ -2579,13 +2579,19 @@ function aloIniciar() {
   clearTimeout(alo.timer);
   if (!alo.el || !alo.el.isConnected) { aloCancelar(); return; }
   alo.ativo = true;
-  const r = alo.el.getBoundingClientRect();
-  alo.dx = Math.min(r.width - 20, alo.x0 - r.left); alo.dy = alo.y0 - r.top;
-  const f = alo.el.cloneNode(true);
-  f.classList.add('kb-fantasma', 'alo-fantasma');
-  f.removeAttribute('data-a');
-  f.style.width = Math.min(r.width, 260) + 'px';
+  // durante o arrasto o cartão vira um chip compacto, mais estreito que a célula da grade,
+  // para enxergar em que dia/consultor ele vai cair (a célula de destino fica destacada)
+  const celRef = document.querySelector('.alo-dir td.alo-cel');
+  const larg = Math.max(56, Math.min(120, (celRef ? celRef.getBoundingClientRect().width : 74) - 14));
+  const nome = (alo.el.querySelector('.kb-nome') || alo.el).textContent.trim();
+  const f = document.createElement('div');
+  f.className = 'kb-fantasma alo-fantasma';
+  f.style.width = larg + 'px';
+  f.innerHTML = `<span>${esc(nome)}</span>`;
   document.body.appendChild(f);
+  // o chip não cobre a célula apontada: no mouse fica logo abaixo e à direita do cursor; no toque, acima do dedo
+  const alt = f.offsetHeight;
+  if (alo.tipo === 'mouse') { alo.dx = -14; alo.dy = -16; } else { alo.dx = larg / 2; alo.dy = alt + 26; }
   alo.fantasma = f;
   alo.el.classList.add('kb-apagado');
   document.body.classList.add('kb-arrastando');

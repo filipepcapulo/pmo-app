@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.8.0';
+const VERSAO_WEB = '2.9.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -85,6 +85,7 @@ const IC = {
   monitor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
   celular: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
   carro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><path d="M5 12h14"/><circle cx="8" cy="17" r="1.8"/><circle cx="16" cy="17" r="1.8"/></svg>',
+  clipe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>',
   adicionar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>',
 };
 
@@ -1820,7 +1821,7 @@ MODULOS.push({
   },
 });
 
-// ---------------------------------------------------------------- Módulos 4 e 5: Backlog Base e Comitê
+// ---------------------------------------------------------------- Módulo 4: Backlog Base (v2.9.0: chamados + alocação)
 
 const COLACAO = new Intl.Collator('pt-BR', { sensitivity: 'base' });
 
@@ -1838,6 +1839,9 @@ function interpretarTarefas(json) {
       horasPlanejadas: numOuNull(o.horas_planejadas), horasRealizadas: Number(o.horas_realizadas) || 0, horasAgendadas: Number(o.horas_agendadas) || 0,
       // Backlog Desenvolvimento: ordem da prioridade (1 urgente … 5 sem) e criação em ms, para o Kanban
       prioridadeOrdem: numOuNull(o.prioridade_ordem) ?? 5, criadoMs: Number(o.criado_ms) || 0,
+      // Backlog Base ao vivo (v2.9.0): dados da triagem e da alocação
+      modulo: o.modulo || '', etapa: o.etapa || '', agenda: o.agenda || '', ticket: o.ticket || '', os: o.os || '',
+      anexos: (o.anexos || []).map(a => ({ nome: a.nome || 'Anexo', url: a.url || '' })),
       subtarefas: (o.subtarefas || []).map(a => ({
         nome: a.nome || '', consultores: txts(a.consultores), data: a.data || '', horas: Number(a.horas) || 0, periodo: a.periodo || '',
         status: a.status || '', statusCor: a.status_cor || '', realizada: !!a.realizada, detalhamento: a.detalhamento || '', url: a.url || '',
@@ -1858,7 +1862,7 @@ function cartaoTarefa(t, cfg, ui) {
   const datas = [];
   if (t.criado) datas.push('Criada ' + dataCurta(t.criado) + (t.diasFila > 0 ? ` (${t.diasFila} dias)` : ''));
   if (t.fim) datas.push('Vence ' + dataCurta(t.fim) + (t.atrasada ? ' · atrasada' : ''));
-  const extras = [['Usuário cliente', t.usuarioCliente], ['Origem', t.origem], ['Agendamento', t.agendamento]].filter(x => x[1]);
+  const extras = [['Usuário cliente', t.usuarioCliente], ['Origem', t.origem], ['Módulo', t.modulo], ['Etapa', t.etapa], ['Ticket', t.ticket], ['OS', t.os], ['Atendimento', t.agenda], ['Agendamento', t.agendamento]].filter(x => x[1]);
   return `<div class="cartao" role="button" data-a="abre" data-k="${esc(t.id)}">
     ${local ? `<div class="local">${esc(local)}</div>` : ''}
     <div class="topo${aberto ? ' aberto' : ''}"><span class="nome-t${aberto ? '' : ' corta'}">${esc(t.nome)}</span>${IC.baixo}</div>
@@ -1870,6 +1874,7 @@ function cartaoTarefa(t, cfg, ui) {
     ${aberto ? `<div style="margin-top:8px">
       ${extras.map(([r, v]) => `<div class="pequeno">${esc(r)}: ${esc(v)}</div>`).join('')}
       ${t.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(t.detalhamento)}</div>` : ''}
+      ${(t.anexos || []).length ? `<div class="rotulo">Anexos (${t.anexos.length})</div>${listaAnexos(t.anexos)}` : ''}
       ${t.subtarefas.length ? `<div class="rotulo">Subtarefas (${t.subtarefas.length})</div>${t.subtarefas.map((a, i) => linhaSub(a, `${t.id}|${i}`, ui.subs.has(`${t.id}|${i}`), true)).join('')}` : ''}
       ${t.url ? `<div class="acoes">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-tar" data-id="${esc(t.id)}">Agendar</button>` : ''}
         <a class="btn contorno pq" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a></div>` : ''}
@@ -1944,16 +1949,743 @@ function moduloTarefas(cfg) {
   };
 }
 
-MODULOS.push(moduloTarefas({
+
+/*
+ * Lido AO VIVO do ClickUp pelo servidor (ação "backlogBase"): status "backlog base"
+ * e Agendamento Agendar/Previsto. Abas:
+ *   Lista     — a visão de sempre (agrupada pelo Agendamento).
+ *   Alocação  — à esquerda, os chamados sem agenda ativa; à direita, a grade da
+ *               Agenda dos Consultores com a disponibilidade de cada dia. Arrastar
+ *               um chamado até o dia de um consultor (ou tocar no chamado e depois
+ *               no dia) abre um popup que só pede o horário; a agenda vira
+ *               subtarefa do chamado (ação agendaSalvar, herdando a Etapa dele).
+ * Botão + na barra: abre um chamado (tarefa nova no Backlog Base) com todos os
+ * campos que a triagem precisa, inclusive anexos.
+ */
+
+const listaAnexos = anexos => `<div class="anexos-l">${anexos.map(a => a.url
+  ? `<a href="${esc(a.url)}" target="_blank" rel="noopener" data-link>${IC.clipe}<span>${esc(a.nome)}</span></a>`
+  : `<span>${IC.clipe}<span>${esc(a.nome)}</span></span>`).join('')}</div>`;
+
+// ---- formulário "Novo chamado"
+
+const TIPOS_CHAMADO = [
+  ['Erro / incidente', 'Algo que funcionava e parou, ou mostra mensagem de erro'],
+  ['Dúvida / orientação', 'Como fazer algo no sistema'],
+  ['Configuração / parametrização', 'Ajustar cadastro, TOP, parâmetro, permissão'],
+  ['Melhoria / personalização', 'Algo novo ou diferente do padrão do sistema'],
+  ['Relatório / dashboard', 'Relatório, dashboard ou consulta nova / alterada'],
+  ['Integração / importação', 'Integração com outro sistema ou carga de dados'],
+];
+const ETAPA_SUGERIDA = {
+  'Melhoria / personalização': 'Personalização / Customização',
+  'Relatório / dashboard': 'Personalização / Customização',
+  'Integração / importação': 'Personalização / Customização',
+};
+const DICA_ANEXO = {
+  'Erro / incidente': 'Print da tela inteira com a mensagem de erro (e o XML/arquivo, se for nota ou importação).',
+  'Dúvida / orientação': 'Print da tela onde está a dúvida.',
+  'Configuração / parametrização': 'Print da tela/cadastro a ajustar ou o exemplo do que precisa.',
+  'Melhoria / personalização': 'Documento ou planilha com o levantamento, exemplo do layout/fluxo desejado.',
+  'Relatório / dashboard': 'Modelo do relatório desejado (planilha, print ou rascunho) com os filtros e colunas.',
+  'Integração / importação': 'Layout do arquivo / documentação da API e um arquivo de exemplo.',
+};
+const AMBIENTES = ['Produção', 'Teste / homologação', 'Produção e teste'];
+const ABRANGENCIAS = ['Um usuário', 'Um setor / equipe', 'Toda a empresa', 'Clientes / fornecedores'];
+const IMPACTO_COR = ['var(--vermelho)', 'var(--laranja)', '#b8932a', 'var(--texto-2)'];
+const ANEXO_MAX = 10 * 1024 * 1024, ANEXOS_MAX_QTD = 10, ANEXOS_MAX_TOTAL = 40 * 1024 * 1024;
+const CAMPOS_RASCUNHO = ['pastaId', 'listaId', 'parceiroId', 'solicitante', 'contato', 'origem', 'ticket', 'os', 'titulo', 'tipo', 'modulo', 'etapa',
+  'descricao', 'passos', 'esperado', 'ambiente', 'impacto', 'abrangencia', 'prazo', 'motivoPrazo', 'agenda', 'horas', 'semAnexo'];
+
+let opcoesChamadoCache = null;
+async function opcoesChamado() {
+  if (opcoesChamadoCache && Date.now() - opcoesChamadoCache.em < 10 * 60000) return opcoesChamadoCache.dados;
+  const r = await api('chamadoOpcoes');
+  opcoesChamadoCache = { em: Date.now(), dados: r };
+  return r;
+}
+const tamanhoTxt = b => b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+const lerBase64 = file => new Promise((ok, falha) => {
+  const r = new FileReader();
+  r.onload = () => ok(String(r.result).split(',')[1] || '');
+  r.onerror = () => falha(new Error('Não consegui ler ' + file.name));
+  r.readAsDataURL(file);
+});
+/** Nome do parceiro a partir da pasta do cliente ("SEMALO - FC" -> "SEMALO"). */
+const clienteDaPasta = nome => String(nome || '').replace(/\s+-\s+[A-Z]{1,4}$/, '').replace(/^\d+\s*-\s*/, '');
+
+/** Pendências do formulário: [id do campo, texto]. Mesmas regras do servidor. */
+function faltasChamado(f) {
+  const n = (s, k) => String(s || '').trim().length >= k;
+  const x = [];
+  if (!f.pastaId) x.push(['ch-pasta', 'cliente']);
+  else if (!f.listaId) x.push(['ch-lista', 'lista']);
+  if (!f.parceiroId) x.push(['ch-parc', 'parceiro']);
+  if (!n(f.solicitante, 2)) x.push(['ch-solic', 'solicitante']);
+  if (!n(f.contato, 5)) x.push(['ch-contato', 'contato do solicitante']);
+  if (!f.origem) x.push(['ch-origem', 'origem']);
+  if (semAcento(f.origem) === 'service desk' && !n(f.ticket, 1)) x.push(['ch-ticket', 'nº do ticket']);
+  if (!n(f.titulo, 10)) x.push(['ch-titulo', 'título (mín. 10 caracteres)']);
+  if (!f.tipo) x.push(['ch-tipo', 'tipo de solicitação']);
+  if (!f.modulo) x.push(['ch-modulo', 'módulo']);
+  if (!f.etapa) x.push(['ch-etapa', 'etapa']);
+  if (!n(f.descricao, 50)) x.push(['ch-desc', 'descrição (mín. 50 caracteres)']);
+  if (/erro/i.test(f.tipo) && !n(f.passos, 20)) x.push(['ch-passos', 'onde ocorre / passos']);
+  if (!n(f.esperado, 15)) x.push(['ch-esperado', 'resultado esperado']);
+  if (!f.ambiente) x.push(['ch-amb', 'ambiente']);
+  if (!f.impacto) x.push(['ch-impacto', 'impacto']);
+  if (!f.abrangencia) x.push(['ch-abr', 'quem é afetado']);
+  if (!f.agenda) x.push(['ch-agenda', 'forma de atendimento']);
+  if (f.prazo && f.prazo < isoHoje()) x.push(['ch-prazo', 'prazo (data já passou)']);
+  if (f.prazo && !n(f.motivoPrazo, 5)) x.push(['ch-motivo', 'motivo do prazo']);
+  if (!f.arquivos.length && !(f.semAnexoMarcado && n(f.semAnexo, 10))) x.push(['ch-anexos', f.semAnexoMarcado ? 'justificativa de não ter anexo' : 'anexos']);
+  return x;
+}
+
+function abrirFormChamado(m) {
+  const f = {
+    op: uuid(), estado: 'carregando', erro: '', tentou: false, criado: null, progresso: '',
+    pastaId: '', listaId: '', parceiroId: '', solicitante: '', contato: '', origem: '', ticket: '', os: '', titulo: '', tipo: '',
+    modulo: '', etapa: '', descricao: '', passos: '', esperado: '', ambiente: '', impacto: '', abrangencia: '', prazo: '', motivoPrazo: '',
+    agenda: 'Remoto', horas: '', semAnexo: '', semAnexoMarcado: false, arquivos: [], recuperado: false,
+  };
+  const rasc = guardar.ler('chamado.rascunho');
+  if (rasc && CAMPOS_RASCUNHO.some(k => rasc[k])) {
+    CAMPOS_RASCUNHO.forEach(k => { if (rasc[k] != null) f[k] = rasc[k]; });
+    f.semAnexoMarcado = !!rasc.semAnexo; f.recuperado = true;
+  }
+  let ops = null, tRasc = 0;
+  const gravarRascunho = () => {
+    clearTimeout(tRasc);
+    tRasc = setTimeout(() => { const o = {}; CAMPOS_RASCUNHO.forEach(k => { o[k] = f[k]; }); guardar.gravar('chamado.rascunho', o); }, 400);
+  };
+  abrirFolha('<h3>Novo chamado</h3><div class="corpo" id="ch"></div><div class="rodape-f" id="ch-rod"></div>', raiz => { raiz.classList.add('alta', 'larga'); });
+  const folha = $('#folha .folha');
+  const desenhar = () => { if (folha.isConnected) desenharFormChamado(folha, f, ops, acoes); };
+  const acoes = {
+    desenhar, gravarRascunho,
+    async salvar() {
+      f.tentou = true;
+      const faltam = faltasChamado(f);
+      if (faltam.length) {
+        f.erro = 'Falta preencher: ' + faltam.map(x => x[1]).join(', ') + '.';
+        desenhar();
+        const el = $('#' + faltam[0][0], folha);
+        if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return;
+      }
+      f.estado = 'salvando'; f.erro = ''; f.progresso = 'Criando o chamado no ClickUp…'; desenhar();
+      const dados = {};
+      CAMPOS_RASCUNHO.forEach(k => { dados[k] = typeof f[k] === 'string' ? f[k].trim() : f[k]; });
+      if (!f.semAnexoMarcado || f.arquivos.length) dados.semAnexo = '';
+      dados.qtdAnexos = f.arquivos.length;
+      try {
+        f.criado = f.criado || await api('chamadoSalvar', { idOperacao: f.op, dados }, { tempo: 120000 });
+      } catch (e) {
+        f.estado = 'editando';
+        f.erro = e.codigo === 'REDE' ? mensagemAmigavel(e) + ' Toque em "Abrir chamado" de novo: se já tiver sido criado, não duplica.' : mensagemAmigavel(e);
+        desenhar();
+        return;
+      }
+      guardar.apagar('chamado.rascunho');
+      await acoes.enviarAnexos();
+    },
+    async enviarAnexos() {
+      const pend = f.arquivos.filter(a => a.estado !== 'ok');
+      f.estado = 'salvando';
+      for (let i = 0; i < pend.length; i++) {
+        const a = pend[i];
+        a.estado = 'enviando'; a.erro = '';
+        f.progresso = `Enviando anexo ${i + 1} de ${pend.length}: ${a.nome}`; desenhar();
+        try {
+          const base64 = await lerBase64(a.file);
+          await api('chamadoAnexo', { tarefaId: f.criado.id, nome: a.nome, tipo: a.tipo, base64 }, { tempo: 180000 });
+          a.estado = 'ok';
+        } catch (e) { a.estado = 'erro'; a.erro = mensagemAmigavel(e); }
+      }
+      f.estado = 'resultado'; f.progresso = ''; desenhar();
+      estadoDe(m).lidoEm = 0;
+      if (moduloAtual === m) recarregar(m, true);
+    },
+    novo() {
+      Object.assign(f, { op: uuid(), estado: 'editando', erro: '', tentou: false, criado: null, titulo: '', tipo: '', descricao: '', passos: '',
+        esperado: '', ticket: '', os: '', prazo: '', motivoPrazo: '', horas: '', semAnexo: '', semAnexoMarcado: false, arquivos: [], recuperado: false });
+      desenhar();
+    },
+  };
+  desenhar();
+  (async () => {
+    try {
+      ops = await opcoesChamado();
+      if (f.pastaId && !ops.clientes.some(c => c.id === f.pastaId)) { f.pastaId = ''; f.listaId = ''; }
+      f.estado = 'editando';
+    } catch (e) { f.estado = 'falhaCarga'; f.erro = mensagemAmigavel(e); }
+    desenhar();
+  })();
+}
+
+function desenharFormChamado(folha, f, ops, acoes) {
+  const corpo = $('#ch', folha), rod = $('#ch-rod', folha);
+  if (!corpo) return;
+  const rolagem = corpo.scrollTop;
+  const ativo = document.activeElement && corpo.contains(document.activeElement) ? document.activeElement.id : null;
+  const spin = '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span>';
+  if (f.estado === 'carregando') {
+    corpo.innerHTML = '<div class="centro"><div class="spinner"></div><div class="muted">Carregando os campos do ClickUp…</div></div>';
+    rod.innerHTML = '<button class="btn contorno" data-x="fechar">Cancelar</button>';
+  } else if (f.estado === 'falhaCarga') {
+    corpo.innerHTML = `<div class="resultado erro">${IC.alerta}<b>Não consegui abrir o formulário</b><div>${esc(f.erro)}</div></div>`;
+    rod.innerHTML = '<button class="btn contorno" data-x="fechar">Fechar</button>';
+  } else if (f.estado === 'resultado') {
+    const r = f.criado, falhas = f.arquivos.filter(a => a.estado === 'erro');
+    const sit = r.situacao === 'ok' && !falhas.length ? 'ok' : 'parcial';
+    corpo.innerHTML = `<div class="resultado ${sit}">${sit === 'ok' ? IC.ok : IC.alerta}
+        <b>${sit === 'ok' ? 'Chamado aberto no Backlog Base' : 'Chamado aberto, mas com pendências'}</b>
+        <div>${esc(r.nome)}</div>
+        ${(r.naoConfirmados || []).length ? `<div>Não confirmado no ClickUp: ${esc(r.naoConfirmados.join(', '))}. Confira direto na tarefa.</div>` : ''}
+        ${(r.avisos || []).length ? `<div class="pequeno">${esc(r.avisos.join(' '))}</div>` : ''}
+        ${falhas.length ? `<div>${falhas.length} anexo${falhas.length > 1 ? 's' : ''} não foi enviado. Toque em "Reenviar anexos".</div>` : ''}
+        ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" style="font-weight:700;color:inherit">Abrir no ClickUp</a>` : ''}
+      </div>
+      ${f.arquivos.map(a => `<div class="res-linha ${a.estado === 'ok' ? 'ok' : 'erro'}"><span class="res-ic">${a.estado === 'ok' ? IC.ok : IC.x}</span>
+        <div><b>${esc(a.nome)}</b><div class="pequeno">${a.estado === 'ok' ? 'Anexado' : esc(a.erro || 'Não enviado')}</div></div></div>`).join('')}
+      <p class="muted" style="margin-top:10px">O chamado já aparece no Backlog Base (aba Lista e Alocação) para triagem.</p>`;
+    rod.innerHTML = `<button class="btn contorno" data-x="fechar">Fechar</button>
+      ${falhas.length ? '<button class="btn primario" data-x="reenviar">Reenviar anexos</button>' : '<button class="btn primario" data-x="novo">Abrir outro</button>'}`;
+  } else {
+    const salvando = f.estado === 'salvando';
+    const faltam = f.tentou ? new Set(faltasChamado(f).map(x => x[0])) : new Set();
+    const inv = id => faltam.has(id) ? ' invalido' : '';
+    const opt = (v, t, sel) => `<option value="${esc(v)}"${sel ? ' selected' : ''}>${esc(t)}</option>`;
+    const chips = (id, lista, atual, x) => `<div class="chips${inv(id)}" id="${id}">${lista.map(v => {
+      const [val, sub] = Array.isArray(v) ? v : [v, ''];
+      return `<button type="button" class="chip${atual === val ? ' sel' : ''}" data-x="${x}" data-v="${esc(val)}">${esc(val)}${sub ? `<small class="sub-chip">${esc(sub)}</small>` : ''}</button>`;
+    }).join('')}</div>`;
+    const cli = ops.clientes.find(c => c.id === f.pastaId);
+    const listas = cli ? cli.listas : [];
+    const total = f.arquivos.reduce((s, a) => s + a.tamanho, 0);
+    const conta = (v, min) => { const n = String(v || '').trim().length; return `<span class="conta${n >= min ? ' ok' : ''}">${n}/${min}</span>`; };
+    corpo.innerHTML = `
+      ${f.recuperado ? `<div class="aviso andamento" style="margin:0 0 8px"><span class="msg">Rascunho recuperado deste aparelho.</span><button type="button" data-x="descartar">Descartar</button></div>` : ''}
+      <div class="pequeno">Preencha tudo o que a triagem precisa para alocar sem voltar ao cliente. Campos com * são obrigatórios.</div>
+      <fieldset ${salvando ? 'disabled' : ''} class="form-ag form-ch">
+        <div class="sec-ch">1 · Cliente e solicitante</div>
+        <label for="ch-pasta">Cliente *</label>
+        <select id="ch-pasta" class="campo${inv('ch-pasta')}">${opt('', 'Escolha o cliente…', !f.pastaId)}${ops.clientes.map(c => opt(c.id, c.nome, c.id === f.pastaId)).join('')}</select>
+        ${listas.length > 1 ? `<label for="ch-lista">Lista *</label>
+          <select id="ch-lista" class="campo${inv('ch-lista')}">${opt('', 'Escolha a lista…', !f.listaId)}${listas.map(l => opt(l.id, l.nome, l.id === f.listaId)).join('')}</select>` : ''}
+        <label for="ch-parc">Parceiro *</label>
+        <select id="ch-parc" class="campo${inv('ch-parc')}">${opt('', 'Escolha…', !f.parceiroId)}${ops.parceiros.map(p => opt(p.id, p.nome, p.id === f.parceiroId)).join('')}</select>
+        <div class="duas">
+          <div><label for="ch-solic">Solicitante (usuário no cliente) *</label>
+            <input id="ch-solic" class="campo${inv('ch-solic')}" type="text" value="${esc(f.solicitante)}" placeholder="Nome de quem pediu" autocomplete="off"></div>
+          <div><label for="ch-contato">Contato do solicitante *</label>
+            <input id="ch-contato" class="campo${inv('ch-contato')}" type="text" value="${esc(f.contato)}" placeholder="Telefone / WhatsApp ou e-mail" autocomplete="off"></div>
+        </div>
+        <label>Origem *</label>${chips('ch-origem', ops.origens, f.origem, 'origem')}
+        <div class="duas">
+          <div><label for="ch-ticket">Nº do ticket${semAcento(f.origem) === 'service desk' ? ' *' : ''}</label>
+            <input id="ch-ticket" class="campo${inv('ch-ticket')}" type="text" inputmode="numeric" value="${esc(f.ticket)}" placeholder="Ex.: 719938" autocomplete="off"></div>
+          <div><label for="ch-os">OS Sankhya</label>
+            <input id="ch-os" class="campo" type="text" inputmode="numeric" value="${esc(f.os)}" placeholder="Ex.: 7180859" autocomplete="off"></div>
+        </div>
+
+        <div class="sec-ch">2 · Demanda</div>
+        <label for="ch-titulo">Título (resumo em uma linha) * ${conta(f.titulo, 10)}</label>
+        <input id="ch-titulo" class="campo${inv('ch-titulo')}" type="text" maxlength="160" value="${esc(f.titulo)}" placeholder="Ex.: Nota de entrada não contabiliza na TOP 1201" autocomplete="off">
+        <label>Tipo de solicitação *</label>${chips('ch-tipo', TIPOS_CHAMADO, f.tipo, 'tipo')}
+        <div class="duas">
+          <div><label for="ch-modulo">Módulo *</label>
+            <select id="ch-modulo" class="campo${inv('ch-modulo')}">${opt('', 'Escolha…', !f.modulo)}${ops.modulos.map(x => opt(x, x, x === f.modulo)).join('')}</select></div>
+          <div><label>Ambiente *</label>${chips('ch-amb', AMBIENTES, f.ambiente, 'ambiente')}</div>
+        </div>
+        <label>Etapa *</label>${chips('ch-etapa', ops.etapas, f.etapa, 'etapa')}
+        <label for="ch-desc">Descrição detalhada * ${conta(f.descricao, 50)}</label>
+        <textarea id="ch-desc" class="campo${inv('ch-desc')}" rows="5" placeholder="O que está acontecendo ou o que o cliente precisa, com o contexto do processo">${esc(f.descricao)}</textarea>
+        <label for="ch-passos">Onde ocorre / passos para reproduzir${/erro/i.test(f.tipo) ? ' *' : ''} ${/erro/i.test(f.tipo) ? conta(f.passos, 20) : ''}</label>
+        <textarea id="ch-passos" class="campo${inv('ch-passos')}" rows="4" placeholder="Tela/rotina, filtros usados, nº único / nota / pedido de exemplo, mensagem de erro exata">${esc(f.passos)}</textarea>
+        <label for="ch-esperado">Resultado esperado * ${conta(f.esperado, 15)}</label>
+        <textarea id="ch-esperado" class="campo${inv('ch-esperado')}" rows="3" placeholder="Como deveria funcionar / o que o cliente espera receber">${esc(f.esperado)}</textarea>
+
+        <div class="sec-ch">3 · Prioridade e atendimento</div>
+        <label>Impacto *</label>
+        <div class="chips${inv('ch-impacto')}" id="ch-impacto">${ops.impactos.map((v, i) => `<button type="button" class="chip${f.impacto === v ? ' sel' : ''}" data-x="impacto" data-v="${esc(v)}"><i class="ponto" style="background:${IMPACTO_COR[i] || 'var(--texto-2)'}"></i>${esc(v)}</button>`).join('')}</div>
+        <label>Quem é afetado *</label>${chips('ch-abr', ABRANGENCIAS, f.abrangencia, 'abrangencia')}
+        <div class="duas">
+          <div><label for="ch-prazo">Prazo desejado</label>
+            <input id="ch-prazo" class="campo${inv('ch-prazo')}" type="date" min="${isoHoje()}" value="${esc(f.prazo)}"></div>
+          <div><label for="ch-horas">Horas estimadas</label>
+            <input id="ch-horas" class="campo" type="text" inputmode="decimal" value="${esc(f.horas)}" placeholder="Se souber (ex.: 4)" autocomplete="off"></div>
+        </div>
+        ${f.prazo ? `<label for="ch-motivo">Motivo do prazo *</label>
+          <input id="ch-motivo" class="campo${inv('ch-motivo')}" type="text" value="${esc(f.motivoPrazo)}" placeholder="Ex.: fechamento fiscal do mês, go-live, multa" autocomplete="off">` : ''}
+        <label>Forma de atendimento *</label>${chips('ch-agenda', ops.agendas, f.agenda, 'agenda')}
+
+        <div class="sec-ch">4 · Anexos</div>
+        <div class="pequeno">${esc(DICA_ANEXO[f.tipo] || 'Prints, documentos, planilhas ou arquivos de exemplo.')} Até ${ANEXOS_MAX_QTD} arquivos, 10 MB cada.</div>
+        <div id="ch-anexos" class="anexos-ch${inv('ch-anexos')}">
+          ${f.arquivos.map((a, i) => `<div class="anexo-ch"><span class="ic">${IC.clipe}</span><span class="n">${esc(a.nome)}</span><span class="pequeno">${tamanhoTxt(a.tamanho)}</span>
+            <button type="button" class="rem-dia" data-x="rem-anexo" data-i="${i}" aria-label="Remover ${esc(a.nome)}">${IC.x}</button></div>`).join('')}
+          ${f.arquivos.length < ANEXOS_MAX_QTD ? `<label class="btn contorno pq add-anexo">${IC.mais.replace('<svg', '<svg width="15" height="15"')} Adicionar arquivos
+            <input id="ch-arq" type="file" multiple hidden></label>` : ''}
+          ${f.arquivos.length ? `<div class="pequeno">${f.arquivos.length} arquivo${f.arquivos.length > 1 ? 's' : ''} · ${tamanhoTxt(total)}</div>` : ''}
+        </div>
+        ${!f.arquivos.length ? `<button type="button" class="opcao" data-x="sem-anexo" style="border:0"><span class="check ${f.semAnexoMarcado ? 'on' : ''}">${f.semAnexoMarcado ? IC.ok : ''}</span>
+            <span class="n" style="white-space:normal">Não há anexo para este chamado</span></button>
+          ${f.semAnexoMarcado ? `<input id="ch-semanexo" class="campo${inv('ch-anexos')}" type="text" value="${esc(f.semAnexo)}" placeholder="Por quê? (ex.: dúvida conceitual, sem tela envolvida)" autocomplete="off">` : ''}` : ''}
+      </fieldset>
+      ${f.progresso ? `<div class="aviso andamento" style="margin:12px 0 0"><span class="spinner p"></span><span class="msg">${esc(f.progresso)}</span></div>` : ''}
+      <div class="erro-txt" style="margin-top:8px">${esc(f.erro)}</div>`;
+    rod.innerHTML = `<button class="btn contorno" data-x="fechar" ${salvando ? 'disabled' : ''}>Cancelar</button>
+      <button class="btn primario" data-x="salvar" ${salvando ? 'disabled' : ''}>${salvando ? spin + ' Gravando…' : 'Abrir chamado'}</button>`;
+
+    // campos de texto: só atualizam o estado (sem redesenhar, para não perder o teclado)
+    const texto = { 'ch-solic': 'solicitante', 'ch-contato': 'contato', 'ch-ticket': 'ticket', 'ch-os': 'os', 'ch-titulo': 'titulo', 'ch-desc': 'descricao',
+      'ch-passos': 'passos', 'ch-esperado': 'esperado', 'ch-motivo': 'motivoPrazo', 'ch-horas': 'horas', 'ch-semanexo': 'semAnexo' };
+    Object.entries(texto).forEach(([id, k]) => {
+      const el = $('#' + id, corpo);
+      if (!el) return;
+      el.addEventListener('input', () => {
+        f[k] = el.value; acoes.gravarRascunho();
+        const c = el.previousElementSibling && el.previousElementSibling.querySelector('.conta');
+        if (c) { const min = +c.textContent.split('/')[1]; const n = el.value.trim().length; c.textContent = `${n}/${min}`; c.classList.toggle('ok', n >= min); }
+        if (f.tentou) el.classList.toggle('invalido', faltasChamado(f).some(x => x[0] === id));
+      });
+    });
+    const muda = (id, fn) => { const el = $('#' + id, corpo); if (el) el.addEventListener('change', () => { fn(el.value); acoes.gravarRascunho(); acoes.desenhar(); }); };
+    muda('ch-pasta', v => {
+      f.pastaId = v; f.listaId = '';
+      const c = ops.clientes.find(x => x.id === v);
+      if (c) {
+        const ls = c.listas;
+        f.listaId = ls.length === 1 ? ls[0].id : ((ls.find(l => /avuls/i.test(l.nome)) || ls.find(l => /backlog|suporte|sustenta/i.test(l.nome)) || {}).id || '');
+        f.parceiroId = parceiroPorNome(ops, clienteDaPasta(c.nome), c.nome) || f.parceiroId;
+      }
+    });
+    muda('ch-lista', v => { f.listaId = v; });
+    muda('ch-parc', v => { f.parceiroId = v; });
+    muda('ch-modulo', v => { f.modulo = v; });
+    muda('ch-prazo', v => { f.prazo = v; });
+    const arq = $('#ch-arq', corpo);
+    if (arq) arq.addEventListener('change', () => {
+      const avisos = [];
+      for (const file of arq.files) {
+        if (f.arquivos.length >= ANEXOS_MAX_QTD) { avisos.push(`Máximo de ${ANEXOS_MAX_QTD} arquivos.`); break; }
+        if (file.size > ANEXO_MAX) { avisos.push(`${file.name} passa de 10 MB.`); continue; }
+        if (f.arquivos.reduce((s, a) => s + a.tamanho, 0) + file.size > ANEXOS_MAX_TOTAL) { avisos.push('O total passa de 40 MB.'); break; }
+        if (f.arquivos.some(a => a.nome === file.name && a.tamanho === file.size)) continue;
+        f.arquivos.push({ file, nome: file.name, tipo: file.type || 'application/octet-stream', tamanho: file.size, estado: 'pendente' });
+      }
+      if (avisos.length) toast(avisos[0]);
+      acoes.desenhar();
+    });
+    if (ativo && $('#' + ativo, corpo)) $('#' + ativo, corpo).focus({ preventScroll: true });
+    corpo.scrollTop = rolagem;
+  }
+  folha.onclick = ev => {
+    const b = ev.target.closest('[data-x]');
+    if (!b || b.disabled) return;
+    const x = b.dataset.x, v = b.dataset.v;
+    if (x === 'fechar') { fecharFolha(); return; }
+    if (x === 'salvar') { acoes.salvar(); return; }
+    if (x === 'reenviar') { acoes.enviarAnexos(); return; }
+    if (x === 'novo') { acoes.novo(); return; }
+    if (x === 'descartar') {
+      guardar.apagar('chamado.rascunho');
+      CAMPOS_RASCUNHO.forEach(k => { f[k] = ''; });
+      Object.assign(f, { agenda: 'Remoto', semAnexoMarcado: false, recuperado: false, tentou: false, erro: '' });
+    }
+    if (x === 'tipo') { f.tipo = v; if (!f.etapaTocada) f.etapa = ETAPA_SUGERIDA[v] || 'Atendimento avulso'; }
+    if (x === 'etapa') { f.etapa = v; f.etapaTocada = true; }
+    if (['origem', 'ambiente', 'impacto', 'abrangencia', 'agenda'].includes(x)) f[x] = v;
+    if (x === 'rem-anexo') f.arquivos.splice(+b.dataset.i, 1);
+    if (x === 'sem-anexo') { f.semAnexoMarcado = !f.semAnexoMarcado; if (!f.semAnexoMarcado) f.semAnexo = ''; }
+    acoes.gravarRascunho();
+    acoes.desenhar();
+  };
+}
+
+// ---- aba Alocação
+
+const aloSemAgenda = t => !t.subtarefas.some(a => !a.planejamento && !a.realizada);
+const turnoDe = p => { const fx = faixaPeriodo(p); if (!fx) return ''; return fx[1] <= 13 ? 'manha' : fx[0] >= 12 ? 'tarde' : 'dia'; };
+const livresDoDia = (dc, dk) => vagosDoDia(dc, dk).reduce((s, [a, b]) => s + (b - a), 0);
+
+function itensAlocacao(st) {
+  const ui = st.ui, t = semAcento(ui.busca.trim());
+  return st.dados.grupos.flatMap(g => g.itens.map(x => ({ ...x, _grupo: g.nome, _grupoCor: g.cor })))
+    .filter(x => (ui.alo.todas || aloSemAgenda(x)) && (!t || [x.nome, x.pasta, x.lista, x.parceiro, x.modulo, x.prioridade, x.usuarioCliente, x.ticket]
+      .some(v => semAcento(v).includes(t))))
+    .sort((a, b) => a.prioridadeOrdem - b.prioridadeOrdem || a.criadoMs - b.criadoMs);
+}
+
+function cartaoAlocacao(x, sel) {
+  const ativas = x.subtarefas.filter(a => !a.planejamento && !a.realizada);
+  const meta = [x.criado ? 'Criado ' + dataCurta(x.criado) + (x.diasFila > 0 ? ` (${x.diasFila}d)` : '') : '', x.fim ? 'Prazo ' + dataCurta(x.fim) : '',
+    (x.anexos || []).length ? `${x.anexos.length} anexo${x.anexos.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+  return `<div class="alo-card${sel ? ' sel' : ''}" role="button" tabindex="0" data-a="alo-sel" data-alo="${esc(x.id)}">
+    <div class="local">${esc([x.pasta, x.lista].filter(Boolean).join(' / '))}</div>
+    <div class="kb-nome">${esc(x.nome)}</div>
+    <div class="linha-selos" style="flex-wrap:wrap">${selo(x.prioridade || 'Sem prioridade', x.prioridadeCor || '#b5bcc2')}${x.modulo ? selo(x.modulo, '#2c4e8c') : ''}${x.agenda ? selo(x.agenda, '#15a3a3') : ''}</div>
+    ${ativas.length ? `<div class="kb-outros">${IC.calendario}${ativas.length} agenda${ativas.length > 1 ? 's' : ''} · ${esc([...new Set(ativas.flatMap(a => a.consultores))].join(', '))}</div>` : ''}
+    <div class="alo-rod"><span class="pequeno${x.atrasada ? ' atraso-txt' : ''}">${esc(meta)}</span>
+      <button class="btn texto pq" data-a="alo-ver" data-id="${esc(x.id)}">Detalhes</button></div>
+  </div>`;
+}
+
+function listaAlocacao(st) {
+  const itens = itensAlocacao(st), ui = st.ui;
+  if (!itens.length) return `<div class="vazio">${ui.busca.trim() ? 'Nenhum chamado encontrado.' : ui.alo.todas ? 'Nada no Backlog Base.' : 'Tudo alocado: nenhum chamado sem agenda.'}</div>`;
+  return itens.map(x => cartaoAlocacao(x, ui.alo.sel === x.id)).join('');
+}
+
+function gradeAlocacao(st, agenda) {
+  const ui = st.ui, hoje = isoHoje();
+  const dias = diasDaGrade(agenda, ui.alo.semanas).filter(dk => dk >= hoje || ui.alo.passados);
+  const sel = ui.alo.sel && itemBacklog(st.dados, ui.alo.sel);
+  return `
+    <div class="alo-ctrl">
+      <div class="chips" style="margin-top:0">${SEMANAS_GRADE.map(([n, t]) => `<button class="chip${ui.alo.semanas === n ? ' sel' : ''}" data-a="alo-semanas" data-v="${n}">${t}</button>`).join('')}</div>
+      <span class="pequeno">Agenda ${agenda.geradoEm ? 'de ' + esc(geradoEmTexto(agenda.geradoEm)) : ''}</span>
+    </div>
+    <div class="alo-dica${sel ? ' ativa' : ''}">${sel
+      ? `${IC.seta}<span><b>${esc(sel.nome)}</b><br>Toque no dia do consultor (ou arraste o chamado) para alocar.</span><button class="btn texto pq" data-a="alo-limpar">Cancelar</button>`
+      : `${IC.alerta}<span>Arraste um chamado até o dia do consultor${modoVisual() === 'pc' ? '' : ' (segure o cartão antes de arrastar)'} — ou toque no chamado e depois no dia. O popup só pede o horário.</span>`}</div>
+    <div class="grade-wrap" data-rola="alo-grade">
+      <table class="grade ag-grade alo-grade">
+        <thead><tr><th class="col-nome" style="text-align:left">Consultor</th>
+          ${dias.map(dk => `<th class="dia${dk === hoje ? ' hoje' : ''}${fimDeSemana(dk) ? ' fds' : ''}"><span>${letraDia(dk)} ${numeroDia(dk)}</span></th>`).join('')}</tr></thead>
+        <tbody>${agenda.consultores.map(c => {
+          const livre = dias.filter(dk => !fimDeSemana(dk)).reduce((s, dk) => s + livresDoDia(diaDe(c, dk), dk), 0);
+          return `<tr><td class="col-nome"><div class="nome-grade">${avatar(c, 26)}<span class="n"><b>${esc(c.nome)}</b><small>${horas(livre)} livres no período</small></span></div></td>
+            ${dias.map(dk => {
+              const dc = diaDe(c, dk), [fundo, txt] = coresHoras(dc.horas), lv = fimDeSemana(dk) ? 0 : livresDoDia(dc, dk);
+              return `<td class="cel alo-cel${fimDeSemana(dk) ? ' fds' : ''}${lv > 0 ? ' com-livre' : ''}" data-a="alo-cel" data-c="${esc(c.id)}" data-dk="${dk}"
+                title="${esc(c.nome)} · ${esc(dataTitulo(dk))}: ${horas(dc.horas)} alocadas${lv ? ' · ' + horas(lv) + ' livres' : ''}">
+                <div class="cel-ag"><b style="background:${fundo};color:${txt}">${dc.horas > 0 ? horas(dc.horas) : fimDeSemana(dk) ? '–' : 'livre'}</b>${miniFaixa(dc)}
+                  <small class="alo-livre">${fimDeSemana(dk) ? '' : lv > 0 ? horas(lv) + ' livres' : 'cheio'}</small></div></td>`;
+            }).join('')}</tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+    <div class="legenda">
+      ${[[0, 'livre'], [4, '≤7h'], [8, '8h'], [10, '≤12h'], [13, '>12h']].map(([h, r]) => { const [f, t] = coresHoras(h); return `<span style="background:${f};color:${t}">${r}</span>`; }).join('')}
+      <span class="leg-t"><i style="background:${TURNO_COR.manha}"></i>Manhã</span><span class="leg-t"><i style="background:${TURNO_COR.tarde}"></i>Tarde</span><span class="leg-t"><i style="background:${TURNO_COR.dia}"></i>Dia inteiro</span>
+    </div>`;
+}
+
+function desenharAlocacao(st, ctx, m) {
+  const { cont, inteiro } = ctx, ui = st.ui;
+  if (!pode('agendar')) { cont.innerHTML = '<div class="vazio">Seu acesso não permite agendar. Fale com o administrador.</div>'; return; }
+  const ag = MODULOS.find(x => x.id === 'agenda');
+  if (!ag || !temModulo('agenda')) { cont.innerHTML = '<div class="vazio">Para alocar, seu acesso precisa incluir a Agenda dos Consultores.</div>'; return; }
+  const sa = estadoDe(ag);
+  // relê a agenda se estiver velha (no máx. 1 tentativa por minuto, para não insistir quando o servidor falha)
+  const precisa = !sa.dados || Date.now() - sa.lidoEm > 5 * 60000;
+  if (precisa && !sa.carregando && Date.now() - (ui.alo.tentouAgenda || 0) > 60000) {
+    ui.alo.tentouAgenda = Date.now();
+    recarregar(ag).then(() => redesenhar(m, true));
+  }
+  if (!sa.dados) {
+    cont.innerHTML = sa.erro ? `<div class="centro"><div>Não consegui ler a Agenda dos Consultores: ${esc(sa.erro)}</div><button class="btn primario" data-a="alo-agenda">Tentar de novo</button></div>`
+      : '<div class="centro"><div class="spinner"></div><div class="muted">Carregando a agenda dos consultores…</div></div>';
+    return;
+  }
+  const focado = document.activeElement && document.activeElement.id === 'busca';
+  if (inteiro || !focado || !$('#alo-lista')) {
+    trocarHTML(cont, `<div class="alo">
+      <aside class="alo-esq">
+        <div class="alo-topo">
+          <div class="alo-tit"><b>A alocar</b><span class="contador" id="alo-n"></span></div>
+          ${campoBusca(ui.busca, 'Buscar cliente, chamado, módulo')}
+          <div class="chips"><button class="chip${ui.alo.todas ? '' : ' sel'}" data-a="alo-todas" data-v="0">Sem agenda</button><button class="chip${ui.alo.todas ? ' sel' : ''}" data-a="alo-todas" data-v="1">Todos</button></div>
+          ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
+        </div>
+        <div id="alo-lista" class="alo-lista"></div>
+      </aside>
+      <section class="alo-dir" id="alo-grade"></section>
+    </div>`);
+    ligarBusca(st, () => { $('#alo-lista').innerHTML = listaAlocacao(st); $('#alo-n').textContent = itensAlocacao(st).length; });
+  }
+  $('#alo-lista').innerHTML = listaAlocacao(st);
+  $('#alo-n').textContent = itensAlocacao(st).length;
+  trocarHTML($('#alo-grade'), gradeAlocacao(st, sa.dados));
+}
+
+/** Popup do chamado (detalhes para a triagem). */
+function folhaChamado(t) {
+  abrirFolha(`<h3>${esc(t.nome)}</h3><div class="corpo">
+      <div class="pequeno">${esc([t.pasta, t.lista].filter(Boolean).join(' / '))}</div>
+      <div class="linha-selos" style="flex-wrap:wrap;margin:6px 0">${selo(t.prioridade || 'Sem prioridade', t.prioridadeCor || '#b5bcc2')}${selo(t.status, t.statusCor)}${t.modulo ? selo(t.modulo, '#2c4e8c') : ''}${t.etapa ? selo(t.etapa, '#8e5cc4') : ''}</div>
+      ${[['Parceiro', t.parceiro], ['Solicitante', t.usuarioCliente], ['Origem', t.origem], ['Ticket', t.ticket], ['OS', t.os], ['Atendimento', t.agenda],
+        ['Criado', t.criado ? dataCurta(t.criado) + (t.diasFila > 0 ? ` (${t.diasFila} dias na fila)` : '') : ''], ['Prazo', t.fim ? dataCurta(t.fim) : '']]
+        .filter(x => x[1]).map(([r, v]) => `<div class="pequeno"><b>${esc(r)}:</b> ${esc(v)}</div>`).join('')}
+      ${t.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(t.detalhamento)}</div>` : ''}
+      ${(t.anexos || []).length ? `<div class="rotulo">Anexos (${t.anexos.length})</div>${listaAnexos(t.anexos)}` : '<div class="rotulo">Anexos</div><div class="pequeno">Nenhum anexo.</div>'}
+      ${t.subtarefas.length ? `<div class="rotulo">Agendas (${t.subtarefas.length})</div>${t.subtarefas.map(a => linhaSubKb(a, false)).join('')}` : ''}
+    </div>
+    <div class="rodape-f"><button class="btn contorno" data-f="fechar">Fechar</button>
+      ${t.url ? `<a class="btn primario" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener">Abrir no ClickUp</a>` : ''}</div>`, f => {
+    f.onclick = ev => {
+      if (ev.target.closest('[data-f="fechar"]')) { fecharFolha(); return; }
+      const e = ev.target.closest('[data-kbe]');
+      if (e) abrirFormAgenda({ id: e.dataset.kbe });
+    };
+  });
+}
+
+/** Popup do arrasto: só pede o horário, mostrando a agenda do consultor no dia. */
+function folhaAlocar(m, t, c, dk) {
+  const st = estadoDe(m);
+  const f = { op: uuid(), periodo: '', outro: false, estado: 'editando', erro: '', resultado: null };
+  let ops = null;
+  const dc = () => diaDe(c, dk);
+  const livres = () => vagosDoDia(dc(), dk).map(([a, b]) => ({ a, b, p: periodoDisponivel(periodoDeFaixa(a, b), ops) })).filter(x => x.p);
+  const primeiroLivre = () => (livres()[0] || {}).p || '';
+  f.periodo = primeiroLivre();
+  const conflitos = p => {
+    const fx = faixaPeriodo(p);
+    if (!fx) return [];
+    return dc().itens.filter(it => { const o = faixaPeriodo(it.periodo); return o && o[0] < fx[1] && fx[0] < o[1]; });
+  };
+  abrirFolha('<h3>Alocar chamado</h3><div class="corpo" id="al"></div><div class="rodape-f" id="al-rod"></div>');
+  const folha = $('#folha .folha');
+  const spin = '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span>';
+  const desenhar = () => {
+    if (!folha.isConnected) return;
+    const corpo = $('#al', folha), rod = $('#al-rod', folha);
+    if (f.estado === 'resultado') {
+      corpo.innerHTML = resultadoAgendaHTML(f.resultado, false);
+      rod.innerHTML = f.resultado.situacao === 'ok' || f.resultado.situacao === 'parcial'
+        ? '<button class="btn primario" data-x="fechar">Concluir</button>'
+        : '<button class="btn contorno" data-x="voltar">Voltar</button><button class="btn primario" data-x="salvar">Tentar de novo</button>';
+      return;
+    }
+    const salvando = f.estado === 'salvando', k = cargaDia(dc().horas);
+    const itens = [...dc().itens].sort((a, b) => ordemPeriodo(a.periodo) - ordemPeriodo(b.periodo));
+    const conf = conflitos(f.periodo);
+    const fixos = PERIODOS_RAPIDOS.filter(([v]) => !livres().some(l => l.p === v));
+    const lista = [...new Set([...PERIODOS_RAPIDOS.map(p => p[0]), ...((ops && ops.periodos) || [])])];
+    const outroSel = f.periodo && !livres().some(l => l.p === f.periodo) && !PERIODOS_RAPIDOS.some(p => p[0] === f.periodo);
+    corpo.innerHTML = `
+      <div class="caixa-dem"><div class="pequeno">${esc([t.pasta, t.lista].filter(Boolean).join(' › '))}</div><b>${esc(t.nome)}</b></div>
+      <div class="ag-quem" style="margin-top:8px">${avatar(c, 32)}<div style="flex:1"><b>${esc(c.nome)}</b><div class="pequeno">${esc(dataTitulo(dk))}</div></div>
+        <span style="font-size:12px;font-weight:700;color:${k.c};text-align:right">${esc(k.t)}</span></div>
+      ${fimDeSemana(dk) ? '<div class="aviso falhou" style="margin:8px 0 0">Este dia é fim de semana.</div>' : ''}
+      <div class="rotulo">Agenda do dia</div>
+      ${itens.length ? itens.map(it => `<div class="al-ocup" style="--t:${TURNO_COR[it.turno] || '#87909e'}"><b>${esc(it.periodo || 'Sem horário')}</b><span>${esc(it.cliente)} · ${esc(it.tarefa)}</span></div>`).join('')
+        : '<div class="pequeno">Nada agendado — dia livre.</div>'}
+      <fieldset class="form-ag" ${salvando ? 'disabled' : ''}>
+        <label>Horário *</label>
+        ${livres().length ? `<div class="chips">${livres().map(l => `<button type="button" class="chip livre${f.periodo === l.p ? ' sel' : ''}" data-x="per" data-v="${esc(l.p)}">Livre ${esc(l.p)}<small>${horas(horasPeriodo(l.p))}</small></button>`).join('')}</div>` : ''}
+        <div class="chips">${fixos.map(([v, tt]) => `<button type="button" class="chip${f.periodo === v ? ' sel' : ''}" data-x="per" data-v="${v}">${tt}<small>${v}</small></button>`).join('')}
+          <button type="button" class="chip${f.outro || outroSel ? ' sel' : ''}" data-x="outro">Outro</button></div>
+        ${f.outro || outroSel ? `<select id="al-per" class="campo" style="margin-top:8px">${`<option value="">Escolha o horário…</option>`}${lista.map(p => `<option value="${esc(p)}"${p === f.periodo ? ' selected' : ''}>${esc(p)} (${horas(horasPeriodo(p))})</option>`).join('')}</select>` : ''}
+        ${conf.length ? `<div class="aviso falhou" style="margin:10px 0 0">${IC.alerta}<span class="msg">Choca com ${esc(conf.map(i => `${i.periodo} (${i.cliente})`).join(', '))}. O consultor ficaria com ${horas(dc().horas + horasPeriodo(f.periodo))} no dia.</span></div>` : ''}
+      </fieldset>
+      <div class="pequeno" style="margin-top:10px">A agenda vira subtarefa do chamado, com o título dele, ${esc(t.agenda || 'Remoto')}, Apontamento OS Experience e a Etapa do chamado. Para mudar algo, use "Mais opções".</div>
+      <div class="erro-txt" style="margin-top:6px">${esc(f.erro)}</div>`;
+    rod.innerHTML = `<button class="btn contorno" data-x="fechar" ${salvando ? 'disabled' : ''}>Cancelar</button>
+      <button class="btn contorno" data-x="mais" ${salvando ? 'disabled' : ''}>Mais opções</button>
+      <button class="btn primario" data-x="salvar" ${salvando ? 'disabled' : ''}>${salvando ? spin + ' Gravando…' : 'Alocar'}</button>`;
+    const sp = $('#al-per', corpo);
+    if (sp) sp.onchange = () => { f.periodo = sp.value; desenhar(); };
+  };
+  const salvar = async () => {
+    if (!f.periodo) { f.erro = 'Escolha o horário.'; desenhar(); return; }
+    f.estado = 'salvando'; f.erro = ''; desenhar();
+    const dados = {
+      paiId: t.id, titulo: t.nome, consultorId: c.id, datas: [dk], periodo: f.periodo,
+      agenda: t.agenda || 'Remoto', apontamento: 'OS Experience', parceiroId: '', etapaPai: true,
+      detalhamento: t.detalhamento ? t.detalhamento.slice(0, 4000) : undefined,
+    };
+    let r;
+    try { r = await api('agendaSalvar', { idOperacao: f.op, dados }, { tempo: 120000 }); }
+    catch (e) { r = { situacao: e.codigo === 'REDE' ? 'incerto' : 'erro', erro: mensagemAmigavel(e), resultados: [] }; }
+    f.resultado = r; f.estado = 'resultado';
+    registrarHistorico({ em: Date.now(), modo: 'incluir', titulo: t.nome, consultor: c.nome, datas: [dk], periodo: f.periodo, demanda: t.nome, situacao: r.situacao,
+      erro: r.erro, resultados: (r.resultados || []).map(x => ({ id: x.id, url: x.url, data: x.data, situacao: x.situacao, erro: x.erro, naoConfirmados: x.naoConfirmados })) });
+    if (r.situacao === 'ok' || r.situacao === 'parcial') {
+      // mostra na hora (o ClickUp e a agenda do app se atualizam por trás)
+      const res = (r.resultados || [])[0] || {}, h = horasPeriodo(f.periodo);
+      const item = itemBacklog(st.dados, t.id);
+      if (item) item.subtarefas.push({ nome: t.nome, consultores: [c.nome], consultorIds: [c.id], data: dk, horas: h, periodo: f.periodo, status: 'não iniciado',
+        statusCor: '', realizada: false, detalhamento: '', url: res.url || '', planejamento: false });
+      const d = c.dias[dk] || (c.dias[dk] = { horas: 0, itens: [] });
+      d.itens.push({ id: res.id, url: res.url, cliente: t.pasta || t.parceiro, tarefa: t.nome, periodo: f.periodo, horas: h, turno: turnoDe(f.periodo), agenda: t.agenda || 'Remoto', detalhamento: '', pai_id: t.id });
+      d.horas = Math.round((d.horas + h) * 100) / 100;
+      if (st.ui.alo.sel === t.id) st.ui.alo.sel = '';
+      const ag = MODULOS.find(x => x.id === 'agenda');
+      if (ag && estados[ag.id]) estadoDe(ag).lidoEm = Date.now() + 3 * 60000 - 5 * 60000; // relê em ~3 min, quando o Gist já tiver a agenda nova
+      redesenhar(m, true);
+    }
+    desenhar();
+  };
+  folha.onclick = ev => {
+    const b = ev.target.closest('[data-x]');
+    if (!b || b.disabled) return;
+    const x = b.dataset.x;
+    if (x === 'fechar') { fecharFolha(); return; }
+    if (x === 'salvar') { salvar(); return; }
+    if (x === 'voltar') { f.estado = 'editando'; f.resultado = null; f.op = uuid(); }
+    if (x === 'mais') {
+      abrirFormAgenda({ pai: { id: t.id, nome: t.nome, local: [t.pasta, t.lista].filter(Boolean).join(' › ') }, consultorId: c.id, data: dk, periodo: f.periodo,
+        parceiro: t.parceiro, cliente: t.pasta, paiFixo: true, etapaPai: true });
+      return;
+    }
+    if (x === 'per') { f.periodo = b.dataset.v; f.outro = false; }
+    if (x === 'outro') { f.outro = true; }
+    desenhar();
+  };
+  desenhar();
+  opcoesAgenda().then(o => { ops = o; if (!f.periodo) f.periodo = primeiroLivre(); desenhar(); }).catch(() => { /* segue com os horários padrão */ });
+}
+
+function aloAbrirPopup(m, itemId, consultorId, dk) {
+  const st = estadoDe(m), ag = MODULOS.find(x => x.id === 'agenda');
+  const t = itemBacklog(st.dados, itemId), sa = ag && estadoDe(ag);
+  const c = sa && sa.dados && sa.dados.consultores.find(x => x.id === consultorId);
+  if (!t || !c) return;
+  if (dk < isoHoje()) { toast('Esse dia já passou.'); return; }
+  folhaAlocar(m, t, c, dk);
+}
+
+// --- arrastar o chamado até a grade (mouse arrasta direto; toque, depois de segurar)
+const alo = { el: null, ativo: false, tipo: '', id: '', x0: 0, y0: 0, px: 0, py: 0, dx: 0, dy: 0, timer: 0, rolar: 0, fantasma: null, ultimo: 0 };
+
+const aloCelEm = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest('.alo-cel'); };
+function aloMover() {
+  if (!alo.fantasma) return;
+  alo.fantasma.style.transform = `translate(${alo.px - alo.dx}px, ${alo.py - alo.dy}px) rotate(2deg)`;
+  const cel = aloCelEm(alo.px, alo.py);
+  document.querySelectorAll('.alo-cel.alvo').forEach(c => { if (c !== cel) c.classList.remove('alvo'); });
+  if (cel) cel.classList.add('alvo');
+}
+function aloRolarBorda() {
+  const g = $('.alo-dir .grade-wrap');
+  if (!alo.ativo) return;
+  if (g) {
+    const r = g.getBoundingClientRect();
+    if (alo.py > r.top && alo.py < r.bottom) {
+      if (alo.px < r.left + 170 && alo.px > r.left) g.scrollLeft -= 14;
+      else if (alo.px > r.right - 40) g.scrollLeft += 14;
+    }
+  }
+  if (alo.py < 110) window.scrollBy(0, -12);
+  else if (alo.py > window.innerHeight - 50) window.scrollBy(0, 12);
+  aloMover();
+}
+function aloIniciar() {
+  clearTimeout(alo.timer);
+  if (!alo.el || !alo.el.isConnected) { aloCancelar(); return; }
+  alo.ativo = true;
+  const r = alo.el.getBoundingClientRect();
+  alo.dx = Math.min(r.width - 20, alo.x0 - r.left); alo.dy = alo.y0 - r.top;
+  const f = alo.el.cloneNode(true);
+  f.classList.add('kb-fantasma', 'alo-fantasma');
+  f.removeAttribute('data-a');
+  f.style.width = Math.min(r.width, 260) + 'px';
+  document.body.appendChild(f);
+  alo.fantasma = f;
+  alo.el.classList.add('kb-apagado');
+  document.body.classList.add('kb-arrastando');
+  try { if (navigator.vibrate) navigator.vibrate(15); } catch { /* sem vibração */ }
+  aloMover();
+  alo.rolar = setInterval(aloRolarBorda, 16);
+}
+function aloCancelar() {
+  clearTimeout(alo.timer); clearInterval(alo.rolar);
+  if (alo.fantasma) alo.fantasma.remove();
+  if (alo.el) alo.el.classList.remove('kb-apagado');
+  document.querySelectorAll('.alo-cel.alvo').forEach(c => c.classList.remove('alvo'));
+  document.body.classList.remove('kb-arrastando');
+  alo.el = null; alo.ativo = false; alo.fantasma = null;
+}
+function aloSoltar() {
+  const cel = aloCelEm(alo.px, alo.py), id = alo.id;
+  aloCancelar();
+  alo.ultimo = Date.now(); // o "click" depois do arrasto não seleciona o cartão
+  const m = moduloAtual;
+  if (!cel || !m || m.id !== 'backlog') return;
+  aloAbrirPopup(m, id, cel.dataset.c, cel.dataset.dk);
+}
+document.addEventListener('pointerdown', ev => {
+  const card = ev.target.closest('.alo-card');
+  if (!card || ev.target.closest('[data-a="alo-ver"]') || !pode('agendar') || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+  aloCancelar();
+  Object.assign(alo, { el: card, tipo: ev.pointerType, id: card.dataset.alo, x0: ev.clientX, y0: ev.clientY, px: ev.clientX, py: ev.clientY });
+  if (ev.pointerType !== 'mouse') alo.timer = setTimeout(aloIniciar, 380);
+});
+document.addEventListener('pointermove', ev => {
+  if (!alo.el) return;
+  alo.px = ev.clientX; alo.py = ev.clientY;
+  if (!alo.ativo) {
+    const dist = Math.hypot(ev.clientX - alo.x0, ev.clientY - alo.y0);
+    if (alo.tipo === 'mouse') { if (dist > 6) aloIniciar(); } else if (dist > 10) aloCancelar();
+    return;
+  }
+  ev.preventDefault();
+  aloMover();
+}, { passive: false });
+document.addEventListener('pointerup', () => { if (alo.ativo) aloSoltar(); else if (alo.el) aloCancelar(); });
+document.addEventListener('pointercancel', () => { if (alo.el) aloCancelar(); });
+document.addEventListener('touchmove', ev => { if (alo.ativo) ev.preventDefault(); }, { passive: false });
+document.addEventListener('contextmenu', ev => { if (ev.target.closest('.alo-card')) ev.preventDefault(); });
+
+// ---- o módulo
+
+const baseBacklog = moduloTarefas({
   id: 'backlog',
   titulo: 'Backlog Base',
-  descricao: 'Backlog base a agendar e previsto',
+  descricao: 'Abrir chamados, triar e alocar na agenda dos consultores',
   icone: IC.sino,
-  arquivo: 'app_backlog_base.json',
+  arquivo: 'app_backlog_base.json', // chave do cache no aparelho (os dados vêm ao vivo)
   textoVazio: 'Nenhuma tarefa no Backlog Base para agendar.',
   mostrarEspaco: false,
   mostrarPrioridade: true,
-}));
+});
+
+MODULOS.push({
+  ...baseBacklog,
+  workflow: null,
+  etapa: '',
+  ler: async forcar => (await api('backlogBase', { forcar: !!forcar }, { tempo: 90000 })).conteudo,
+  uiInicial: () => ({ ...baseBacklog.uiInicial(), aba: 0,
+    alo: { sel: '', todas: false, passados: false, semanas: [0, 1, 2].includes(guardar.ler('alo.semanas')) ? guardar.ler('alo.semanas') : 1 } }),
+  desenhar(st, ctx) {
+    const ui = st.ui;
+    if (ui.aba === 0) baseBacklog.desenhar(st, ctx);
+    ctx.abas.innerHTML = pode('agendar')
+      ? `<nav class="abas">${['Lista', 'Alocação'].map((t, i) => `<button class="${ui.aba === i ? 'ativa' : ''}" data-a="aba" data-v="${i}">${t}</button>`).join('')}</nav>` : '';
+    ctx.acoes.innerHTML = `<button class="icone-btn" data-a="novo-chamado" aria-label="Novo chamado" title="Novo chamado">${IC.mais}</button>`;
+    if (ui.aba === 1) desenharAlocacao(st, ctx, this);
+  },
+  acao(nome, el, st, ev) {
+    const ui = st.ui;
+    switch (nome) {
+      case 'aba': ui.aba = +el.dataset.v; window.scrollTo(0, 0); redesenhar(this, true); return false;
+      case 'novo-chamado': abrirFormChamado(this); return false;
+      case 'alo-sel':
+        if (Date.now() - alo.ultimo < 500) return false;
+        ui.alo.sel = ui.alo.sel === el.dataset.alo ? '' : el.dataset.alo;
+        redesenhar(this, true); return false;
+      case 'alo-limpar': ui.alo.sel = ''; redesenhar(this, true); return false;
+      case 'alo-ver': { const t = itemBacklog(st.dados, el.dataset.id); if (t) folhaChamado(t); return false; }
+      case 'alo-todas': ui.alo.todas = el.dataset.v === '1'; redesenhar(this, true); return false;
+      case 'alo-semanas': ui.alo.semanas = +el.dataset.v; guardar.gravar('alo.semanas', ui.alo.semanas); redesenhar(this, true); return false;
+      case 'alo-agenda': { const ag = MODULOS.find(x => x.id === 'agenda'); recarregar(ag, true).then(() => redesenhar(this, true)); return false; }
+      case 'alo-cel':
+        if (Date.now() - alo.ultimo < 500) return false;
+        if (!ui.alo.sel) { toast('Escolha um chamado à esquerda (ou arraste-o até aqui).'); return false; }
+        aloAbrirPopup(this, ui.alo.sel, el.dataset.c, el.dataset.dk);
+        return false;
+      case 'limpar-busca':
+        if (ui.aba === 1) { ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); redesenhar(this, true); return false; }
+        break;
+    }
+    return baseBacklog.acao(nome, el, st, ev);
+  },
+});
 
 // Comitê de Personalizações retirado do app em 23/10/2026 (substituído pelo Backlog Desenvolvimento)
 

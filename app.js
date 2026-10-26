@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.6.2';
+const VERSAO_WEB = '2.6.3';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -73,6 +73,7 @@ const IC = {
   sino: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>',
   ferramenta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>',
   busca: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  filtros: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
   x: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
   sair: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/></svg>',
@@ -2147,11 +2148,27 @@ function controlesGantt(ui) {
   const g = gtUi(ui);
   const b = (a, v, t, sel) => `<button class="chip${sel ? ' sel' : ''}" data-a="${a}" data-v="${v}">${t}</button>`;
   const fim = somaDias(g.inicio, GT_ZOOM[g.zoom].dias - 1);
-  return `<div class="chips" style="flex-wrap:wrap">${b('gt-modo', 'tarefa', 'Por tarefa', g.modo === 'tarefa')}${b('gt-modo', 'consultor', 'Por consultor', g.modo === 'consultor')}</div>
-    <div class="chips" style="flex-wrap:wrap">${b('gt-zoom', 'semana', 'Semanas', g.zoom === 'semana')}${b('gt-zoom', 'mes', 'Meses', g.zoom === 'mes')}${b('gt-zoom', 'trimestre', 'Trimestre', g.zoom === 'trimestre')}</div>
-    <div class="chips" style="flex-wrap:wrap"><span class="pequeno" style="align-self:center">Ordenar:</span>${GT_ORDENS.map(([v, t]) => b('gt-ordem', v, t, g.ordem === v)).join('')}</div>
-    <div class="chips">${b('gt-nav', '-1', '‹', false)}${b('gt-nav', '0', 'Hoje', false)}${b('gt-nav', '1', '›', false)}
+  return `<div class="chips">${b('gt-nav', '-1', '‹', false)}${b('gt-nav', '0', 'Hoje', false)}${b('gt-nav', '1', '›', false)}
       <span class="pequeno" style="align-self:center">${esc(dataCurta(g.inicio))} a ${esc(dataCurta(fim))}</span></div>`;
+}
+
+/** Linha da busca do Gantt com o botão de filtros/ordenação no fim; o painel abre suspenso logo abaixo. */
+function buscaGantt(ui, dica) {
+  const g = gtUi(ui);
+  const b = (a, v, t, sel) => `<button class="chip${sel ? ' sel' : ''}" data-a="${a}" data-v="${v}">${t}</button>`;
+  const alterado = g.modo !== 'tarefa' || g.zoom !== 'mes' || g.ordem !== 'prioridade';
+  const painel = g.painel ? `<div class="gt-fundo-painel" data-a="gt-filtros"></div>
+    <div class="gt-painel" role="dialog" aria-label="Filtros e ordenação">
+      <div class="rotulo">Visão</div>
+      <div class="chips">${b('gt-modo', 'tarefa', 'Por tarefa', g.modo === 'tarefa')}${b('gt-modo', 'consultor', 'Por consultor', g.modo === 'consultor')}</div>
+      <div class="rotulo">Escala</div>
+      <div class="chips">${b('gt-zoom', 'semana', 'Semanas', g.zoom === 'semana')}${b('gt-zoom', 'mes', 'Meses', g.zoom === 'mes')}${b('gt-zoom', 'trimestre', 'Trimestre', g.zoom === 'trimestre')}</div>
+      <div class="rotulo">Ordenar</div>
+      <div class="chips" style="flex-wrap:wrap">${GT_ORDENS.map(([v, t]) => b('gt-ordem', v, t, g.ordem === v)).join('')}</div>
+    </div>` : '';
+  return `<div class="busca-linha">${campoBusca(ui.busca, dica)}
+      <button class="btn-filtros${g.painel ? ' aberto' : ''}" data-a="gt-filtros" aria-label="Filtros e ordenação" aria-expanded="${g.painel ? 'true' : 'false'}">${IC.filtros}${alterado ? '<i class="ponto"></i>' : ''}</button>
+      ${painel}</div>`;
 }
 
 /**
@@ -2349,7 +2366,7 @@ MODULOS.push({
     ctx.acoes.innerHTML = '';
     if (ui.aba === 2) {
       const topoGt = `<div class="secao">
-          ${campoBusca(ui.busca, 'Buscar cliente, tarefa, status ou consultor')}
+          ${buscaGantt(ui, 'Buscar cliente, tarefa, status ou consultor')}
           ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
           ${controlesGantt(ui)}
         </div>`;
@@ -2388,6 +2405,7 @@ MODULOS.push({
       if (t) folhaBacklog(t, st.dados.colunas, el.dataset.col);
       return false;
     }
+    if (nome === 'gt-filtros') { const g = gtUi(ui); g.painel = !g.painel; redesenhar(this, true); return false; }
     if (nome === 'gt-modo' || nome === 'gt-zoom' || nome === 'gt-nav' || nome === 'gt-ordem') {
       const g = gtUi(ui);
       if (nome === 'gt-modo') { g.modo = el.dataset.v; g.rolarHoje = true; }

@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.6.0';
+const VERSAO_WEB = '2.6.1';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -1830,8 +1830,9 @@ function itemBacklog(d, id) {
  * subtarefa "ativa" dela. Subtarefa ativa = não é de planejamento e o status
  * dela está no mesmo critério que coloca a demanda no Kanban (os status das
  * próprias demandas carregadas + não iniciado / pendente / em andamento /
- * em validação). Consultores fora da lista de desenvolvimento ganham coluna
- * própria. Sem nenhuma subtarefa ativa -> "Sem ninguém" (com o motivo).
+ * em validação). Só contam os consultores de desenvolvimento (as colunas que
+ * vêm do servidor); os demais consultores do ClickUp são ignorados. Sem
+ * subtarefa ativa de um desenvolvedor -> "A distribuir" (com o motivo).
  */
 const STATUS_KANBAN_BASE = ['nao iniciado', 'pendente', 'em andamento', 'em validacao'];
 const normStatus = s => semAcento(s).trim();
@@ -1861,26 +1862,28 @@ function filtrarItensBacklog(d, busca) {
     .sort((a, b) => a.prioridadeOrdem - b.prioridadeOrdem || a.criadoMs - b.criadoMs);
 }
 
-/** Quem está com cada demanda: Map(chave -> {nome, subs}) só com subtarefas ativas, mais as encerradas. */
-function analisarDemanda(it, crit, porNome, nomes) {
+/** Devs de uma subtarefa (só as chaves que são colunas do Kanban). */
+const devsDaSub = (a, ctx) => consultoresSub(a, ctx.porNome).map(([k]) => k).filter(k => ctx.devs.has(k));
+
+/** Quem está com cada demanda: Map(dev -> subtarefas ativas dele); temAgenda = já teve subtarefa de algum dev. */
+function analisarDemanda(it, ctx) {
   const ativos = new Map();
-  const validas = it.subtarefas.filter(a => !a.planejamento);
-  for (const a of validas) {
-    if (!subAtiva(a, crit)) continue;
-    for (const [k, n] of consultoresSub(a, porNome)) {
-      if (!nomes.has(k) && n) nomes.set(k, n);
+  const doDev = it.subtarefas.filter(a => !a.planejamento && devsDaSub(a, ctx).length);
+  for (const a of doDev) {
+    if (!subAtiva(a, ctx.crit)) continue;
+    for (const k of devsDaSub(a, ctx)) {
       if (!ativos.has(k)) ativos.set(k, []);
       ativos.get(k).push(a);
     }
   }
-  return { ativos, temAgenda: validas.length > 0 };
+  return { ativos, temAgenda: doDev.length > 0 };
 }
 
 function contextoBacklog(d) {
   const crit = criterioStatus(d);
   const porNome = new Map(d.colunas.map(c => [semAcento(c.nome), c.id]));
   const nomes = new Map(d.colunas.map(c => [c.id, c.nome]));
-  return { crit, porNome, nomes };
+  return { crit, porNome, nomes, devs: new Set(d.colunas.map(c => c.id)) };
 }
 
 function montarColunas(d, busca) {
@@ -1889,29 +1892,24 @@ function montarColunas(d, busca) {
   const por = new Map([[FILA, []], ...d.colunas.map(c => [c.id, []]), [VALIDACAO, []]]);
   const resumo = { total: 0, comAlguem: 0, semNinguem: 0, multi: 0 };
   for (const it of itens) {
-    const { ativos, temAgenda } = analisarDemanda(it, ctx.crit, ctx.porNome, ctx.nomes);
+    const { ativos, temAgenda } = analisarDemanda(it, ctx);
     // status "Em Validação": só na última coluna, à direita
     if (emValidacao(it)) { por.get(VALIDACAO).push({ item: it, proxima: null, outros: [...ativos.keys()] }); continue; }
     resumo.total++;
     if (!ativos.size) {
       resumo.semNinguem++;
-      por.get(FILA).push({ item: it, proxima: null, outros: [], motivo: temAgenda ? 'Sem agenda ativa — parada' : 'Nenhuma agenda criada' });
+      por.get(FILA).push({ item: it, proxima: null, outros: [], motivo: temAgenda ? 'Sem agenda ativa — parada' : 'Nenhuma subtarefa atribuída' });
       continue;
     }
     resumo.comAlguem++;
     if (ativos.size > 1) resumo.multi++;
     for (const [c, subs] of ativos) {
-      if (!por.has(c)) por.set(c, []);
       const prox = subs.map(a => a.data).filter(Boolean).sort()[0] || null;
       por.get(c).push({ item: it, proxima: prox, outros: [...ativos.keys()].filter(k => k !== c) });
     }
   }
-  // consultores que não estão na lista de desenvolvimento, mas estão em subtarefas ativas
-  const extras = [...por.keys()].filter(k => k !== FILA && k !== VALIDACAO && !d.colunas.some(c => c.id === k))
-    .map(k => ({ id: k, nome: ctx.nomes.get(k) || k.replace(/^n:/, ''), extra: true }))
-    .sort((a, b) => COLACAO.compare(a.nome, b.nome));
-  const cols = [{ id: FILA, nome: 'Sem ninguém', itens: por.get(FILA) },
-    ...[...d.colunas, ...extras].map(c => ({ id: c.id, nome: c.nome, extra: !!c.extra, itens: por.get(c.id) })),
+  const cols = [{ id: FILA, nome: 'A distribuir', itens: por.get(FILA) },
+    ...d.colunas.map(c => ({ id: c.id, nome: c.nome, itens: por.get(c.id) })),
     { id: VALIDACAO, nome: 'Em Validação', itens: por.get(VALIDACAO) }];
   cols.resumo = resumo;
   cols.nomes = ctx.nomes;
@@ -1936,16 +1934,16 @@ function cartaoKanban(x, colId, nomes) {
 
 function resumoKanban(r) {
   const n = (t, v, c) => `<div class="num"><b style="color:${c}">${v}</b><span>${t}</span></div>`;
-  return `<div class="secao" style="padding-top:4px;padding-bottom:4px"><div class="numeros">${n('Demandas', r.total, 'var(--texto)')}${n('Com consultor', r.comAlguem, 'var(--verde)')}${n('Sem ninguém', r.semNinguem, r.semNinguem ? 'var(--vermelho)' : 'var(--texto-2)')}${n('2+ consultores', r.multi, 'var(--azul)')}</div></div>`;
+  return `<div class="secao" style="padding-top:4px;padding-bottom:4px"><div class="numeros">${n('Demandas', r.total, 'var(--texto)')}${n('Com consultor', r.comAlguem, 'var(--verde)')}${n('A distribuir', r.semNinguem, r.semNinguem ? 'var(--vermelho)' : 'var(--texto-2)')}${n('2+ consultores', r.multi, 'var(--azul)')}</div></div>`;
 }
 
 function quadroKanban(st) {
   const cols = montarColunas(st.dados, st.ui.busca);
   return `${resumoKanban(cols.resumo)}<div class="kanban" data-rola="kanban">${cols.map(c => `
     <div class="kb-col${c.id === FILA ? ' fila' : c.id === VALIDACAO ? ' validacao' : ''}" data-col="${esc(c.id)}">
-      <div class="kb-cab"><b>${esc(c.nome)}</b>${c.extra ? '<span class="kb-tag">fora do dev</span>' : ''}<span class="contador">${c.itens.length}</span></div>
+      <div class="kb-cab"><b>${esc(c.nome)}</b><span class="contador">${c.itens.length}</span></div>
       <div class="kb-itens">${c.itens.length ? c.itens.map(x => cartaoKanban(x, c.id, cols.nomes)).join('')
-        : `<div class="pequeno kb-vazio">${c.id === FILA ? 'Toda demanda está com alguém' : c.id === VALIDACAO ? 'Nada em validação' : 'Arraste uma tarefa para cá'}</div>`}</div>
+        : `<div class="pequeno kb-vazio">${c.id === FILA ? 'Nada a distribuir' : c.id === VALIDACAO ? 'Nada em validação' : 'Arraste uma tarefa para cá'}</div>`}</div>
     </div>`).join('')}</div>`;
 }
 
@@ -1957,7 +1955,7 @@ function quadroKanban(st) {
  * consultor; concluída fica esmaecida, fora do critério do Kanban fica hachurada.
  * A barra fina de fundo é o período da demanda (início/1ª agenda até
  * vencimento/última agenda). "Por consultor": um grupo por consultor com as
- * demandas que estão com ele (mesma regra do Kanban) e o grupo "Sem ninguém".
+ * demandas que estão com ele (mesma regra do Kanban) e o grupo "A distribuir".
  * Tocar numa linha ou bloco abre o detalhe da demanda (editar / agendar).
  */
 const GT_ZOOM = { semana: { dias: 28, w: 40, voltar: 7 }, mes: { dias: 70, w: 20, voltar: 14 }, trimestre: { dias: 130, w: 9, voltar: 21 } };
@@ -2004,7 +2002,7 @@ function gtBlocos(subs, g, dias, w, corDe, ctx, chaveItem, col, soDe) {
     const x = difDias(a.data, g.inicio);
     if (x < 0 || x >= dias) return '';
     const cons = consultoresSub(a, ctx.porNome);
-    const k = soDe || (cons[0] && cons[0][0]) || '';
+    const k = soDe || (cons.find(([c]) => ctx.devs.has(c)) || cons[0] || [''])[0];
     const estado = a.realizada ? ' feita' : !subAtiva(a, crit) ? ' fora' : '';
     const dica = [dataCurta(a.data), a.consultores.join(', ') || 'Sem consultor', a.periodo, a.horas ? horas(a.horas) : '', a.status].filter(Boolean).join(' · ');
     return `<i class="gt-bloco${estado}" style="left:${x * w + 1}px;width:${Math.max(3, w - 2)}px;background:${corDe(k)}" title="${esc(dica)}" data-a="kb-detalhe" data-kb="${esc(chaveItem)}" data-col="${esc(col)}"></i>`;
@@ -2029,10 +2027,10 @@ function gantt(st) {
   const d = st.dados, g = gtUi(st.ui), z = GT_ZOOM[g.zoom], dias = z.dias, w = z.w, larg = dias * w;
   const ctx = contextoBacklog(d);
   const itens = filtrarItensBacklog(d, st.ui.busca);
-  const analise = new Map(itens.map(it => [it.id, analisarDemanda(it, ctx.crit, ctx.porNome, ctx.nomes)]));
+  const analise = new Map(itens.map(it => [it.id, analisarDemanda(it, ctx)]));
   // cor por consultor (ordem alfabética, estável)
   const chaves = new Set();
-  for (const it of itens) for (const a of it.subtarefas) if (!a.planejamento) for (const [k, n] of consultoresSub(a, ctx.porNome)) { chaves.add(k); if (n && !ctx.nomes.has(k)) ctx.nomes.set(k, n); }
+  for (const it of itens) for (const a of it.subtarefas) if (!a.planejamento) for (const k of devsDaSub(a, ctx)) chaves.add(k);
   const nomeDe = k => ctx.nomes.get(k) || String(k).replace(/^n:/, '') || 'Sem consultor';
   const ordem = [...chaves].sort((a, b) => COLACAO.compare(nomeDe(a), nomeDe(b)));
   const corDe = k => { const i = ordem.indexOf(k); return i < 0 ? '#87909e' : GT_CORES[i % GT_CORES.length]; };
@@ -2050,14 +2048,14 @@ function gantt(st) {
     for (const it of itens) {
       const { ativos, temAgenda } = analise.get(it.id);
       const subs = subsDe(it), ds = datasDe(subs);
-      const quem = ativos.size ? [...ativos.keys()].map(nomeDe).join(', ') : (temAgenda ? 'Sem ninguém · sem agenda ativa' : 'Sem ninguém · sem agenda');
+      const quem = ativos.size ? [...ativos.keys()].map(nomeDe).join(', ') : (temAgenda ? 'A distribuir · sem agenda ativa' : 'A distribuir · nenhuma subtarefa atribuída');
       const trilha = gtPeriodo(it.inicio || ds[0] || '', it.fim || ds[ds.length - 1] || '', g, dias, w, cor(it.statusCor), !ativos.size)
         + gtBlocos(subs, g, dias, w, k => corDe(k), ctx, it.id, '', '');
       linhas += gtLinha(rotDemanda(it, [it.pasta, quem].filter(Boolean).join(' · ')), linhaHoje + trilha, larg,
         ativos.size ? '' : ' sem-ninguem', ` role="button" data-a="kb-detalhe" data-kb="${esc(it.id)}" data-col=""`);
     }
   } else {
-    // grupos por consultor (só quem tem subtarefa ativa) + "Sem ninguém"
+    // grupos por desenvolvedor (só quem tem subtarefa ativa) + "A distribuir"
     const grupos = new Map(), semNinguem = [];
     for (const it of itens) {
       const { ativos } = analise.get(it.id);
@@ -2080,10 +2078,10 @@ function gantt(st) {
       }
     }
     if (semNinguem.length) {
-      linhas += gtLinha(`<div class="gt-nome"><span class="gt-ponto" style="background:var(--vermelho)"></span>Sem ninguém</div><div class="gt-sub">${semNinguem.length} demanda${semNinguem.length > 1 ? 's' : ''} sem subtarefa ativa</div>`, linhaHoje, larg, ' gt-grupo sem-ninguem');
+      linhas += gtLinha(`<div class="gt-nome"><span class="gt-ponto" style="background:var(--vermelho)"></span>A distribuir</div><div class="gt-sub">${semNinguem.length} demanda${semNinguem.length > 1 ? 's' : ''} sem desenvolvedor ativo</div>`, linhaHoje, larg, ' gt-grupo sem-ninguem');
       for (const it of semNinguem) {
         const subs = subsDe(it), ds = datasDe(subs);
-        linhas += gtLinha(rotDemanda(it, [it.pasta, subs.length ? 'sem agenda ativa' : 'sem agenda', it.fim ? 'vence ' + dataCurta(it.fim) : ''].filter(Boolean).join(' · ')),
+        linhas += gtLinha(rotDemanda(it, [it.pasta, analise.get(it.id).temAgenda ? 'sem agenda ativa' : 'nenhuma subtarefa atribuída', it.fim ? 'vence ' + dataCurta(it.fim) : ''].filter(Boolean).join(' · ')),
           linhaHoje + gtPeriodo(it.inicio || ds[0] || '', it.fim || ds[ds.length - 1] || '', g, dias, w, cor(it.statusCor), true) + gtBlocos(subs, g, dias, w, k => corDe(k), ctx, it.id, '', ''),
           larg, ' gt-filho', ` role="button" data-a="kb-detalhe" data-kb="${esc(it.id)}" data-col=""`);
       }
@@ -2093,7 +2091,7 @@ function gantt(st) {
     ? `<div class="gt-legenda">${ordem.map(k => `<span><i style="background:${corDe(k)}"></i>${esc(nomeDe(k))}</span>`).join('')}</div>` : '';
   return `${legenda}<div class="gantt" data-rola="gantt"><div class="gt-corpo" style="${fundo}">
     ${gtCabecalho(g, dias, w, larg)}${linhas}</div></div>
-    <div class="pequeno gt-nota">Bloco = agenda (subtarefa). Esmaecido = concluída · hachurado = status fora do critério do Kanban. Barra fina = período da demanda; tracejada = sem ninguém.</div>`;
+    <div class="pequeno gt-nota">Bloco = agenda (subtarefa). Esmaecido = concluída · hachurado = status fora do critério do Kanban. Barra fina = período da demanda; tracejada = a distribuir. Cinza = agenda de quem não é desenvolvedor.</div>`;
 }
 
 function controlesGantt(ui) {
@@ -2318,7 +2316,7 @@ MODULOS.push({
         ${campoBusca(ui.busca, 'Buscar cliente, tarefa, status ou pessoa')}
         ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
         <div class="pequeno" style="margin-top:8px">${pode('agendar')
-          ? 'Cada demanda aparece em todos os consultores com subtarefa ativa; sem nenhuma, fica em "Sem ninguém". Arraste um cartão até a coluna do consultor para criar a agenda (no celular, segure o cartão antes de arrastar). Toque no cartão para ver os detalhes e editar as agendas.'
+          ? 'Cada demanda aparece em todos os consultores com subtarefa ativa; sem nenhuma, fica em "A distribuir". Arraste um cartão até a coluna do consultor para criar a agenda (no celular, segure o cartão antes de arrastar). Toque no cartão para ver os detalhes e editar as agendas.'
           : 'Toque no cartão para ver os detalhes.'}</div>
       </div>`;
     const focado = document.activeElement && document.activeElement.id === 'busca';

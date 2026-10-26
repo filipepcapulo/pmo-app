@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.7.0';
+const VERSAO_WEB = '2.7.1';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -570,7 +570,7 @@ function telaInicio(app) {
  * (ok / parcial / erro) aparece no fim e fica no histórico do aparelho.
  */
 
-const PERIODOS_RAPIDOS = [['08h-12h', 'Manhã'], ['13h-17h', 'Tarde'], ['08h-18h', 'Dia inteiro']];
+const PERIODOS_RAPIDOS = [['08h-12h', 'Manhã'], ['14h-18h', 'Tarde'], ['08h-18h', 'Dia inteiro']];
 let opcoesCache = null;
 async function opcoesAgenda(forcar) {
   if (!forcar && opcoesCache && Date.now() - opcoesCache.em < 10 * 60000) return opcoesCache.dados;
@@ -598,7 +598,7 @@ function parceiroPorNome(ops, ...nomes) {
 }
 
 function horasPeriodo(p) {
-  const fixo = { '08h-12h': 4, '13h-17h': 4, '08h-18h': 8 }[p];
+  const fixo = { '08h-12h': 4, '13h-17h': 4, '14h-18h': 4, '08h-18h': 8 }[p];
   if (fixo) return fixo;
   const m = /^(\d{1,2})h-(\d{1,2})h$/.exec(p || '');
   if (!m) return 0;
@@ -1268,14 +1268,14 @@ function folhaEscolherConsultor(dados) {
 /* ---- v2.7.0: Agenda no padrão visual dos demais módulos ----
  * Por dia: um cartão por consultor (como na Ociosidade); o drilldown abre a linha do
  * tempo do dia, ordenada pelo horário de execução, com os horários livres clicáveis.
- * Grade: "Gantt" por consultor (mini-faixa 08h–17h em cada dia); o drilldown mostra as
+ * Grade: "Gantt" por consultor (mini-faixa 08h–18h em cada dia); o drilldown mostra as
  * agendas de cada dia por horário. Tocar numa agenda abre o popup com Editar e
  * Alocar mais (duplica a agenda para outras datas/horários); tocar num horário
  * vazio abre o formulário já com o consultor, o dia e o período.
  */
 const TURNO_COR = { manha: '#d29c0b', tarde: '#3b7dd8', dia: '#8e5cc4', noite: '#55606e' };
-const JANELAS_TRABALHO = [[8, 12], [13, 17]];
-const INICIO_DIA = 8, FIM_DIA = 17;
+const JANELAS_TRABALHO = [[8, 12], [14, 18]];
+const INICIO_DIA = 8, FIM_DIA = 18;
 
 /** "08h-12h", "08h30 - 12h" → [8, 12] / [8.5, 12] (horas decimais) ou null. */
 function faixaPeriodo(p) {
@@ -1287,7 +1287,7 @@ function faixaPeriodo(p) {
 const horaTxt = h => { const i = Math.floor(h), m = Math.round((h - i) * 60); return pad2(i) + 'h' + (m ? pad2(m) : ''); };
 const periodoDeFaixa = (a, b) => `${horaTxt(a)}-${horaTxt(b)}`;
 
-/** Horários livres do dia (≥ 1h) dentro de 08h–12h e 13h–17h, descontando os períodos ocupados. */
+/** Horários livres do dia (≥ 1h) dentro de 08h–12h e 14h–18h, descontando os períodos ocupados. */
 function vagosDoDia(dc, dk) {
   if (fimDeSemana(dk) || dc.horas >= 8) return [];
   const ocup = dc.itens.map(i => faixaPeriodo(i.periodo)).filter(Boolean);
@@ -1339,7 +1339,7 @@ function linhaTempo(c, dk, compacto = false) {
   }).join('')}</div>`;
 }
 
-/** Mini-faixa 08h–17h do dia, com os períodos ocupados (Grade). */
+/** Mini-faixa 08h–18h do dia, com os períodos ocupados (Grade). */
 function miniFaixa(dc) {
   const tot = FIM_DIA - INICIO_DIA;
   const segs = dc.itens.map(it => { const f = faixaPeriodo(it.periodo); return f && { f, cor: TURNO_COR[it.turno] || '#87909e' }; }).filter(Boolean)
@@ -1424,7 +1424,7 @@ function agendaGrade(st) {
       ${[[0, 'livre'], [4, '≤7h'], [8, '8h'], [10, '≤12h'], [13, '>12h']].map(([h, r]) => { const [f, t] = coresHoras(h); return `<span style="background:${f};color:${t}">${r}</span>`; }).join('')}
       <span class="leg-t"><i style="background:${TURNO_COR.manha}"></i>Manhã</span><span class="leg-t"><i style="background:${TURNO_COR.tarde}"></i>Tarde</span><span class="leg-t"><i style="background:${TURNO_COR.dia}"></i>Dia inteiro</span>
     </div>
-    <p class="muted" style="padding:0 16px">Faixa de cada dia: 08h–17h. Toque no consultor (ou num dia com horas) para abrir as agendas por horário · toque numa agenda para ver os detalhes${pode('agendar') ? ' · toque num dia ou horário livre para agendar' : ''}.</p>`;
+    <p class="muted" style="padding:0 16px">Faixa de cada dia: 08h–18h (almoço 12h–14h). Toque no consultor (ou num dia com horas) para abrir as agendas por horário · toque numa agenda para ver os detalhes${pode('agendar') ? ' · toque num dia ou horário livre para agendar' : ''}.</p>`;
 }
 
 /** Popup de detalhes da agenda, com Editar e Alocar mais. */

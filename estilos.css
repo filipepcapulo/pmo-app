@@ -535,7 +535,9 @@ body.modo-pc .folha.larga { max-width: 760px; }
 .alo-rod { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .alo-rod .pequeno { flex: 1; min-width: 0; }
 .alo-rod .btn { padding: 2px 4px; font-size: 13px; }
-.alo-fantasma { width: 240px; }
+.alo-fantasma { padding: 4px 7px; border-radius: 8px; background: var(--superficie); border: 2px solid var(--verde); opacity: .9;
+  font-size: 11px; font-weight: 600; line-height: 1.25; color: var(--texto); box-shadow: 0 6px 16px rgba(0,0,0,.25); }
+.alo-fantasma span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .alo-dir { min-width: 0; }
 .alo-ctrl { display: flex; align-items: center; gap: 10px; padding: 10px 12px 6px; flex-wrap: wrap; }
 .alo-ctrl .chips { flex: 1; min-width: 0; }

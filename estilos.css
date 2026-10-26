@@ -494,3 +494,71 @@ body.modo-pc { --gt-rot: 280px; }
 .gt-legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 0 16px 8px; font-size: 12px; }
 .gt-legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .gt-nota { padding: 6px 16px 20px; }
+
+/* ---------- v2.9.0 — Backlog Base: novo chamado e alocação ---------- */
+body.modo-pc .folha.larga { max-width: 760px; }
+.form-ch .sec-ch { margin: 22px 0 2px; padding-top: 12px; border-top: 1px solid var(--linha); font-size: 13px; font-weight: 800; color: var(--verde); text-transform: uppercase; letter-spacing: .3px; }
+.form-ch .sec-ch:first-of-type { border-top: 0; margin-top: 10px; padding-top: 0; }
+.form-ch .duas { display: grid; grid-template-columns: 1fr; gap: 0 12px; }
+@media (min-width: 560px) { .form-ch .duas { grid-template-columns: 1fr 1fr; } }
+.form-ch .chip { flex-direction: column; align-items: flex-start; gap: 1px; white-space: normal; text-align: left; }
+.form-ch .chip .ponto { display: none; }
+.form-ch #ch-impacto .chip { flex-direction: row; align-items: center; gap: 6px; }
+.form-ch #ch-impacto .chip .ponto { display: inline-block; width: 8px; height: 8px; }
+.form-ch .chip .sub-chip { font-size: 11px; font-weight: 400; opacity: .7; margin: 0; }
+.form-ch label .conta { float: right; font-weight: 600; text-transform: none; color: var(--laranja); }
+.form-ch label .conta.ok { color: var(--verde); }
+.campo.invalido, .chips.invalido, .anexos-ch.invalido { outline: 2px solid var(--vermelho); outline-offset: 2px; border-radius: 10px; }
+.anexos-ch { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding: 2px; }
+.anexo-ch { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border: 1px solid var(--linha); border-radius: 10px; background: var(--superficie); }
+.anexo-ch .ic svg { width: 16px; height: 16px; color: var(--texto-2); display: block; }
+.anexo-ch .n { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.form-ag label.add-anexo { display: inline-flex; align-self: flex-start; margin: 0; font-size: 14px; color: var(--verde); text-transform: none; cursor: pointer; }
+.anexos-l { display: flex; flex-direction: column; gap: 4px; }
+.anexos-l > a, .anexos-l > span { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; text-decoration: none; min-width: 0; }
+.anexos-l svg { width: 14px; height: 14px; flex: none; }
+.anexos-l span span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.alo { display: flex; flex-direction: column; }
+.alo-esq { background: var(--superficie-2); border-bottom: 1px solid var(--linha); }
+.alo-topo { padding: 10px 12px 4px; }
+.alo-topo .busca { margin-top: 8px; }
+.alo-tit { display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.alo-lista { display: flex; gap: 8px; overflow-x: auto; padding: 8px 12px 12px; scrollbar-width: none; }
+.alo-lista::-webkit-scrollbar { display: none; }
+.alo-lista .vazio { padding: 8px 4px; }
+.alo-card { flex: none; width: 240px; background: var(--superficie); border-radius: 10px; padding: 10px; box-shadow: var(--sombra); border: 2px solid transparent;
+  cursor: grab; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.alo-card.sel { border-color: var(--verde); background: color-mix(in srgb, var(--verde-claro) 45%, var(--superficie)); }
+.alo-card .local { font-size: 11px; color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alo-card .kb-outros svg { width: 13px; height: 13px; }
+.alo-rod { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.alo-rod .pequeno { flex: 1; min-width: 0; }
+.alo-rod .btn { padding: 2px 4px; font-size: 13px; }
+.alo-fantasma { width: 240px; }
+.alo-dir { min-width: 0; }
+.alo-ctrl { display: flex; align-items: center; gap: 10px; padding: 10px 12px 6px; flex-wrap: wrap; }
+.alo-ctrl .chips { flex: 1; min-width: 0; }
+.alo-dica { display: flex; align-items: center; gap: 8px; margin: 0 12px 8px; padding: 8px 10px; border-radius: 10px; background: var(--superficie-2); font-size: 12.5px; color: var(--texto-2); }
+.alo-dica svg { width: 16px; height: 16px; flex: none; }
+.alo-dica span { flex: 1; min-width: 0; }
+.alo-dica.ativa { background: var(--verde-claro); color: var(--verde-texto); }
+.alo-dica.ativa b { display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+table.alo-grade td.alo-cel { cursor: pointer; transition: background .1s; }
+table.alo-grade td.alo-cel:hover { background: color-mix(in srgb, var(--verde-claro) 35%, transparent); }
+table.alo-grade td.alo-cel.alvo { background: var(--verde-claro); outline: 2px dashed var(--verde); outline-offset: -3px; }
+table.alo-grade th.dia, table.alo-grade td.cel { min-width: 74px; }
+.alo-livre { display: block; font-size: 10px; font-weight: 700; text-align: center; color: var(--texto-2); white-space: nowrap; }
+td.com-livre .alo-livre { color: var(--verde); }
+.al-ocup { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px 6px 10px; margin: 4px 0; border-radius: 8px; background: var(--superficie-2); border-left: 4px solid var(--t); font-size: 13px; }
+.al-ocup b { flex: none; font-variant-numeric: tabular-nums; }
+.al-ocup span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--texto-2); }
+.chip.livre { border-style: dashed; border-color: var(--verde); color: var(--verde); }
+.chip.livre.sel { border-style: solid; }
+
+body.modo-pc .alo { flex-direction: row; align-items: stretch; }
+body.modo-pc .alo-esq { flex: none; width: 320px; border-bottom: 0; border-right: 1px solid var(--linha);
+  position: sticky; top: calc(var(--topo) + 56px + 46px); align-self: flex-start; height: calc(100vh - var(--topo) - 56px - 46px); display: flex; flex-direction: column; }
+body.modo-pc .alo-lista { flex: 1; flex-direction: column; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
+body.modo-pc .alo-card { width: auto; }
+body.modo-pc .alo-dir { flex: 1; }

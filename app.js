@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.11.0';
+const VERSAO_WEB = '2.11.1';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -1808,7 +1808,7 @@ function listaDemandas(st) {
   const gerente = d.gerentes.includes(ui.gerente) ? ui.gerente : null;
   const filtrando = !!ui.busca.trim() || ui.soAtrasadas;
   const clientes = filtrarDemandas(d, ui.busca, ui.soAtrasadas, gerente);
-  if (!clientes.length) return `<div class="vazio">${filtrando ? 'Nenhuma demanda encontrada.' : 'Nenhuma demanda aberta na etapa Planejamento.'}</div>`;
+  if (!clientes.length) return `<div class="vazio">${filtrando ? 'Nenhuma demanda encontrada.' : 'Nenhuma demanda aberta nas etapas Planejamento ou Personalização.'}</div>`;
   const grupos = new Map();
   clientes.forEach(c => { if (!grupos.has(c.gerente)) grupos.set(c.gerente, []); grupos.get(c.gerente).push(c); });
   let h = '';
@@ -1840,7 +1840,7 @@ function listaDemandas(st) {
 MODULOS.push({
   id: 'demandas',
   titulo: 'Demandas',
-  descricao: 'Demandas na etapa Planejamento por gerente, cliente, lista e demanda',
+  descricao: 'Demandas em Planejamento ou Personalização por gerente, cliente, lista e demanda',
   icone: IC.lista,
   workflow: null,
   arquivo: 'app_demandas.json', // só a chave do cache no aparelho (os dados vêm ao vivo)

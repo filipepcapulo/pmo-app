@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.9.1';
+const VERSAO_WEB = '2.10.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -563,7 +563,9 @@ function telaInicio(app) {
 /*
  * Formulário único para incluir (subtarefa nova dentro da demanda) ou alterar
  * uma agenda. Regras da skill agendar-atendimento-clickup: título, consultor,
- * data, período e parceiro obrigatórios; observações vão no Detalhamento;
+ * data e período obrigatórios; o Parceiro é o da pasta (cliente), gravado pelo
+ * servidor; a tarefa-pai é digitada: se não existir, é criada (ação demandaCriar)
+ * antes das agendas; observações vão no Detalhamento;
  * Etapa "Atendimento avulso", Agendamento "Agendar", Experience "Não lançado"
  * e Apontamento "OS Experience" por padrão; vários dias = uma subtarefa por dia,
  * cada dia com o período geral ou um período próprio (um envio ao servidor por período).
@@ -585,17 +587,24 @@ function uuid() {
   const b = crypto.getRandomValues(new Uint8Array(16));
   return [...b].map(x => x.toString(16).padStart(2, '0')).join('');
 }
-function parceiroPorNome(ops, ...nomes) {
-  for (const n of nomes) {
-    const t = semAcento(n).trim();
-    if (!t) continue;
-    const exato = ops.parceiros.find(p => semAcento(p.nome) === t);
-    if (exato) return exato.id;
-    const p1 = t.split(/[\s-]+/)[0];
-    const parc = ops.parceiros.filter(p => semAcento(p.nome).split(/[\s-]+/)[0] === p1);
-    if (parc.length === 1) return parc[0].id;
-  }
-  return '';
+/** Lista sugerida para criar a tarefa-pai: a "Avulso" aberta (sem o Z de encerrada) do cliente. */
+function listaPadraoPai(ops, pastaId) {
+  const ls = ((ops.clientes.find(c => c.id === pastaId) || {}).listas) || [];
+  const abertas = ls.filter(l => !/^z/i.test(l.nome.trim()));
+  return ((abertas.find(l => /avuls/i.test(l.nome)) || abertas[0] || ls[0]) || {}).id || '';
+}
+/** Sugestões da tarefa-pai conforme o texto digitado (e a opção de criar quando não existe). */
+function sugestoesDemandaHTML(f) {
+  const txt = f.paiBusca.trim(), t = semAcento(txt), todas = f.demandas || [];
+  const lista = todas.filter(d => !t || semAcento(d.nome + ' ' + d.lista).includes(t));
+  const exato = todas.some(d => semAcento(d.nome) === t);
+  const grupos = {};
+  lista.slice(0, 40).forEach(d => { (grupos[d.lista] = grupos[d.lista] || []).push(d); });
+  return (txt.length >= 3 && !exato ? `<button type="button" class="dem-op nova" data-x="dem-nova">+ Criar tarefa-pai “${esc(txt)}”</button>` : '')
+    + Object.entries(grupos).map(([l, ds]) => `<div class="dem-grupo">${esc(l)}</div>${ds.map(d => `<button type="button" class="dem-op" data-x="dem-esc" data-id="${esc(d.id)}">${esc(d.nome)}</button>`).join('')}`).join('')
+    + (lista.length > 40 ? `<div class="pequeno">Mais ${lista.length - 40} demandas: digite para filtrar.</div>` : '')
+    + (!todas.length ? '<div class="pequeno">Nenhuma demanda aberta neste cliente. Digite o nome para criar a tarefa-pai.</div>'
+      : !lista.length ? '<div class="pequeno">Nenhuma demanda com esse nome.</div>' : '');
 }
 
 function horasPeriodo(p) {
@@ -644,11 +653,11 @@ async function abrirFormAgenda(inicial = {}) {
   const f = {
     op: uuid(), estado: 'carregando', erro: '', resultado: null,
     id: inicial.id || '', paiId: inicial.pai?.id || '', paiNome: inicial.pai?.nome || '', paiLocal: inicial.pai?.local || '',
-    pastaId: '', demandas: null, carregandoDemandas: false,
+    pastaId: '', demandas: null, carregandoDemandas: false, paiBusca: '', novoPai: null, opPai: uuid(), paiCriada: null,
     paiFixo: !!inicial.paiFixo, exigirData: !!inicial.exigirData, etapaPai: !!inicial.etapaPai,
     titulo: '', consultorId: inicial.consultorId || '',
     datas: inicial.exigirData || copia ? [] : [inicial.data && inicial.data >= isoHoje() ? inicial.data : isoHoje()],
-    copia, periodo: '08h-12h', agenda: 'Remoto', apontamento: 'OS Experience', parceiroId: '', detalhamento: '', status: '',
+    copia, periodo: '08h-12h', agenda: 'Remoto', apontamento: 'OS Experience', detalhamento: '', status: '',
     // período próprio por dia (vazio = usa o período geral) e id de operação por período (não duplica ao repetir)
     periodosDia: {}, opsPeriodo: {},
   };
@@ -661,7 +670,7 @@ async function abrirFormAgenda(inicial = {}) {
   const acoes = {
     desenhar,
     async escolherPasta(id) {
-      f.pastaId = id; f.paiId = ''; f.demandas = null;
+      f.pastaId = id; f.paiId = ''; f.demandas = null; f.novoPai = null; f.paiBusca = '';
       if (!id) { desenhar(); return; }
       f.carregandoDemandas = true; desenhar();
       try { f.demandas = (await api('agendaDemandas', { pastaId: id })).demandas; }
@@ -669,19 +678,35 @@ async function abrirFormAgenda(inicial = {}) {
       f.carregandoDemandas = false; desenhar();
     },
     async salvar() {
+      // Texto digitado na tarefa-pai sem escolher: usa a demanda de mesmo nome ou cria uma nova
+      if (!editando && !f.paiId && !f.novoPai && f.pastaId && f.paiBusca.trim().length >= 3) {
+        const ex = (f.demandas || []).find(d => semAcento(d.nome) === semAcento(f.paiBusca.trim()));
+        if (ex) acoes.escolherDemanda(ex); else acoes.novaDemanda();
+      }
       const faltam = [];
       if (!f.titulo.trim()) faltam.push('título');
       if (!f.consultorId) faltam.push('consultor');
       if (!f.datas.length) faltam.push(f.exigirData ? 'data de vencimento' : 'data');
       const perDe = d => (!editando && f.periodosDia[d]) || f.periodo;
       if (f.datas.some(d => !perDe(d))) faltam.push('período');
-      if (!editando && !f.paiId) faltam.push('demanda');
+      if (!editando && !f.paiId && !f.novoPai) faltam.push('demanda (tarefa-pai)');
+      if (f.novoPai && !f.novoPai.listaId) faltam.push('lista da nova tarefa-pai');
       if (faltam.length) { f.erro = 'Preencha: ' + faltam.join(', ') + '.'; desenhar(); return; }
       f.estado = 'salvando'; f.erro = ''; desenhar();
+      if (f.novoPai && !f.paiId) {
+        try {
+          const p = await api('demandaCriar', { idOperacao: f.opPai, dados: { nome: f.paiNome, pastaId: f.pastaId, listaId: f.novoPai.listaId, agenda: f.agenda } }, { tempo: 120000 });
+          f.paiCriada = p; f.paiId = p.id; f.paiNome = p.nome; f.paiLocal = [p.pasta, p.lista].filter(Boolean).join(' › '); f.novoPai = null;
+        } catch (e) {
+          f.estado = 'editando';
+          f.erro = 'Não consegui criar a tarefa-pai: ' + mensagemAmigavel(e) + (e.codigo === 'REDE' ? ' Toque em salvar de novo: se já tiver sido criada, não duplica.' : '');
+          desenhar(); return;
+        }
+      }
       const dados = {
         id: f.id || undefined, paiId: f.paiId || undefined, titulo: f.titulo.trim(), consultorId: f.consultorId,
         datas: [...f.datas].sort(), periodo: f.periodo, agenda: f.agenda, apontamento: f.apontamento,
-        parceiroId: f.parceiroId, detalhamento: f.detalhamento,
+        detalhamento: f.detalhamento,
       };
       if (f.etapaPai) dados.etapaPai = true;
       // um envio por período: os dias com o mesmo período vão juntos
@@ -716,10 +741,20 @@ async function abrirFormAgenda(inicial = {}) {
         registrarHistorico({ em: Date.now(), modo: editando ? 'editar' : 'incluir', titulo: dados.titulo, consultor, datas: dados.datas,
           periodo: periodoTxt, demanda: f.paiNome, situacao: r.situacao,
           resultados: r.resultados.map(x => ({ id: x.id, url: x.url, data: x.data, situacao: x.situacao, erro: x.erro, naoConfirmados: x.naoConfirmados })) });
+        if (f.paiCriada) r.paiCriada = f.paiCriada;
         if (r.situacao === 'ok' || r.situacao === 'parcial') {
-          // Backlog Desenvolvimento relê o ClickUp para o cartão mudar de coluna
-          const bd = MODULOS.find(m => m.id === 'backlogdev');
-          if (bd && estados[bd.id]) { estadoDe(bd).lidoEm = 0; if (moduloAtual === bd) recarregar(bd, true); }
+          // mostra na hora na Agenda/Alocação; o ClickUp e o Gist se atualizam por trás
+          const cliente = f.paiLocal.split(' › ')[0] || '';
+          registrarAgendasLocais((r.resultados || []).filter(x => x.situacao !== 'erro').map(x => {
+            const p = x.periodo || perDe(x.data);
+            return { consultorId: f.consultorId, data: x.data, item: { id: x.id, url: x.url, cliente, tarefa: dados.titulo, periodo: p,
+              horas: horasPeriodo(p), turno: turnoDe(p), agenda: f.agenda, detalhamento: f.detalhamento, pai_id: f.paiId || '' } };
+          }));
+          // Backlogs (ao vivo) relêem o ClickUp para o cartão/chamado mostrar a agenda nova
+          for (const id of ['backlogdev', 'backlog']) {
+            const bm = MODULOS.find(m => m.id === id);
+            if (bm && estados[bm.id]) { estadoDe(bm).lidoEm = 0; if (moduloAtual === bm) recarregar(bm, true); }
+          }
         }
         if (r.agendaAtualizando) {
           const ag = MODULOS.find(m => m.id === 'agenda');
@@ -732,6 +767,15 @@ async function abrirFormAgenda(inicial = {}) {
           periodo: periodoTxt, demanda: f.paiNome, situacao: f.resultado.situacao, erro: f.resultado.erro, resultados: [] });
       }
       desenhar();
+    },
+    escolherDemanda(d) {
+      f.paiId = d.id; f.paiNome = d.nome; f.novoPai = null;
+      f.paiLocal = [ops.clientes.find(c => c.id === f.pastaId)?.nome, d.lista].filter(Boolean).join(' › ');
+    },
+    novaDemanda() {
+      f.novoPai = { listaId: listaPadraoPai(ops, f.pastaId) };
+      f.paiNome = f.paiBusca.trim().replace(/\s+/g, ' ');
+      f.paiLocal = ops.clientes.find(c => c.id === f.pastaId)?.nome || '';
     },
     voltar() { f.estado = 'editando'; f.resultado = null; desenhar(); },
     novo() {
@@ -748,7 +792,7 @@ async function abrirFormAgenda(inicial = {}) {
       const t = (await api('agendaTarefa', { id: inicial.id })).tarefa;
       Object.assign(f, {
         id: t.id, titulo: t.titulo, consultorId: t.consultorId, datas: [t.data || isoHoje()], periodo: t.periodo || '',
-        agenda: t.agenda || 'Remoto', apontamento: t.apontamento || 'OS Experience', parceiroId: t.parceiroId || '',
+        agenda: t.agenda || 'Remoto', apontamento: t.apontamento || 'OS Experience',
         detalhamento: t.detalhamento || '', paiNome: t.pai.nome, paiLocal: [t.pasta?.nome, t.lista].filter(Boolean).join(' › '),
         url: t.url, status: t.status,
       });
@@ -758,7 +802,7 @@ async function abrirFormAgenda(inicial = {}) {
       const t = (await api('agendaTarefa', { id: inicial.copiaDe })).tarefa;
       Object.assign(f, {
         titulo: t.titulo || '', consultorId: inicial.consultorId || t.consultorId || '', periodo: t.periodo || '',
-        agenda: t.agenda || 'Remoto', apontamento: t.apontamento || 'OS Experience', parceiroId: t.parceiroId || '',
+        agenda: t.agenda || 'Remoto', apontamento: t.apontamento || 'OS Experience',
         detalhamento: t.detalhamento || '', paiId: (t.pai && t.pai.id) || t.paiId || inicial.paiId || '',
         paiNome: (t.pai && t.pai.nome) || '', paiLocal: [t.pasta?.nome, t.lista].filter(Boolean).join(' › '),
       });
@@ -767,10 +811,7 @@ async function abrirFormAgenda(inicial = {}) {
       f.aviso = `Nova agenda com os dados de “${t.titulo || inicial.copiaNome || 'agenda'}”. Escolha as novas datas e horários (dá para trocar o consultor).`
         + (f.paiId ? '' : ' Não identifiquei a demanda-pai: escolha o cliente e a demanda abaixo.');
       if (f.consultorId && !ops.consultores.some(c => c.id === f.consultorId)) ops = { ...ops, consultores: [...ops.consultores, ...(t.consultores || []).filter(c => c.id === f.consultorId)] };
-    } else {
-      f.parceiroId = parceiroPorNome(ops, inicial.parceiro, inicial.cliente);
-      if (inicial.periodo) f.periodo = periodoDisponivel(inicial.periodo, ops);
-    }
+    } else if (inicial.periodo) f.periodo = periodoDisponivel(inicial.periodo, ops);
     if (f.periodo && !PERIODOS_RAPIDOS.some(p => p[0] === f.periodo)) f.outroPeriodo = true;
     f.estado = 'editando';
   } catch (e) {
@@ -798,17 +839,19 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
     const salvando = f.estado === 'salvando';
     const opt = (v, t, sel) => `<option value="${esc(v)}"${sel ? ' selected' : ''}>${esc(t)}</option>`;
     let demanda;
-    if (editando || f.paiId && f.paiNome) {
+    if (editando || f.paiId && f.paiNome || f.novoPai) {
+      const listas = f.novoPai ? (((ops.clientes.find(c => c.id === f.pastaId) || {}).listas) || []) : [];
       demanda = `<div class="caixa-dem"><div class="pequeno">${esc(f.paiLocal)}</div><b>${esc(f.paiNome || 'Demanda')}</b>
+        ${f.novoPai ? `<span class="nova-pai">Nova tarefa-pai: será criada no ClickUp ao salvar</span>
+          <label for="fa-pai-lista">Lista *</label>
+          <select id="fa-pai-lista" class="campo">${opt('', 'Escolha a lista…', !f.novoPai.listaId)}${listas.map(l => opt(l.id, l.nome, l.id === f.novoPai.listaId)).join('')}</select>` : ''}
         ${!editando && !f.paiFixo ? '<button class="btn texto" data-x="trocar-dem" style="padding:4px 0">Trocar demanda</button>' : ''}</div>`;
     } else {
-      const grupos = {};
-      (f.demandas || []).forEach(d => { (grupos[d.lista] = grupos[d.lista] || []).push(d); });
       demanda = `
         <select id="fa-pasta" class="campo">${opt('', 'Escolha o cliente…', !f.pastaId)}${ops.clientes.map(c => opt(c.id, c.nome, c.id === f.pastaId)).join('')}</select>
         ${f.pastaId ? (f.carregandoDemandas ? '<div class="muted" style="margin-top:8px"><span class="spinner p" style="display:inline-block;vertical-align:middle"></span> Buscando demandas…</div>'
-          : `<select id="fa-dem" class="campo" style="margin-top:8px">${opt('', (f.demandas || []).length ? 'Escolha a demanda (tarefa-pai)…' : 'Nenhuma demanda aberta neste cliente', !f.paiId)}
-              ${Object.entries(grupos).map(([l, ds]) => `<optgroup label="${esc(l)}">${ds.map(d => opt(d.id, d.nome, d.id === f.paiId)).join('')}</optgroup>`).join('')}</select>`) : ''}`;
+          : `<input id="fa-dem-busca" class="campo" style="margin-top:8px" type="text" value="${esc(f.paiBusca)}" placeholder="Digite para buscar ou criar a tarefa-pai…" autocomplete="off" aria-label="Tarefa-pai">
+             <div id="fa-dem-sug" class="dem-sug">${sugestoesDemandaHTML(f)}</div>`) : ''}`;
     }
     const periodoOutro = f.periodo && !PERIODOS_RAPIDOS.some(p => p[0] === f.periodo);
     const multi = !editando && f.datas.length > 1;
@@ -847,8 +890,6 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
         }).join('')}</div>` : ''}
         <label>Tipo de agenda</label>
         <div class="chips" style="flex-wrap:wrap">${ops.agendas.map(a => `<button type="button" class="chip${f.agenda === a ? ' sel' : ''}" data-x="agenda" data-v="${esc(a)}">${esc(a)}</button>`).join('')}</div>
-        <label for="fa-parc">Parceiro *</label>
-        <select id="fa-parc" class="campo">${opt('', editando ? 'Escolha…' : 'O mesmo da demanda', !f.parceiroId)}${ops.parceiros.map(p => opt(p.id, p.nome, p.id === f.parceiroId)).join('')}</select>
         <label for="fa-apont">Apontamento</label>
         <select id="fa-apont" class="campo">${ops.apontamentos.map(a => opt(a, a, a === f.apontamento)).join('')}</select>
         <label for="fa-det">Detalhamento</label>
@@ -864,7 +905,8 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
     liga('fa-titulo', v => { f.titulo = v; });
     liga('fa-det', v => { f.detalhamento = v; });
     liga('fa-cons', v => { f.consultorId = v; }, 'change');
-    liga('fa-parc', v => { f.parceiroId = v; }, 'change');
+    liga('fa-pai-lista', v => { f.novoPai.listaId = v; }, 'change');
+    liga('fa-dem-busca', v => { f.paiBusca = v; const sg = $('#fa-dem-sug', corpo); if (sg) sg.innerHTML = sugestoesDemandaHTML(f); });
     liga('fa-apont', v => { f.apontamento = v; }, 'change');
     liga('fa-per', v => { f.periodo = v; acoes.desenhar(); }, 'change');
     corpo.querySelectorAll('[data-per-dia]').forEach(el => el.addEventListener('change', () => {
@@ -879,12 +921,6 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
       acoes.desenhar();
     }, 'change');
     liga('fa-pasta', v => acoes.escolherPasta(v), 'change');
-    liga('fa-dem', v => {
-      f.paiId = v;
-      const d = (f.demandas || []).find(x => x.id === v);
-      if (d) { f.paiNome = d.nome; f.paiLocal = [ops.clientes.find(c => c.id === f.pastaId)?.nome, d.lista].filter(Boolean).join(' › '); if (d.parceiroId) f.parceiroId = d.parceiroId; }
-      acoes.desenhar();
-    }, 'change');
     if (ativo && $('#' + ativo, corpo)) $('#' + ativo, corpo).focus();
   }
   folha.onclick = ev => {
@@ -895,7 +931,9 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
     if (x === 'salvar') { acoes.salvar(); return; }
     if (x === 'voltar') { acoes.voltar(); return; }
     if (x === 'novo') { acoes.novo(); return; }
-    if (x === 'trocar-dem') { f.paiId = ''; f.paiNome = ''; f.paiLocal = ''; f.pastaId = ''; f.demandas = null; }
+    if (x === 'trocar-dem') { f.paiId = ''; f.paiNome = ''; f.paiLocal = ''; f.pastaId = ''; f.demandas = null; f.novoPai = null; f.paiBusca = ''; f.paiCriada = null; f.opPai = uuid(); }
+    if (x === 'dem-esc') { const d = (f.demandas || []).find(y => y.id === b.dataset.id); if (d) acoes.escolherDemanda(d); }
+    if (x === 'dem-nova') acoes.novaDemanda();
     if (x === 'periodo') {
       f.periodo = b.dataset.v; f.outroPeriodo = false;
       for (const d of Object.keys(f.periodosDia)) if (f.periodosDia[d] === f.periodo) delete f.periodosDia[d];
@@ -929,13 +967,15 @@ function resultadoAgendaHTML(r, editando) {
         ${(x.avisos || []).length ? `<div class="pequeno">${esc(x.avisos.join(' '))}</div>` : ''}
         ${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener" class="pequeno" style="font-weight:700">Abrir no ClickUp</a>` : ''}</div>
     </div>`).join('');
+  const pc = r.paiCriada;
   return `<div class="resultado ${tit[2]}">${tit[0]}<b>${tit[1]}</b>
       ${r.erro ? `<div>${esc(r.erro)}</div>` : ''}
+      ${pc ? `<div>${pc.reaproveitada ? 'Tarefa-pai já existia e foi usada' : 'Tarefa-pai criada'}: <a href="${esc(pc.url)}" target="_blank" rel="noopener" style="color:inherit;font-weight:700">${esc(pc.nome)}</a>${(pc.naoConfirmados || []).length ? ' (confira no ClickUp: ' + esc(pc.naoConfirmados.join(', ')) + ')' : ''}</div>` : ''}
       ${r.situacao === 'incerto' ? '<div>A internet falhou no meio do envio. Toque em "Tentar de novo": se já tiver sido gravado, não duplica.</div>' : ''}
       ${r.situacao === 'parcial' ? '<div>Confira os itens abaixo direto no ClickUp.</div>' : ''}
     </div>
     ${linhas}
-    ${r.agendaAtualizando ? '<p class="muted" style="margin-top:10px">A Agenda dos Consultores do app está sendo atualizada e mostra a mudança em 1–3 minutos.</p>' : ''}`;
+    ${r.situacao === 'ok' || r.situacao === 'parcial' ? '<p class="muted" style="margin-top:10px">Já aparece na Agenda dos Consultores do app. Os demais dados do ClickUp se atualizam por trás em 1–3 minutos.</p>' : ''}`;
 }
 
 // ---------------------------------------------------------------- histórico de agendamentos
@@ -1172,7 +1212,42 @@ function interpretarAgenda(json) {
     }
     return { id: String(c.id), nome: c.nome || '', iniciais: c.iniciais || '', cor: c.cor || '#1f7a45', dias: m };
   });
-  return { geradoEm: r.gerado_em || '', hoje: r.hoje || '', dias, consultores };
+  return mesclarAgendasLocais({ geradoEm: r.gerado_em || '', hoje: r.hoje || '', dias, consultores });
+}
+
+/*
+ * Agendas gravadas pelo app aparecem na hora na Agenda dos Consultores (Por dia, Grade,
+ * Gantt e Alocação do Backlog Base), sem esperar a atualização do ClickUp: ficam guardadas
+ * no aparelho e são mescladas aos dados até chegar uma versão gerada depois da gravação
+ * (ou por 30 min). Na edição, a agenda sai do lugar antigo e vai para o novo.
+ */
+const AGENDAS_LOCAIS_MS = 30 * 60000;
+function mesclarAgendasLocais(d) {
+  const ger = Date.parse(d.geradoEm) || 0, agora = Date.now();
+  for (const x of guardar.ler('agenda.locais') || []) {
+    if (agora - x.em > AGENDAS_LOCAIS_MS || ger >= x.em) continue;
+    for (const c of d.consultores) for (const dia of Object.values(c.dias)) {
+      const i = dia.itens.findIndex(it => it.id && it.id === x.item.id);
+      if (i >= 0) { dia.horas = Math.round((dia.horas - (Number(dia.itens[i].horas) || 0)) * 100) / 100; dia.itens.splice(i, 1); }
+    }
+    const c = d.consultores.find(y => y.id === x.consultorId);
+    if (!c || !d.dias.includes(x.data)) continue;
+    const dia = c.dias[x.data] || (c.dias[x.data] = { horas: 0, itens: [] });
+    dia.itens.push({ ...x.item });
+    dia.horas = Math.round((dia.horas + (Number(x.item.horas) || 0)) * 100) / 100;
+  }
+  return d;
+}
+/** novas: [{ consultorId, data, item: { id, url, cliente, tarefa, periodo, horas, turno, agenda, detalhamento, pai_id } }] */
+function registrarAgendasLocais(novas) {
+  novas = novas.filter(n => n.item.id && n.consultorId && n.data);
+  if (!novas.length) return;
+  const agora = Date.now();
+  const antes = (guardar.ler('agenda.locais') || []).filter(x => agora - x.em < AGENDAS_LOCAIS_MS && !novas.some(n => n.item.id === x.item.id));
+  guardar.gravar('agenda.locais', [...antes, ...novas.map(n => ({ ...n, em: agora }))]);
+  const ag = MODULOS.find(m => m.id === 'agenda');
+  if (ag && estados[ag.id] && estados[ag.id].dados) mesclarAgendasLocais(estados[ag.id].dados);
+  if (moduloAtual) redesenhar(moduloAtual, true);
 }
 const diaDe = (c, dk) => c.dias[dk] || { horas: 0, itens: [] };
 
@@ -1994,7 +2069,9 @@ const AMBIENTES = ['Produção', 'Teste / homologação', 'Produção e teste'];
 const ABRANGENCIAS = ['Um usuário', 'Um setor / equipe', 'Toda a empresa', 'Clientes / fornecedores'];
 const IMPACTO_COR = ['var(--vermelho)', 'var(--laranja)', '#b8932a', 'var(--texto-2)'];
 const ANEXO_MAX = 10 * 1024 * 1024, ANEXOS_MAX_QTD = 10, ANEXOS_MAX_TOTAL = 40 * 1024 * 1024;
-const CAMPOS_RASCUNHO = ['pastaId', 'listaId', 'parceiroId', 'solicitante', 'contato', 'origem', 'ticket', 'os', 'titulo', 'tipo', 'modulo', 'etapa',
+// Etapa do chamado (o Módulo vai sempre "Atendimento Avulso" e o status "backlog base")
+const ETAPAS_CHAMADO = [['Atendimento avulso', 'Backlog Base'], ['Personalização / Customização', 'Backlog Desenvolvimento']];
+const CAMPOS_RASCUNHO = ['pastaId', 'listaId', 'solicitante', 'contato', 'origem', 'ticket', 'os', 'titulo', 'tipo', 'etapa',
   'descricao', 'passos', 'esperado', 'ambiente', 'impacto', 'abrangencia', 'prazo', 'motivoPrazo', 'agenda', 'horas', 'semAnexo'];
 
 let opcoesChamadoCache = null;
@@ -2011,8 +2088,6 @@ const lerBase64 = file => new Promise((ok, falha) => {
   r.onerror = () => falha(new Error('Não consegui ler ' + file.name));
   r.readAsDataURL(file);
 });
-/** Nome do parceiro a partir da pasta do cliente ("SEMALO - FC" -> "SEMALO"). */
-const clienteDaPasta = nome => String(nome || '').replace(/\s+-\s+[A-Z]{1,4}$/, '').replace(/^\d+\s*-\s*/, '');
 
 /** Pendências do formulário: [id do campo, texto]. Mesmas regras do servidor. */
 function faltasChamado(f) {
@@ -2020,14 +2095,12 @@ function faltasChamado(f) {
   const x = [];
   if (!f.pastaId) x.push(['ch-pasta', 'cliente']);
   else if (!f.listaId) x.push(['ch-lista', 'lista']);
-  if (!f.parceiroId) x.push(['ch-parc', 'parceiro']);
   if (!n(f.solicitante, 2)) x.push(['ch-solic', 'solicitante']);
   if (!n(f.contato, 5)) x.push(['ch-contato', 'contato do solicitante']);
   if (!f.origem) x.push(['ch-origem', 'origem']);
   if (semAcento(f.origem) === 'service desk' && !n(f.ticket, 1)) x.push(['ch-ticket', 'nº do ticket']);
   if (!n(f.titulo, 10)) x.push(['ch-titulo', 'título (mín. 10 caracteres)']);
   if (!f.tipo) x.push(['ch-tipo', 'tipo de solicitação']);
-  if (!f.modulo) x.push(['ch-modulo', 'módulo']);
   if (!f.etapa) x.push(['ch-etapa', 'etapa']);
   if (!n(f.descricao, 50)) x.push(['ch-desc', 'descrição (mín. 50 caracteres)']);
   if (/erro/i.test(f.tipo) && !n(f.passos, 20)) x.push(['ch-passos', 'onde ocorre / passos']);
@@ -2045,13 +2118,14 @@ function faltasChamado(f) {
 function abrirFormChamado(m) {
   const f = {
     op: uuid(), estado: 'carregando', erro: '', tentou: false, criado: null, progresso: '',
-    pastaId: '', listaId: '', parceiroId: '', solicitante: '', contato: '', origem: '', ticket: '', os: '', titulo: '', tipo: '',
-    modulo: '', etapa: '', descricao: '', passos: '', esperado: '', ambiente: '', impacto: '', abrangencia: '', prazo: '', motivoPrazo: '',
+    pastaId: '', listaId: '', solicitante: '', contato: '', origem: '', ticket: '', os: '', titulo: '', tipo: '',
+    etapa: 'Atendimento avulso', descricao: '', passos: '', esperado: '', ambiente: '', impacto: '', abrangencia: '', prazo: '', motivoPrazo: '',
     agenda: 'Remoto', horas: '', semAnexo: '', semAnexoMarcado: false, arquivos: [], recuperado: false,
   };
   const rasc = guardar.ler('chamado.rascunho');
-  if (rasc && CAMPOS_RASCUNHO.some(k => rasc[k])) {
+  if (rasc && CAMPOS_RASCUNHO.some(k => k !== 'etapa' && rasc[k])) {
     CAMPOS_RASCUNHO.forEach(k => { if (rasc[k] != null) f[k] = rasc[k]; });
+    if (!ETAPAS_CHAMADO.some(e => e[0] === f.etapa)) f.etapa = ETAPAS_CHAMADO[0][0];
     f.semAnexoMarcado = !!rasc.semAnexo; f.recuperado = true;
   }
   let ops = null, tRasc = 0;
@@ -2174,8 +2248,6 @@ function desenharFormChamado(folha, f, ops, acoes) {
         <select id="ch-pasta" class="campo${inv('ch-pasta')}">${opt('', 'Escolha o cliente…', !f.pastaId)}${ops.clientes.map(c => opt(c.id, c.nome, c.id === f.pastaId)).join('')}</select>
         ${listas.length > 1 ? `<label for="ch-lista">Lista *</label>
           <select id="ch-lista" class="campo${inv('ch-lista')}">${opt('', 'Escolha a lista…', !f.listaId)}${listas.map(l => opt(l.id, l.nome, l.id === f.listaId)).join('')}</select>` : ''}
-        <label for="ch-parc">Parceiro *</label>
-        <select id="ch-parc" class="campo${inv('ch-parc')}">${opt('', 'Escolha…', !f.parceiroId)}${ops.parceiros.map(p => opt(p.id, p.nome, p.id === f.parceiroId)).join('')}</select>
         <div class="duas">
           <div><label for="ch-solic">Solicitante (usuário no cliente) *</label>
             <input id="ch-solic" class="campo${inv('ch-solic')}" type="text" value="${esc(f.solicitante)}" placeholder="Nome de quem pediu" autocomplete="off"></div>
@@ -2194,12 +2266,9 @@ function desenharFormChamado(folha, f, ops, acoes) {
         <label for="ch-titulo">Título (resumo em uma linha) * ${conta(f.titulo, 10)}</label>
         <input id="ch-titulo" class="campo${inv('ch-titulo')}" type="text" maxlength="160" value="${esc(f.titulo)}" placeholder="Ex.: Nota de entrada não contabiliza na TOP 1201" autocomplete="off">
         <label>Tipo de solicitação *</label>${chips('ch-tipo', TIPOS_CHAMADO, f.tipo, 'tipo')}
-        <div class="duas">
-          <div><label for="ch-modulo">Módulo *</label>
-            <select id="ch-modulo" class="campo${inv('ch-modulo')}">${opt('', 'Escolha…', !f.modulo)}${ops.modulos.map(x => opt(x, x, x === f.modulo)).join('')}</select></div>
-          <div><label>Ambiente *</label>${chips('ch-amb', AMBIENTES, f.ambiente, 'ambiente')}</div>
-        </div>
-        <label>Etapa *</label>${chips('ch-etapa', ops.etapas, f.etapa, 'etapa')}
+        <label>Ambiente *</label>${chips('ch-amb', AMBIENTES, f.ambiente, 'ambiente')}
+        <label>Etapa *</label>${chips('ch-etapa', ETAPAS_CHAMADO, f.etapa, 'etapa')}
+        <div class="pequeno" style="margin-top:4px">Vai para o ClickUp com o status "backlog base" e o Módulo "Atendimento Avulso".</div>
         <label for="ch-desc">Descrição detalhada * ${conta(f.descricao, 50)}</label>
         <textarea id="ch-desc" class="campo${inv('ch-desc')}" rows="5" placeholder="O que está acontecendo ou o que o cliente precisa, com o contexto do processo">${esc(f.descricao)}</textarea>
         <label for="ch-passos">Onde ocorre / passos para reproduzir${/erro/i.test(f.tipo) ? ' *' : ''} ${/erro/i.test(f.tipo) ? conta(f.passos, 20) : ''}</label>
@@ -2259,12 +2328,9 @@ function desenharFormChamado(folha, f, ops, acoes) {
       if (c) {
         const ls = c.listas;
         f.listaId = ls.length === 1 ? ls[0].id : ((ls.find(l => /avuls/i.test(l.nome)) || ls.find(l => /backlog|suporte|sustenta/i.test(l.nome)) || {}).id || '');
-        f.parceiroId = parceiroPorNome(ops, clienteDaPasta(c.nome), c.nome) || f.parceiroId;
       }
     });
     muda('ch-lista', v => { f.listaId = v; });
-    muda('ch-parc', v => { f.parceiroId = v; });
-    muda('ch-modulo', v => { f.modulo = v; });
     muda('ch-prazo', v => { f.prazo = v; });
     const arq = $('#ch-arq', corpo);
     if (arq) arq.addEventListener('change', () => {
@@ -2293,7 +2359,7 @@ function desenharFormChamado(folha, f, ops, acoes) {
     if (x === 'descartar') {
       guardar.apagar('chamado.rascunho');
       CAMPOS_RASCUNHO.forEach(k => { f[k] = ''; });
-      Object.assign(f, { agenda: 'Remoto', semAnexoMarcado: false, recuperado: false, tentou: false, erro: '' });
+      Object.assign(f, { agenda: 'Remoto', etapa: ETAPAS_CHAMADO[0][0], semAnexoMarcado: false, recuperado: false, tentou: false, erro: '' });
     }
     if (x === 'tipo') { f.tipo = v; if (!f.etapaTocada) f.etapa = ETAPA_SUGERIDA[v] || 'Atendimento avulso'; }
     if (x === 'etapa') { f.etapa = v; f.etapaTocada = true; }
@@ -2496,7 +2562,7 @@ function folhaAlocar(m, t, c, dk) {
     f.estado = 'salvando'; f.erro = ''; desenhar();
     const dados = {
       paiId: t.id, titulo: t.nome, consultorId: c.id, datas: [dk], periodo: f.periodo,
-      agenda: t.agenda || 'Remoto', apontamento: 'OS Experience', parceiroId: '', etapaPai: true,
+      agenda: t.agenda || 'Remoto', apontamento: 'OS Experience', etapaPai: true,
       detalhamento: t.detalhamento ? t.detalhamento.slice(0, 4000) : undefined,
     };
     let r;
@@ -2511,10 +2577,9 @@ function folhaAlocar(m, t, c, dk) {
       const item = itemBacklog(st.dados, t.id);
       if (item) item.subtarefas.push({ nome: t.nome, consultores: [c.nome], consultorIds: [c.id], data: dk, horas: h, periodo: f.periodo, status: 'não iniciado',
         statusCor: '', realizada: false, detalhamento: '', url: res.url || '', planejamento: false });
-      const d = c.dias[dk] || (c.dias[dk] = { horas: 0, itens: [] });
-      d.itens.push({ id: res.id, url: res.url, cliente: t.pasta || t.parceiro, tarefa: t.nome, periodo: f.periodo, horas: h, turno: turnoDe(f.periodo), agenda: t.agenda || 'Remoto', detalhamento: '', pai_id: t.id });
-      d.horas = Math.round((d.horas + h) * 100) / 100;
       if (st.ui.alo.sel === t.id) st.ui.alo.sel = '';
+      registrarAgendasLocais([{ consultorId: c.id, data: dk, item: { id: res.id, url: res.url, cliente: t.pasta || t.parceiro, tarefa: t.nome,
+        periodo: f.periodo, horas: h, turno: turnoDe(f.periodo), agenda: t.agenda || 'Remoto', detalhamento: '', pai_id: t.id } }]);
       const ag = MODULOS.find(x => x.id === 'agenda');
       if (ag && estados[ag.id]) estadoDe(ag).lidoEm = Date.now() + 3 * 60000 - 5 * 60000; // relê em ~3 min, quando o Gist já tiver a agenda nova
       redesenhar(m, true);

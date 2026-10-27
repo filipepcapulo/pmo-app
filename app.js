@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.10.0';
+const VERSAO_WEB = '2.11.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -750,8 +750,8 @@ async function abrirFormAgenda(inicial = {}) {
             return { consultorId: f.consultorId, data: x.data, item: { id: x.id, url: x.url, cliente, tarefa: dados.titulo, periodo: p,
               horas: horasPeriodo(p), turno: turnoDe(p), agenda: f.agenda, detalhamento: f.detalhamento, pai_id: f.paiId || '' } };
           }));
-          // Backlogs (ao vivo) relêem o ClickUp para o cartão/chamado mostrar a agenda nova
-          for (const id of ['backlogdev', 'backlog']) {
+          // Backlogs e Demandas (ao vivo) relêem o ClickUp para o cartão/chamado mostrar a agenda nova
+          for (const id of ['backlogdev', 'backlog', 'demandas']) {
             const bm = MODULOS.find(m => m.id === id);
             if (bm && estados[bm.id]) { estadoDe(bm).lidoEm = 0; if (moduloAtual === bm) recarregar(bm, true); }
           }
@@ -1709,6 +1709,7 @@ MODULOS.push({
 });
 
 // ---------------------------------------------------------------- Módulo 3: Demandas
+// v2.11.0: lido AO VIVO do ClickUp pelo servidor (ação "demandas"); antes vinha do Gist (demandas.yml).
 
 const SEM_GERENTE = 'Sem gerente';
 const numOuNull = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
@@ -1841,9 +1842,10 @@ MODULOS.push({
   titulo: 'Demandas',
   descricao: 'Demandas na etapa Planejamento por gerente, cliente, lista e demanda',
   icone: IC.lista,
-  workflow: 'demandas.yml',
-  arquivo: 'app_demandas.json',
-  etapa: 'Buscando as demandas no ClickUp…',
+  workflow: null,
+  arquivo: 'app_demandas.json', // só a chave do cache no aparelho (os dados vêm ao vivo)
+  etapa: '',
+  ler: async forcar => (await api('demandas', { forcar: !!forcar }, { tempo: 90000 })).conteudo,
   uiInicial: () => ({ busca: '', soAtrasadas: false, gerente: null, abertos: new Set(), gerentesFechados: new Set(), subs: new Set() }),
   interpretar: interpretarDemandas,
   desenhar(st, { cont, abas, acoes, inteiro }) {

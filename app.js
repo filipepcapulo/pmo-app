@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.11.1';
+const VERSAO_WEB = '2.12.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -751,7 +751,7 @@ async function abrirFormAgenda(inicial = {}) {
               horas: horasPeriodo(p), turno: turnoDe(p), agenda: f.agenda, detalhamento: f.detalhamento, pai_id: f.paiId || '' } };
           }));
           // Backlogs e Demandas (ao vivo) relêem o ClickUp para o cartão/chamado mostrar a agenda nova
-          for (const id of ['backlogdev', 'backlog', 'demandas']) {
+          for (const id of ['backlogdev', 'backlog', 'demandas', 'portfolio']) {
             const bm = MODULOS.find(m => m.id === id);
             if (bm && estados[bm.id]) { estadoDe(bm).lidoEm = 0; if (moduloAtual === bm) recarregar(bm, true); }
           }
@@ -1007,7 +1007,7 @@ function telaHistorico(app) {
 
 // ---------------------------------------------------------------- permissões (administrador)
 
-const NOMES_MODULOS = { agenda: 'Agenda dos Consultores', ociosidade: 'Ociosidade', demandas: 'Demandas', backlog: 'Backlog Base', backlogdev: 'Backlog Desenvolvimento' };
+const NOMES_MODULOS = { agenda: 'Agenda dos Consultores', ociosidade: 'Ociosidade', demandas: 'Demandas', backlog: 'Backlog Base', backlogdev: 'Backlog Desenvolvimento', portfolio: 'Portfólio de Projetos' };
 
 async function telaPermissoes(app) {
   const ui = { lista: null, erro: '', busca: '' };
@@ -1715,6 +1715,18 @@ const SEM_GERENTE = 'Sem gerente';
 const numOuNull = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
 const txts = a => (a || []).map(String).filter(x => x.trim());
 
+/** Uma demanda do JSON do servidor (módulo Demandas e drill down do Portfólio). */
+const demandaDe = o => ({
+  id: String(o.id), nome: o.nome || '', url: o.url || '', status: o.status || '', statusCor: o.status_cor || '',
+  responsaveis: txts(o.responsaveis), inicio: o.inicio || '', fim: o.fim || '', atrasada: !!o.atrasada,
+  parceiro: o.parceiro || '', planejamento: !!o.planejamento, detalhamento: o.detalhamento || '',
+  horasPlanejadas: numOuNull(o.horas_planejadas), horasRealizadas: Number(o.horas_realizadas) || 0, horasAgendadas: Number(o.horas_agendadas) || 0,
+  agendas: (o.agendas || []).map(a => ({
+    nome: a.nome || '', consultores: txts(a.consultores), data: a.data || '', horas: Number(a.horas) || 0, periodo: a.periodo || '',
+    status: a.status || '', statusCor: a.status_cor || '', realizada: !!a.realizada, detalhamento: a.detalhamento || '', url: a.url || '',
+  })),
+});
+
 function interpretarDemandas(json) {
   const r = JSON.parse(json);
   const clientes = (r.clientes || []).map(c => ({
@@ -1723,16 +1735,7 @@ function interpretarDemandas(json) {
     listas: (c.listas || []).map(l => ({
       id: String(l.id), nome: l.nome || '', url: l.url || '',
       horasPlanejadas: Number(l.horas_planejadas) || 0, horasRealizadas: Number(l.horas_realizadas) || 0, horasAgendadas: Number(l.horas_agendadas) || 0,
-      demandas: (l.demandas || []).map(o => ({
-        id: String(o.id), nome: o.nome || '', url: o.url || '', status: o.status || '', statusCor: o.status_cor || '',
-        responsaveis: txts(o.responsaveis), inicio: o.inicio || '', fim: o.fim || '', atrasada: !!o.atrasada,
-        parceiro: o.parceiro || '', planejamento: !!o.planejamento, detalhamento: o.detalhamento || '',
-        horasPlanejadas: numOuNull(o.horas_planejadas), horasRealizadas: Number(o.horas_realizadas) || 0, horasAgendadas: Number(o.horas_agendadas) || 0,
-        agendas: (o.agendas || []).map(a => ({
-          nome: a.nome || '', consultores: txts(a.consultores), data: a.data || '', horas: Number(a.horas) || 0, periodo: a.periodo || '',
-          status: a.status || '', statusCor: a.status_cor || '', realizada: !!a.realizada, detalhamento: a.detalhamento || '', url: a.url || '',
-        })),
-      })),
+      demandas: (l.demandas || []).map(demandaDe),
     })),
   }));
   const qtd = c => c.listas.reduce((s, l) => s + l.demandas.length, 0);
@@ -1892,6 +1895,256 @@ MODULOS.push({
       }
       case 'gerente': ui.gerente = el.dataset.g && ui.gerente !== el.dataset.g ? el.dataset.g : null; return;
       case 'atrasadas': ui.soAtrasadas = !ui.soAtrasadas; return;
+      case 'limpar-busca': ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); return;
+    }
+    return false;
+  },
+});
+
+// ---------------------------------------------------------------- Módulo: Portfólio de Projetos
+// v2.12.0: lido AO VIVO do ClickUp pelo servidor (ação "portfolio"). Substitui o card de
+// Riscos Ativos que o riscos.yml publicava no Gist.
+
+const PF_NIVEIS = [['critico', 'Crítico'], ['alto', 'Alto'], ['moderado', 'Moderado']];
+const PF_MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+function interpretarPortfolio(json) {
+  const r = JSON.parse(json);
+  const projetos = (r.projetos || []).map(p => ({
+    id: String(p.id), nome: p.nome || '', url: p.url || '', cliente: p.cliente || '',
+    gerente: (p.gerente || '').trim() || SEM_GERENTE, fase: p.fase || 'Outros',
+    inicio: p.inicio || '', fim: p.fim || '', golive: p.golive || '', goliveOk: !!p.golive_ok,
+    atraso: p.atraso || '', etapasAtrasadas: txts(p.etapas_atrasadas),
+    horas: Number(p.horas_executadas) || 0, demandas: (p.demandas || []).map(demandaDe),
+  }));
+  const riscos = (r.riscos || []).map(x => ({
+    id: String(x.id), nome: x.nome || '', url: x.url || '', nivel: x.nivel || 'moderado', vencimento: x.vencimento || '',
+    dias: numOuNull(x.dias), cliente: x.cliente || '', responsavel: x.responsavel || '',
+  }));
+  const gerentes = [...new Set(projetos.map(p => p.gerente))]
+    .sort((a, b) => (a === SEM_GERENTE) - (b === SEM_GERENTE) || a.toLowerCase().localeCompare(b.toLowerCase()));
+  const fases = (r.fases || []).filter(f => projetos.some(p => p.fase === f));
+  projetos.forEach(p => { if (!fases.includes(p.fase)) fases.push(p.fase); });
+  return { geradoEm: r.gerado_em || '', hoje: r.hoje || '', projetos, riscos, gerentes, fases };
+}
+
+const pfCorGerente = (d, g) => g === SEM_GERENTE ? '#87909e' : GT_CORES[d.gerentes.indexOf(g) % GT_CORES.length];
+const pfSigla = g => g === SEM_GERENTE ? '—' : g.split(/\s+/).filter(Boolean).map(x => x[0]).slice(0, 2).join('').toUpperCase();
+
+function pfFiltrar(d, ui, comBusca) {
+  const t = comBusca ? semAcento(ui.busca.trim()) : '';
+  return d.projetos.filter(p => (!ui.gerente || p.gerente === ui.gerente) && (!ui.fase || p.fase === ui.fase) &&
+    (!t || [p.nome, p.cliente, p.gerente, p.fase].some(v => semAcento(v).includes(t))));
+}
+
+/** Cards de quantidade por fase (tocar filtra o Gantt e a grade). */
+function pfCards(d, ui) {
+  const doGerente = d.projetos.filter(p => !ui.gerente || p.gerente === ui.gerente);
+  const card = (f, rot, n, cor_) => `<button class="num pf-card${ui.fase === f ? ' sel' : ''}" data-a="pf-fase" data-f="${esc(f)}">
+    <b style="color:${cor_}">${n}</b><span>${esc(rot)}</span></button>`;
+  return `<div class="numeros rola" data-rola="pf-fases">${card('', 'Projetos', doGerente.length, 'var(--verde)')}
+    ${d.fases.map(f => card(f, f, doGerente.filter(p => p.fase === f).length, 'var(--texto)')).join('')}</div>`;
+}
+
+/** Gráfico de barras: projetos por GP (tocar filtra pelo GP). */
+function pfGraficoGp(d, ui) {
+  const base = d.projetos.filter(p => !ui.fase || p.fase === ui.fase);
+  const linhas = d.gerentes.map(g => {
+    const ps = base.filter(p => p.gerente === g);
+    return { g, n: ps.length, atrasados: ps.filter(p => p.atraso).length };
+  }).filter(x => x.n);
+  const max = Math.max(1, ...linhas.map(x => x.n));
+  if (!linhas.length) return '<div class="vazio">Nenhum projeto.</div>';
+  return `<div class="pf-gp">${linhas.map(x => `<button class="pf-gp-l${ui.gerente === x.g ? ' sel' : ''}${ui.gerente && ui.gerente !== x.g ? ' apagado' : ''}" data-a="gerente" data-g="${esc(x.g)}">
+      <span class="pf-gp-nome"><span class="pf-sigla" style="--c:${pfCorGerente(d, x.g)}">${esc(pfSigla(x.g))}</span>${esc(x.g)}</span>
+      <span class="pf-gp-trilha"><i style="width:${(x.n / max * 100).toFixed(1)}%;--c:${pfCorGerente(d, x.g)}"></i></span>
+      <b>${x.n}</b>${x.atrasados ? `<span class="pf-gp-atraso">${x.atrasados} atrasado${x.atrasados > 1 ? 's' : ''}</span>` : '<span class="pf-gp-atraso"></span>'}
+    </button>`).join('')}</div>`;
+}
+
+/**
+ * Gantt dos projetos: barra início → fim, losango no Go Live. Go Live vencido = losango e
+ * etiqueta vermelhos; etapa vencida = barra hachurada laranja e etiqueta laranja.
+ * Sem Go Live: no fim, com o fundo vermelho claro.
+ */
+function pfGantt(d, ui, projetos) {
+  if (!projetos.length) return '<div class="vazio">Nenhum projeto encontrado.</div>';
+  const hoje = d.hoje || isoHoje();
+  const datas = projetos.flatMap(p => [p.inicio, p.fim, p.golive]).filter(Boolean).sort();
+  let ini = datas[0] && datas[0] > somaDias(hoje, -180) ? datas[0] : somaDias(hoje, -180);
+  let fim = datas[datas.length - 1] && datas[datas.length - 1] < somaDias(hoje, 365) ? datas[datas.length - 1] : somaDias(hoje, 365);
+  if (ini > hoje) ini = hoje;
+  if (fim < somaDias(hoje, 30)) fim = somaDias(hoje, 30);
+  ini = ini.slice(0, 8) + '01';
+  const w = document.body.classList.contains('modo-pc') ? 4 : 3, dias = difDias(fim, ini) + 15, larg = dias * w;
+  const x = iso => difDias(iso, ini) * w;
+  let meses = '';
+  for (let iso = ini; difDias(iso, ini) < dias; iso = somaDias(iso.slice(0, 8) + '01', 32).slice(0, 8) + '01') {
+    const dt = parseDia(iso);
+    meses += `<span class="gt-mes" style="left:${x(iso)}px">${PF_MESES[dt.getMonth()]}/${String(dt.getFullYear()).slice(2)}</span>`;
+  }
+  const cab = `<div class="gt-linha gt-cab pf-cab"><div class="gt-rot"></div><div class="gt-trilha" style="width:${larg}px">${meses}</div></div>`;
+  const hojeL = `<span class="gt-hoje" style="left:${x(hoje) + w / 2}px"></span>`;
+  const linha = p => {
+    const c = pfCorGerente(d, p.gerente);
+    let a = p.inicio || p.golive || p.fim, b = p.fim || p.golive || p.inicio, trilha = hojeL;
+    if (a && b) {
+      if (b < a) [a, b] = [b, a];
+      const l = Math.max(0, x(a)), r = Math.min(larg, x(b) + w);
+      if (r > l) trilha += `<span class="pf-barra${p.atraso === 'etapa' ? ' etapa' : ''}" style="left:${l}px;width:${r - l}px;--c:${c}"
+        title="${esc(dataCurta(a) + ' → ' + dataCurta(b))}"></span>`;
+    }
+    if (p.golive) {
+      const est = p.goliveOk ? 'ok' : p.atraso === 'golive' ? 'atraso' : '';
+      trilha += `<i class="pf-gl ${est}" style="left:${x(p.golive) + w / 2}px" title="Go Live ${esc(dataCurta(p.golive))}${p.goliveOk ? ' (concluído)' : ''}"></i>`;
+    }
+    const tag = p.atraso === 'golive' ? '<span class="pf-tag golive">Go Live atrasado</span>'
+      : p.atraso === 'etapa' ? `<span class="pf-tag etapa" title="${esc(p.etapasAtrasadas.join(', '))}">Etapa atrasada</span>` : '';
+    const sub = p.golive ? `GL ${dataCurta(p.golive)}${p.goliveOk ? ' ✓' : ''}` : p.fase;
+    return gtLinha(`<div class="gt-nome">${esc(p.nome)}</div>
+      <div class="gt-sub gt-sub-1"><span class="pf-sigla" style="--c:${c}">${esc(pfSigla(p.gerente))}</span>${tag}<span class="gt-datas">${esc(sub)}</span></div>`,
+      trilha, larg, p.golive ? '' : ' sem-ninguem', ` role="button" data-a="pf-ir" data-id="${esc(p.id)}"`);
+  };
+  const com = projetos.filter(p => p.golive).sort((a, b) => a.golive.localeCompare(b.golive) || COLACAO.compare(a.nome, b.nome));
+  const sem = projetos.filter(p => !p.golive).sort((a, b) => (a.inicio || '9999').localeCompare(b.inicio || '9999') || COLACAO.compare(a.nome, b.nome));
+  let linhas = com.map(linha).join('');
+  if (sem.length) {
+    linhas += gtLinha(`<div class="gt-nome">Sem Go Live (${sem.length})</div><div class="gt-sub">${ui.verSemGl ? 'tocar para esconder' : 'tocar para mostrar'}</div>`,
+      hojeL, larg, ' gt-grupo sem-ninguem', ' role="button" data-a="pf-semgl"');
+    if (ui.verSemGl) linhas += sem.map(linha).join('');
+  }
+  return `<div class="gantt" data-rola="pf-gantt"><div class="gt-corpo">${cab}${linhas}</div></div>
+    <div class="pequeno gt-nota"><span class="pf-leg"><i class="pf-gl"></i>Go Live</span><span class="pf-leg"><i class="pf-gl ok"></i>concluído</span>
+      <span class="pf-leg"><i class="pf-gl atraso"></i>Go Live atrasado</span><span class="pf-leg"><i class="pf-barra-leg"></i>etapa atrasada</span>
+      · Barra = início → fim das etapas, na cor do GP. Tocar na linha abre o projeto na grade.</div>`;
+}
+
+function pfVenc(r) {
+  if (r.dias === null) return ['—', 'normal'];
+  if (r.dias < 0) return ['Vencido', 'overdue'];
+  if (r.dias === 0) return ['Hoje', 'overdue'];
+  if (r.dias === 1) return ['Amanhã', r.nivel !== 'moderado' ? 'overdue' : 'soon'];
+  return [dataCurta(r.vencimento), r.nivel !== 'moderado' ? 'soon' : 'normal'];
+}
+
+/** Riscos Ativos (lista 3- Planos de Ação), no formato do antigo card-riscos.html. */
+function pfRiscos(d) {
+  const rs = d.riscos;
+  if (!rs.length) return '<div class="vazio">Nenhum risco ativo.</div>';
+  const n = Object.fromEntries(PF_NIVEIS.map(([k]) => [k, rs.filter(r => r.nivel === k).length]));
+  const vencidos = rs.filter(r => r.dias !== null && r.dias < 0).length, amanha = rs.filter(r => r.dias === 1).length;
+  const alerta = [vencidos ? `${vencidos} vencido${vencidos > 1 ? 's' : ''}` : '', amanha ? `${amanha} vence${amanha > 1 ? 'm' : ''} amanhã` : ''].filter(Boolean).join(' · ') || 'Nenhum vencido';
+  const porResp = new Map();
+  rs.forEach(r => { const k = r.responsavel || '—'; porResp.set(k, (porResp.get(k) || 0) + 1); });
+  return `<div class="pf-riscos">
+    <div class="pf-r-met">${PF_NIVEIS.map(([k, t]) => `<div class="pf-r-num ${k}"><b>${n[k]}</b><span>${t}</span></div>`).join('')}</div>
+    <div class="pf-r-barra">${PF_NIVEIS.map(([k]) => `<i class="${k}" style="width:${(n[k] / rs.length * 100).toFixed(1)}%"></i>`).join('')}</div>
+    ${rs.map(r => {
+      const [rot, css] = pfVenc(r);
+      return `<a class="pf-r-item" href="${esc(r.url)}" target="_blank" rel="noopener" data-link>
+        <i class="pf-r-ponto ${r.nivel}"></i>
+        <span class="pf-r-txt"><span class="pf-r-nome">${esc(r.nome)}</span><span class="pequeno">${esc([r.cliente || '—', r.responsavel || '—'].join(' · '))}</span></span>
+        <span class="pf-r-venc ${css}">${esc(rot)}</span></a>`;
+    }).join('')}
+    <div class="pf-r-rodape"><b>${esc(alerta)}</b><span>${esc([...porResp].map(([k, v]) => `${k}: ${v}`).join(' · '))}</span></div>
+  </div>`;
+}
+
+/** Grade de projetos: nome, GP, fase, horas executadas; tocar abre as demandas em Planejamento/Personalização. */
+function pfGrade(d, ui, projetos) {
+  if (!projetos.length) return '<div class="vazio">Nenhum projeto encontrado.</div>';
+  const linhas = projetos.map(p => {
+    const aberto = ui.abertos.has('p:' + p.id), c = pfCorGerente(d, p.gerente);
+    let h = `<button class="pf-g-l${aberto ? ' aberto' : ''}" id="pf-p-${esc(p.id)}" data-a="abre" data-k="p:${esc(p.id)}">
+      <span class="pf-g-nome"><b>${esc(p.nome)}</b><span class="pequeno uma-linha">${esc(p.cliente)}${p.atraso ? ` · <span class="atraso-txt">${p.atraso === 'golive' ? 'Go Live atrasado' : 'etapa atrasada'}</span>` : ''}</span></span>
+      <span class="pf-g-resp"><span class="pf-sigla" style="--c:${c}">${esc(pfSigla(p.gerente))}</span><span class="pf-g-gp">${esc(p.gerente)}</span></span>
+      <span class="pf-g-fase">${esc(p.fase)}</span>
+      <span class="pf-g-h">${horas(p.horas)}</span>
+      <span class="pf-g-qtd">${p.demandas.length ? `<span class="contador">${p.demandas.length}</span>` : ''}${IC.baixo}</span></button>`;
+    if (aberto) {
+      h += `<div class="pf-g-drill">
+        ${p.demandas.length ? p.demandas.map(x => cartaoDemanda(x, ui)).join('') : '<div class="vazio">Nenhuma tarefa em Planejamento ou Personalização nesta lista.</div>'}
+        ${p.url ? `<div class="acoes" style="padding:0 12px 10px"><a class="btn contorno pq" style="text-decoration:none" href="${esc(p.url)}" target="_blank" rel="noopener" data-link>Abrir lista no ClickUp</a></div>` : ''}
+      </div>`;
+    }
+    return h;
+  }).join('');
+  return `<div class="pf-grade">
+    <div class="pf-g-l pf-g-cab"><span class="pf-g-nome">Projeto</span><span class="pf-g-resp"><span class="pf-so-pc">Responsável</span><span class="pf-so-cel">GP</span></span><span class="pf-g-fase">Fase</span><span class="pf-g-h">Horas exec.</span><span class="pf-g-qtd"></span></div>
+    ${linhas}
+    <div class="pf-g-l pf-g-tot"><span class="pf-g-nome"><b>${projetos.length} projeto${projetos.length > 1 ? 's' : ''}</b></span><span class="pf-g-resp"></span><span class="pf-g-fase"></span>
+      <span class="pf-g-h">${horas(soma(projetos, p => p.horas))}</span><span class="pf-g-qtd"></span></div>
+  </div>
+  <div class="pequeno gt-nota">Horas exec. = soma do Período das tarefas com vencimento e responsável (sem cancelado/suspenso e sem os GPs; com vários executantes, multiplica). O número é a quantidade de tarefas em Planejamento ou Personalização.</div>`;
+}
+
+function pfCorpo(st) {
+  const d = st.dados, ui = st.ui, projetos = pfFiltrar(d, ui, true);
+  return `<h3 class="pf-tit">Cronograma</h3>${pfGantt(d, ui, projetos)}
+    <h3 class="pf-tit">Riscos ativos</h3>${pfRiscos(d)}
+    <h3 class="pf-tit">Projetos</h3>${pfGrade(d, ui, projetos)}`;
+}
+
+MODULOS.push({
+  id: 'portfolio',
+  titulo: 'Portfólio de Projetos',
+  descricao: 'Projetos por fase e GP, Gantt com Go Live, riscos ativos e horas executadas',
+  icone: IC.kanban,
+  workflow: null,
+  arquivo: 'app_portfolio.json', // só a chave do cache no aparelho (os dados vêm ao vivo)
+  etapa: '',
+  ler: async forcar => (await api('portfolio', { forcar: !!forcar }, { tempo: 180000 })).conteudo,
+  uiInicial: () => ({ busca: '', gerente: null, fase: null, verSemGl: true, abertos: new Set(), subs: new Set() }),
+  interpretar: interpretarPortfolio,
+  desenhar(st, { cont, abas, acoes, inteiro }) {
+    const d = st.dados, ui = st.ui;
+    abas.innerHTML = ''; acoes.innerHTML = '';
+    if (ui.gerente && !d.gerentes.includes(ui.gerente)) ui.gerente = null;
+    if (ui.fase && !d.fases.includes(ui.fase)) ui.fase = null;
+    const topo = `
+      <div class="secao">
+        ${pfCards(d, ui)}
+        ${d.gerentes.length > 1 ? `<div class="chips" data-rola="pf-gerentes">
+          <button class="chip${ui.gerente ? '' : ' sel'}" data-a="gerente">Todos os GPs</button>
+          ${d.gerentes.map(g => `<button class="chip${ui.gerente === g ? ' sel' : ''}" data-a="gerente" data-g="${esc(g)}">${IC.pessoa}${esc(g)}</button>`).join('')}
+        </div>` : ''}
+        ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
+      </div>
+      <div class="divisor"></div>
+      <h3 class="pf-tit">Projetos por GP</h3>${pfGraficoGp(d, ui)}
+      <div class="secao" style="padding-bottom:0">${campoBusca(ui.busca, 'Buscar projeto, cliente, GP ou fase')}</div>`;
+    const focado = document.activeElement && document.activeElement.id === 'busca';
+    if (inteiro || !focado || !$('#pf-corpo')) {
+      trocarHTML(cont, topo + '<div id="pf-corpo"></div>');
+      ligarBusca(st, () => { trocarHTML($('#pf-corpo'), pfCorpo(st)); });
+    }
+    trocarHTML($('#pf-corpo'), pfCorpo(st));
+    const gq = $('#pf-corpo .gantt'), gh = gq && gq.querySelector('.gt-hoje');
+    if (!ui.gtRolado && gh) { gq.scrollLeft = Math.max(0, gh.offsetLeft - 120); ui.gtRolado = true; } // abre perto de hoje
+    if (ui.rolarPara) {
+      const el = document.getElementById('pf-p-' + ui.rolarPara);
+      ui.rolarPara = null;
+      if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  },
+  acao(nome, el, st, ev) {
+    const ui = st.ui;
+    if (ev.target.closest('[data-link]')) return false;
+    switch (nome) {
+      case 'abre': alternar(ui.abertos, el.dataset.k); return;
+      case 'sub': alternar(ui.subs, el.dataset.k); return;
+      case 'pf-fase': ui.fase = el.dataset.f && ui.fase !== el.dataset.f ? el.dataset.f : null; return;
+      case 'gerente': ui.gerente = el.dataset.g && ui.gerente !== el.dataset.g ? el.dataset.g : null; return;
+      case 'pf-semgl': ui.verSemGl = !ui.verSemGl; return;
+      case 'pf-ir': ui.abertos.add('p:' + el.dataset.id); ui.rolarPara = el.dataset.id; return;
+      case 'editar': abrirFormAgenda({ id: el.dataset.id }); return false;
+      case 'agendar-dem': {
+        for (const p of st.dados.projetos) {
+          const x = p.demandas.find(y => y.id === el.dataset.id);
+          if (x) { abrirFormAgenda({ pai: { id: x.id, nome: x.nome, local: p.cliente + ' › ' + p.nome }, parceiro: x.parceiro, cliente: p.cliente }); return false; }
+        }
+        return false;
+      }
       case 'limpar-busca': ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); return;
     }
     return false;

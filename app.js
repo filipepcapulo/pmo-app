@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.12.0';
+const VERSAO_WEB = '2.12.1';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -523,7 +523,7 @@ function telaInicio(app) {
   const u = sessao.usuario;
   const meus = MODULOS.filter(m => temModulo(m.id));
   const extras = [];
-  if (pode('agendar') || pode('editar')) extras.push({ id: 'historico', titulo: 'Agendamentos feitos', descricao: 'O que você gravou no ClickUp e se deu certo', icone: IC.ok });
+  if (pode('agendar') || pode('editar')) extras.push({ id: 'historico', titulo: 'Agendamentos feitos', descricao: 'O que você gravou pelo app e se deu certo', icone: IC.ok });
   if (tiposNotificacao().length) extras.push({ id: 'notificacoes', titulo: 'Notificações', descricao: guardar.ler('push.tipos') ? 'Ativas neste aparelho' : 'Avisos no celular (ociosidade, reembolso)', icone: IC.sino });
   if (pode('admin')) extras.push({ id: 'permissoes', titulo: 'Permissões', descricao: 'Quem pode acessar o app e o quê', icone: IC.chave });
   app.innerHTML = `
@@ -793,10 +793,10 @@ async function abrirFormAgenda(inicial = {}) {
       Object.assign(f, {
         id: t.id, titulo: t.titulo, consultorId: t.consultorId, datas: [t.data || isoHoje()], periodo: t.periodo || '',
         agenda: t.agenda || 'Remoto', apontamento: t.apontamento || 'OS Experience',
-        detalhamento: t.detalhamento || '', paiNome: t.pai.nome, paiLocal: [t.pasta?.nome, t.lista].filter(Boolean).join(' › '),
+        detalhamento: t.detalhamento || '', paiNome: t.pai.nome || (t.pai.id ? '' : 'Tarefa avulsa (sem demanda-pai)'), paiLocal: [t.pasta?.nome, t.lista].filter(Boolean).join(' › '),
         url: t.url, status: t.status,
       });
-      if (t.consultores.length > 1) f.aviso = 'Esta agenda tem mais de um consultor no ClickUp (' + t.consultores.map(c => c.nome).join(', ') + '). Ao salvar, fica só o escolhido.';
+      if (t.consultores.length > 1) f.aviso = 'Esta agenda tem mais de um consultor (' + t.consultores.map(c => c.nome).join(', ') + '). Ao salvar, fica só o escolhido.';
       if (t.consultorId && !ops.consultores.some(c => c.id === t.consultorId)) ops = { ...ops, consultores: [...ops.consultores, ...t.consultores.filter(c => c.id === t.consultorId)] };
     } else if (copia) {
       const t = (await api('agendaTarefa', { id: inicial.copiaDe })).tarefa;
@@ -825,7 +825,7 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
   if (!corpo) return;
   const ativo = document.activeElement && corpo.contains(document.activeElement) ? document.activeElement.id : null;
   if (f.estado === 'carregando') {
-    corpo.innerHTML = '<div class="centro"><div class="spinner"></div><div class="muted">Carregando do ClickUp…</div></div>';
+    corpo.innerHTML = '<div class="centro"><div class="spinner"></div><div class="muted">Carregando…</div></div>';
     rod.innerHTML = '<button class="btn contorno" data-x="fechar">Cancelar</button>';
   } else if (f.estado === 'falhaCarga') {
     corpo.innerHTML = `<div class="resultado erro">${IC.alerta}<b>Não consegui abrir o formulário</b><div>${esc(f.erro)}</div></div>`;
@@ -842,7 +842,7 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
     if (editando || f.paiId && f.paiNome || f.novoPai) {
       const listas = f.novoPai ? (((ops.clientes.find(c => c.id === f.pastaId) || {}).listas) || []) : [];
       demanda = `<div class="caixa-dem"><div class="pequeno">${esc(f.paiLocal)}</div><b>${esc(f.paiNome || 'Demanda')}</b>
-        ${f.novoPai ? `<span class="nova-pai">Nova tarefa-pai: será criada no ClickUp ao salvar</span>
+        ${f.novoPai ? `<span class="nova-pai">Nova tarefa-pai: será criada ao salvar</span>
           <label for="fa-pai-lista">Lista *</label>
           <select id="fa-pai-lista" class="campo">${opt('', 'Escolha a lista…', !f.novoPai.listaId)}${listas.map(l => opt(l.id, l.nome, l.id === f.novoPai.listaId)).join('')}</select>` : ''}
         ${!editando && !f.paiFixo ? '<button class="btn texto" data-x="trocar-dem" style="padding:4px 0">Trocar demanda</button>' : ''}</div>`;
@@ -894,12 +894,12 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
         <select id="fa-apont" class="campo">${ops.apontamentos.map(a => opt(a, a, a === f.apontamento)).join('')}</select>
         <label for="fa-det">Detalhamento</label>
         <textarea id="fa-det" class="campo" rows="4" placeholder="Observações da agenda (vão no campo Detalhamento)">${esc(f.detalhamento)}</textarea>
-        ${editando && f.url ? `<a class="pequeno" href="${esc(f.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px">Abrir no ClickUp</a>` : ''}
+        ${editando && f.url ? `` : ''}
       </fieldset>
       <div class="erro-txt" style="margin-top:8px">${esc(f.erro)}</div>`;
-    const resumo = !editando && f.datas.length > 1 ? `Salvar ${f.datas.length} agendas` : editando ? 'Salvar alterações' : 'Salvar no ClickUp';
+    const resumo = !editando && f.datas.length > 1 ? `Salvar ${f.datas.length} agendas` : editando ? 'Salvar alterações' : 'Salvar';
     rod.innerHTML = `<button class="btn contorno" data-x="fechar" ${salvando ? 'disabled' : ''}>Cancelar</button>
-      <button class="btn primario" data-x="salvar" ${salvando ? 'disabled' : ''}>${salvando ? '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Gravando no ClickUp…' : resumo}</button>`;
+      <button class="btn primario" data-x="salvar" ${salvando ? 'disabled' : ''}>${salvando ? '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Gravando…' : resumo}</button>`;
     // liga campos
     const liga = (id, fn, ev = 'input') => { const el = $('#' + id, corpo); if (el) el.addEventListener(ev, () => fn(el.value)); };
     liga('fa-titulo', v => { f.titulo = v; });
@@ -953,29 +953,29 @@ function desenharFormAgenda(folha, f, ops, editando, acoes) {
 
 function resultadoAgendaHTML(r, editando) {
   const tit = {
-    ok: [IC.ok, editando ? 'Alteração gravada no ClickUp' : 'Agenda gravada no ClickUp', 'ok'],
+    ok: [IC.ok, editando ? 'Alteração gravada' : 'Agenda gravada', 'ok'],
     parcial: [IC.alerta, 'Gravado, mas com pendências', 'parcial'],
-    erro: [IC.x, 'Não foi gravado no ClickUp', 'erro'],
+    erro: [IC.x, 'Não foi gravado', 'erro'],
     incerto: [IC.alerta, 'Não consegui confirmar a gravação', 'parcial'],
   }[r.situacao] || [IC.alerta, r.situacao, 'parcial'];
   const linhas = (r.resultados || []).map(x => `
     <div class="res-linha ${x.situacao}">
       <span class="res-ic">${x.situacao === 'ok' ? IC.ok : x.situacao === 'erro' ? IC.x : IC.alerta}</span>
       <div><b>${esc(dataTitulo(x.data))}</b>${x.periodo ? ` <span class="pequeno">· ${esc(x.periodo)}</span>` : ''}
-        <div class="pequeno">${x.situacao === 'ok' ? `Confirmado no ClickUp (${x.conferidos} itens conferidos)`
+        <div class="pequeno">${x.situacao === 'ok' ? `Confirmado (${x.conferidos} itens conferidos)`
           : x.situacao === 'erro' ? esc(x.erro || 'Erro') : 'Não confirmado: ' + esc((x.naoConfirmados || []).join(', '))}</div>
         ${(x.avisos || []).length ? `<div class="pequeno">${esc(x.avisos.join(' '))}</div>` : ''}
-        ${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener" class="pequeno" style="font-weight:700">Abrir no ClickUp</a>` : ''}</div>
+        </div>
     </div>`).join('');
   const pc = r.paiCriada;
   return `<div class="resultado ${tit[2]}">${tit[0]}<b>${tit[1]}</b>
       ${r.erro ? `<div>${esc(r.erro)}</div>` : ''}
-      ${pc ? `<div>${pc.reaproveitada ? 'Tarefa-pai já existia e foi usada' : 'Tarefa-pai criada'}: <a href="${esc(pc.url)}" target="_blank" rel="noopener" style="color:inherit;font-weight:700">${esc(pc.nome)}</a>${(pc.naoConfirmados || []).length ? ' (confira no ClickUp: ' + esc(pc.naoConfirmados.join(', ')) + ')' : ''}</div>` : ''}
+      ${pc ? `<div>${pc.reaproveitada ? 'Tarefa-pai já existia e foi usada' : 'Tarefa-pai criada'}: <b>${esc(pc.nome)}</b>${(pc.naoConfirmados || []).length ? ' (não confirmado: ' + esc(pc.naoConfirmados.join(', ')) + ')' : ''}</div>` : ''}
       ${r.situacao === 'incerto' ? '<div>A internet falhou no meio do envio. Toque em "Tentar de novo": se já tiver sido gravado, não duplica.</div>' : ''}
-      ${r.situacao === 'parcial' ? '<div>Confira os itens abaixo direto no ClickUp.</div>' : ''}
+      ${r.situacao === 'parcial' ? '<div>Confira os itens abaixo.</div>' : ''}
     </div>
     ${linhas}
-    ${r.situacao === 'ok' || r.situacao === 'parcial' ? '<p class="muted" style="margin-top:10px">Já aparece na Agenda dos Consultores do app. Os demais dados do ClickUp se atualizam por trás em 1–3 minutos.</p>' : ''}`;
+    ${r.situacao === 'ok' || r.situacao === 'parcial' ? '<p class="muted" style="margin-top:10px">Já aparece na Agenda dos Consultores do app. Os demais painéis se atualizam em 1–3 minutos.</p>' : ''}`;
 }
 
 // ---------------------------------------------------------------- histórico de agendamentos
@@ -996,7 +996,7 @@ function telaHistorico(app) {
           <div class="pequeno">${esc((x.datas || []).map(dataCurta).join(', '))} · ${esc(x.periodo || '')}${x.demanda ? ' · ' + esc(x.demanda) : ''}</div>
           ${x.erro ? `<div class="erro-txt">${esc(x.erro)}</div>` : ''}
           ${(x.resultados || []).map(r => `<div class="pequeno">${esc(dataCurta(r.data))}: ${esc((rot[r.situacao] || [r.situacao])[0])}${r.naoConfirmados?.length ? ' (' + esc(r.naoConfirmados.join(', ')) + ')' : ''}${r.erro ? ' — ' + esc(r.erro) : ''}
-            ${r.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener">ClickUp</a>` : ''}${r.id && pode('editar') && r.situacao !== 'erro' ? ` · <a href="#" data-editar="${esc(r.id)}">Editar</a>` : ''}</div>`).join('')}
+            ${r.id && pode('editar') && r.situacao !== 'erro' ? ` · <a href="#" data-editar="${esc(r.id)}">Editar</a>` : ''}</div>`).join('')}
         </div>`;
       }).join('') : '<div class="vazio">Nada agendado ou alterado por este aparelho ainda.</div>'}
     </main>`;
@@ -1073,8 +1073,8 @@ function folhaUsuario(u, aoSalvar) {
       <label>Módulos que pode ver</label>
       ${Object.entries(NOMES_MODULOS).map(([k, t]) => chk(d.modulos.includes(k), `data-m="${k}"`, t)).join('')}
       <label>Ações</label>
-      ${chk(d.agendar, 'data-p="agendar"', 'Agendar no ClickUp', 'Criar agendas pelo app')}
-      ${chk(d.editar, 'data-p="editar"', 'Editar agendas no ClickUp')}
+      ${chk(d.agendar, 'data-p="agendar"', 'Agendar', 'Criar agendas pelo app')}
+      ${chk(d.editar, 'data-p="editar"', 'Editar agendas')}
       ${chk(d.admin, 'data-p="admin"', 'Administrador', 'Pode cadastrar e-mails e mudar permissões')}
       <label>Notificações</label>
       ${chk(temOci && d.notifOciosidade, `data-p="notifOciosidade"${temOci ? '' : ' disabled style="opacity:.55"'}`, 'Receber notificação de Ociosidade', temOci ? 'Aviso 1 vez por dia útil, depois do relatório da manhã' : 'Marque antes o módulo Ociosidade')}
@@ -1528,7 +1528,7 @@ function folhaAgendaItem(c, dk, it) {
       <div class="linha-selos" style="flex-wrap:wrap;margin:8px 0">${selo(it.periodo || 'Sem horário', TURNO_COR[it.turno] || '#87909e')}${selo(horas(it.horas), '#1f7a45')}${selo(it.agenda, '#2c4e8c')}</div>
       <div class="ag-quem">${avatar(c, 32)}<div><b>${esc(c.nome)}</b><div class="pequeno">${esc(dataTitulo(dk))}</div></div></div>
       ${it.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(it.detalhamento)}</div>` : ''}
-      ${it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:14px;font-size:14px;font-weight:700;color:var(--verde)">Abrir no ClickUp</a>` : ''}
+      
     </div>
     <div class="rodape-f">${botoes.length ? botoes.join('') : '<button class="btn contorno" data-f="fechar">Fechar</button>'}</div>`, f => {
     f.onclick = ev => {
@@ -1548,7 +1548,7 @@ MODULOS.push({
   icone: IC.calendario,
   workflow: 'carga_trabalho.yml',
   arquivo: 'app_carga_trabalho.json',
-  etapa: 'Buscando as agendas no ClickUp…',
+  etapa: 'Buscando as agendas no banco…',
   uiInicial: () => ({ aba: 0, dia: null, abertos: new Set(), abertosGrade: new Set(), rolarPara: null, centralizarDia: true,
     semanas: [0, 1, 2].includes(+guardar.ler('agenda.semanas')) ? +guardar.ler('agenda.semanas') : 0 }),
   interpretar: interpretarAgenda,
@@ -1648,15 +1648,14 @@ function cartaoOcioso(c, aberto) {
     ${!aberto && c.sugestoes.length ? `<div class="pequeno" style="margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Sugestões: ${esc(c.sugestoes.slice(0, 3).map(x => x.rotulo).join(', '))}</div>` : ''}
     ${aberto ? `<div style="margin-top:8px">
       ${c.agendasHoje.length ? `<div class="rotulo">Agenda de hoje</div>${c.agendasHoje.map(a => `
-        <div class="linha-s"><a ${a.url ? `href="${esc(a.url)}" target="_blank" rel="noopener"` : ''} data-link style="flex:1;color:inherit;text-decoration:none">${esc(a.parceiro)} - ${esc(a.tarefa)}</a><b style="font-size:12px">${horas(a.horas)}</b>${botaoEditar(a.url, 'btn-card')}</div>`).join('')}` : ''}
+        <div class="linha-s"><span style="flex:1">${esc(a.parceiro)} - ${esc(a.tarefa)}</span><b style="font-size:12px">${horas(a.horas)}</b>${botaoEditar(a.url, 'btn-card')}</div>`).join('')}` : ''}
       ${c.situacao !== 'completo' ? `<div class="rotulo">Sugestões de alocação</div>
         ${c.sugestoes.length ? '' : '<div class="pequeno" style="font-size:13px">Sem sugestões disponíveis</div>'}
         ${c.sugestoes.map((s, i) => {
           const meta = [s.lista, (s.datas || []).length ? s.datas.map(dataCurta).join(' e ') : '', s.horas > 0 ? horas(s.horas) : ''].filter(Boolean).join(' · ');
           return `<div class="sug"><div class="p">${esc(s.parceiro)}</div><div class="t">${esc(s.tarefa)}</div>
             ${meta ? `<div class="pequeno">${esc(meta)}</div>` : ''}
-            ${s.url ? `<div class="acoes" style="margin-top:6px">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-sug" data-id="${esc(c.id)}" data-i="${i}">Agendar</button>` : ''}
-              <a class="btn contorno pq" style="text-decoration:none" href="${esc(s.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a></div>` : ''}</div>`;
+            ${s.url ? `<div class="acoes" style="margin-top:6px">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-sug" data-id="${esc(c.id)}" data-i="${i}">Agendar</button>` : ''}</div>` : ''}</div>`;
         }).join('')}` : ''}
     </div>` : ''}
   </div>`;
@@ -1670,7 +1669,7 @@ MODULOS.push({
   workflow: 'ociosidade.yml',
   arquivo: 'app_ociosidade.json',
   entradas: { telegram: 'false' }, // pelo app, não repete a mensagem do Telegram
-  etapa: 'Calculando a ociosidade no ClickUp…',
+  etapa: 'Calculando a ociosidade…',
   uiInicial: () => ({ abertos: new Set(), verCompletos: false }),
   interpretar: interpretarOciosidade,
   desenhar(st, { cont, abas, acoes }) {
@@ -1783,7 +1782,7 @@ function linhaSub(a, chave, aberto, comPlanejamento) {
       ${a.horas > 0 || !comPlanejamento ? `<b style="font-size:12px">${horas(a.horas)}</b>` : ''}</div>
     ${aberto ? `<div class="extra">${selo(a.status, a.statusCor)}
       ${a.detalhamento ? `<div class="pre" style="font-size:12px;margin-top:4px">${esc(a.detalhamento)}</div>` : ''}
-      <div class="acoes-card">${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a>` : ''}${botaoEditar(a.url, 'btn-card')}</div></div>` : ''}
+      <div class="acoes-card">${botaoEditar(a.url, 'btn-card')}</div></div>` : ''}
   </div>`;
 }
 
@@ -1800,8 +1799,7 @@ function cartaoDemanda(d, ui) {
     ${aberto ? `<div style="margin-top:8px">
       ${d.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(d.detalhamento)}</div>` : ''}
       ${d.agendas.length ? `<div class="rotulo">Agendas (${d.agendas.length})</div>${d.agendas.map((a, i) => linhaSub(a, `${d.id}|${i}`, ui.subs.has(`${d.id}|${i}`), false)).join('')}` : ''}
-      ${d.url ? `<div class="acoes">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-dem" data-id="${esc(d.id)}">Agendar</button>` : ''}
-        <a class="btn contorno pq" style="text-decoration:none" href="${esc(d.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a></div>` : ''}
+      ${d.url ? `<div class="acoes">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-dem" data-id="${esc(d.id)}">Agendar</button>` : ''}</div>` : ''}
     </div>` : ''}
   </div>`;
 }
@@ -2041,10 +2039,10 @@ function pfRiscos(d) {
     <div class="pf-r-barra">${PF_NIVEIS.map(([k]) => `<i class="${k}" style="width:${(n[k] / rs.length * 100).toFixed(1)}%"></i>`).join('')}</div>
     ${rs.map(r => {
       const [rot, css] = pfVenc(r);
-      return `<a class="pf-r-item" href="${esc(r.url)}" target="_blank" rel="noopener" data-link>
+      return `<div class="pf-r-item">
         <i class="pf-r-ponto ${r.nivel}"></i>
         <span class="pf-r-txt"><span class="pf-r-nome">${esc(r.nome)}</span><span class="pequeno">${esc([r.cliente || '—', r.responsavel || '—'].join(' · '))}</span></span>
-        <span class="pf-r-venc ${css}">${esc(rot)}</span></a>`;
+        <span class="pf-r-venc ${css}">${esc(rot)}</span></div>`;
     }).join('')}
     <div class="pf-r-rodape"><b>${esc(alerta)}</b><span>${esc([...porResp].map(([k, v]) => `${k}: ${v}`).join(' · '))}</span></div>
   </div>`;
@@ -2064,7 +2062,6 @@ function pfGrade(d, ui, projetos) {
     if (aberto) {
       h += `<div class="pf-g-drill">
         ${p.demandas.length ? p.demandas.map(x => cartaoDemanda(x, ui)).join('') : '<div class="vazio">Nenhuma tarefa em Planejamento ou Personalização nesta lista.</div>'}
-        ${p.url ? `<div class="acoes" style="padding:0 12px 10px"><a class="btn contorno pq" style="text-decoration:none" href="${esc(p.url)}" target="_blank" rel="noopener" data-link>Abrir lista no ClickUp</a></div>` : ''}
       </div>`;
     }
     return h;
@@ -2206,8 +2203,7 @@ function cartaoTarefa(t, cfg, ui) {
       ${t.detalhamento ? `<div class="rotulo">Detalhamento</div><div class="pre">${esc(t.detalhamento)}</div>` : ''}
       ${(t.anexos || []).length ? `<div class="rotulo">Anexos (${t.anexos.length})</div>${listaAnexos(t.anexos)}` : ''}
       ${t.subtarefas.length ? `<div class="rotulo">Subtarefas (${t.subtarefas.length})</div>${t.subtarefas.map((a, i) => linhaSub(a, `${t.id}|${i}`, ui.subs.has(`${t.id}|${i}`), true)).join('')}` : ''}
-      ${t.url ? `<div class="acoes">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-tar" data-id="${esc(t.id)}">Agendar</button>` : ''}
-        <a class="btn contorno pq" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener" data-link>Abrir no ClickUp</a></div>` : ''}
+      ${t.url ? `<div class="acoes">${pode('agendar') ? `<button class="btn primario pq" data-a="agendar-tar" data-id="${esc(t.id)}">Agendar</button>` : ''}</div>` : ''}
     </div>` : ''}
   </div>`;
 }
@@ -2233,7 +2229,7 @@ function moduloTarefas(cfg) {
   return {
     ...cfg,
     workflow: 'backlog_comite.yml',
-    etapa: 'Buscando as tarefas no ClickUp…',
+    etapa: 'Buscando as tarefas no banco…',
     uiInicial: () => ({ busca: '', soAtrasadas: false, fechados: new Set(), abertos: new Set(), subs: new Set() }),
     interpretar: interpretarTarefas,
     desenhar(st, { cont, abas, acoes, inteiro }) {
@@ -2403,7 +2399,7 @@ function abrirFormChamado(m) {
         if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
         return;
       }
-      f.estado = 'salvando'; f.erro = ''; f.progresso = 'Criando o chamado no ClickUp…'; desenhar();
+      f.estado = 'salvando'; f.erro = ''; f.progresso = 'Criando o chamado…'; desenhar();
       const dados = {};
       CAMPOS_RASCUNHO.forEach(k => { dados[k] = typeof f[k] === 'string' ? f[k].trim() : f[k]; });
       if (!f.semAnexoMarcado || f.arquivos.length) dados.semAnexo = '';
@@ -2460,7 +2456,7 @@ function desenharFormChamado(folha, f, ops, acoes) {
   const ativo = document.activeElement && corpo.contains(document.activeElement) ? document.activeElement.id : null;
   const spin = '<span class="spinner p" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></span>';
   if (f.estado === 'carregando') {
-    corpo.innerHTML = '<div class="centro"><div class="spinner"></div><div class="muted">Carregando os campos do ClickUp…</div></div>';
+    corpo.innerHTML = '<div class="centro"><div class="spinner"></div><div class="muted">Carregando os campos…</div></div>';
     rod.innerHTML = '<button class="btn contorno" data-x="fechar">Cancelar</button>';
   } else if (f.estado === 'falhaCarga') {
     corpo.innerHTML = `<div class="resultado erro">${IC.alerta}<b>Não consegui abrir o formulário</b><div>${esc(f.erro)}</div></div>`;
@@ -2471,10 +2467,10 @@ function desenharFormChamado(folha, f, ops, acoes) {
     corpo.innerHTML = `<div class="resultado ${sit}">${sit === 'ok' ? IC.ok : IC.alerta}
         <b>${sit === 'ok' ? 'Chamado aberto no Backlog Base' : 'Chamado aberto, mas com pendências'}</b>
         <div>${esc(r.nome)}</div>
-        ${(r.naoConfirmados || []).length ? `<div>Não confirmado no ClickUp: ${esc(r.naoConfirmados.join(', '))}. Confira direto na tarefa.</div>` : ''}
+        ${(r.naoConfirmados || []).length ? `<div>Não confirmado: ${esc(r.naoConfirmados.join(', '))}.</div>` : ''}
         ${(r.avisos || []).length ? `<div class="pequeno">${esc(r.avisos.join(' '))}</div>` : ''}
         ${falhas.length ? `<div>${falhas.length} anexo${falhas.length > 1 ? 's' : ''} não foi enviado. Toque em "Reenviar anexos".</div>` : ''}
-        ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" style="font-weight:700;color:inherit">Abrir no ClickUp</a>` : ''}
+        
       </div>
       ${f.arquivos.map(a => `<div class="res-linha ${a.estado === 'ok' ? 'ok' : 'erro'}"><span class="res-ic">${a.estado === 'ok' ? IC.ok : IC.x}</span>
         <div><b>${esc(a.nome)}</b><div class="pequeno">${a.estado === 'ok' ? 'Anexado' : esc(a.erro || 'Não enviado')}</div></div></div>`).join('')}
@@ -2523,7 +2519,7 @@ function desenharFormChamado(folha, f, ops, acoes) {
         <label>Tipo de solicitação *</label>${chips('ch-tipo', TIPOS_CHAMADO, f.tipo, 'tipo')}
         <label>Ambiente *</label>${chips('ch-amb', AMBIENTES, f.ambiente, 'ambiente')}
         <label>Etapa *</label>${chips('ch-etapa', ETAPAS_CHAMADO, f.etapa, 'etapa')}
-        <div class="pequeno" style="margin-top:4px">Vai para o ClickUp com o status "backlog base" e o Módulo "Atendimento Avulso".</div>
+        <div class="pequeno" style="margin-top:4px">Entra com o status "backlog base" e o Módulo "Atendimento Avulso".</div>
         <label for="ch-desc">Descrição detalhada * ${conta(f.descricao, 50)}</label>
         <textarea id="ch-desc" class="campo${inv('ch-desc')}" rows="5" placeholder="O que está acontecendo ou o que o cliente precisa, com o contexto do processo">${esc(f.descricao)}</textarea>
         <label for="ch-passos">Onde ocorre / passos para reproduzir${/erro/i.test(f.tipo) ? ' *' : ''} ${/erro/i.test(f.tipo) ? conta(f.passos, 20) : ''}</label>
@@ -2746,7 +2742,7 @@ function folhaChamado(t) {
       ${t.subtarefas.length ? `<div class="rotulo">Agendas (${t.subtarefas.length})</div>${t.subtarefas.map(a => linhaSubKb(a, false)).join('')}` : ''}
     </div>
     <div class="rodape-f"><button class="btn contorno" data-f="fechar">Fechar</button>
-      ${t.url ? `<a class="btn primario" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener">Abrir no ClickUp</a>` : ''}</div>`, f => {
+      </div>`, f => {
     f.onclick = ev => {
       if (ev.target.closest('[data-f="fechar"]')) { fecharFolha(); return; }
       const e = ev.target.closest('[data-kbe]');
@@ -3300,7 +3296,7 @@ function gantt(st) {
   const periodoPai = it => it.inicio || it.fim
     ? `${it.inicio ? dataCurta(it.inicio) : '—'} → ${it.fim ? dataCurta(it.fim) : '—'}` : 'sem datas';
   const rotDemanda = (it, sub) => `<div class="gt-nome">${esc(it.nome)}</div>
-    <div class="gt-sub gt-sub-1">${pilula(it.pasta)}<span class="gt-datas${it.atrasada ? ' atraso-txt' : ''}" title="Início → entrega no ClickUp">${esc(periodoPai(it))}</span></div>
+    <div class="gt-sub gt-sub-1">${pilula(it.pasta)}<span class="gt-datas${it.atrasada ? ' atraso-txt' : ''}" title="Início → entrega">${esc(periodoPai(it))}</span></div>
     ${sub ? `<div class="gt-sub">${esc(sub)}</div>` : ''}`;
   const ordenar = lista => {
     const o = g.ordem;
@@ -3451,7 +3447,7 @@ function folhaBacklog(t, colunas, colId = '') {
           <button class="chip" data-kbc="">Outro consultor…</button></div>` : ''}
     </div>
     <div class="rodape-f"><button class="btn contorno" data-f="fechar">Fechar</button>
-      ${t.url ? `<a class="btn primario" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener">Abrir no ClickUp</a>` : ''}</div>`, f => {
+      </div>`, f => {
     f.onclick = ev => {
       if (ev.target.closest('[data-f="fechar"]')) { fecharFolha(); return; }
       const e = ev.target.closest('[data-kbe]');

@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.12.1';
+const VERSAO_WEB = '2.13.0';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -1007,7 +1007,7 @@ function telaHistorico(app) {
 
 // ---------------------------------------------------------------- permissões (administrador)
 
-const NOMES_MODULOS = { agenda: 'Agenda dos Consultores', ociosidade: 'Ociosidade', demandas: 'Demandas', backlog: 'Backlog Base', backlogdev: 'Backlog Desenvolvimento', portfolio: 'Portfólio de Projetos' };
+const NOMES_MODULOS = { agenda: 'Agenda dos Consultores', ociosidade: 'Ociosidade', demandas: 'Demandas', backlog: 'Backlog Base', backlogdev: 'Backlog Desenvolvimento', portfolio: 'Portfólio de Projetos', ferias: 'Controle de Férias' };
 
 async function telaPermissoes(app) {
   const ui = { lista: null, erro: '', busca: '' };
@@ -3632,6 +3632,128 @@ MODULOS.push({
     }
     if (nome === 'limpar-busca' && ui.aba >= 1) { ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); redesenhar(this, true); return false; }
     return baseBacklogDev.acao(nome, el, st, ev);
+  },
+});
+
+// ---------------------------------------------------------------- Módulo: Controle de Férias (v2.13.0)
+
+/*
+ * G4 do plano sair do GitHub: o relatório semanal do ferias.yml (HTML no Gist + e-mail) virou módulo. O servidor
+ * (ação "ferias", Ferias.gs) cruza a Programação de Férias da contabilidade, guardada no banco, com a lista
+ * "Férias" e calcula quantos dias faltam para o limite legal (art. 134/137 CLT). O admin troca a programação
+ * enviando o JSON (formato do antigo ferias_dados.json); o e-mail das segundas sai do servidor.
+ */
+const FE_ST = [['atrasado', 'Atrasado', '#c0362c'], ['critico', 'Crítico', '#d97a1f'], ['atencao', 'Atenção', '#b79a06'],
+  ['agendado', 'Agendado', '#1f8a44'], ['ok', 'Ok', '#87909e']];
+const FE_COR = Object.fromEntries(FE_ST.map(x => [x[0], x[2]]));
+const FE_ROT = Object.fromEntries(FE_ST.map(x => [x[0], x[1]]));
+const feNum = n => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('pt-BR');
+
+function interpretarFerias(json) {
+  const r = JSON.parse(json);
+  return {
+    geradoEm: r.gerado_em || '', hoje: r.hoje || '', empresa: r.empresa || '', fonte: r.fonte || '', dataBase: r.data_base || '',
+    programacaoEm: r.programacao_em || '', programacaoPor: r.programacao_por || '',
+    limiares: { critico: Number((r.limiares || {}).critico) || 60, atencao: Number((r.limiares || {}).atencao) || 120 },
+    linhas: (r.linhas || []).map(l => ({
+      nome: l.nome || '', codigo: l.codigo || '', admissao: l.admissao || '',
+      inicioAq: l.inicio_aquisitivo || '', fimAq: l.fim_aquisitivo || '', limite: l.limite_gozo || '',
+      saldo: Number(l.saldo) || 0, dias: Number(l.dias_para_vencer) || 0, status: l.status || 'ok',
+      visual: FE_COR[l.status_visual] ? l.status_visual : 'ok', acao: l.acao_sugerida || '',
+      agendado: l.agendado ? { inicio: l.agendado.inicio || '', fim: l.agendado.fim || '' } : null,
+      periodos: (l.periodos || []).map(p => ({ inicioAq: p.inicio_aquisitivo || '', fimAq: p.fim_aquisitivo || '',
+        limite: p.limite_gozo || '', direito: Number(p.dias_direito) || 0, gozados: Number(p.dias_gozados) || 0, saldo: Number(p.saldo) || 0 })),
+    })),
+  };
+}
+
+function feCartao(l, ui) {
+  const aberto = ui.abertos.has(l.nome), c = FE_COR[l.visual];
+  const dias = l.dias < 0 ? `venceu há ${-l.dias} dia${l.dias === -1 ? '' : 's'}` : `${l.dias} dia${l.dias === 1 ? '' : 's'}`;
+  return `<div class="cartao" role="button" data-a="abre" data-k="${esc(l.nome)}" style="border-left:4px solid ${c}">
+    <div class="topo${aberto ? ' aberto' : ''}"><span class="nome-t${aberto ? '' : ' corta'}">${esc(l.nome)}</span>${IC.baixo}</div>
+    <div class="linha-selos">${selo(FE_ROT[l.visual], c)}${l.visual === 'agendado' && l.status !== 'ok' ? selo(FE_ROT[l.status], FE_COR[l.status]) : ''}
+      <span class="pequeno" style="font-size:11px;white-space:nowrap">Saldo ${feNum(l.saldo)} dia(s)</span></div>
+    <div class="data-linha ${l.dias < 0 ? 'atraso' : ''}">${IC.calendario}${esc('Limite p/ gozo ' + l.limite + ' · ' + dias)}</div>
+    <div class="pequeno" style="margin-top:4px">${esc(l.acao)}</div>
+    ${aberto ? `<div style="margin-top:8px">
+      ${l.admissao ? `<div class="pequeno">Admissão: ${esc(l.admissao)}</div>` : ''}
+      <div class="pequeno">Período aquisitivo: ${esc(l.inicioAq + ' a ' + l.fimAq)}</div>
+      ${l.agendado ? `<div class="pequeno">Férias agendadas: ${esc(l.agendado.inicio + ' a ' + l.agendado.fim)}</div>` : ''}
+      <div class="rotulo">Períodos na programação (${l.periodos.length})</div>
+      ${l.periodos.map(p => `<div class="pequeno">${esc(p.inicioAq + ' a ' + p.fimAq)} · limite ${esc(p.limite)} · direito ${feNum(p.direito)}, gozados ${feNum(p.gozados)}, saldo ${feNum(p.saldo)}</div>`).join('')}
+    </div>` : ''}
+  </div>`;
+}
+
+function feLista(st) {
+  const d = st.dados, ui = st.ui, b = semAcento(ui.busca);
+  const linhas = d.linhas.filter(l => (!ui.status || l.visual === ui.status) && (!b || semAcento(l.nome + ' ' + l.acao).includes(b)));
+  return linhas.length ? linhas.map(l => feCartao(l, ui)).join('')
+    : `<div class="vazio">${ui.busca || ui.status ? 'Ninguém encontrado.' : 'A programação de férias está vazia.'}</div>`;
+}
+
+function feCarregarProgramacao(m, st) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.addEventListener('change', async () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    try {
+      const texto = await f.text();
+      try { JSON.parse(texto); } catch (e) { throw new Error('O arquivo não é um JSON válido.'); }
+      toast('Enviando a programação…');
+      const r = await api('feriasProgramacao', { programacao: texto }, { tempo: 90000 });
+      st.dados = m.interpretar(r.conteudo); st.lidoEm = Date.now(); st.erro = null;
+      guardar.gravar('json.' + m.arquivo, r.conteudo);
+      toast(`Programação carregada: ${st.dados.linhas.length} colaboradores.`);
+    } catch (e) { toast(mensagemAmigavel(e)); }
+    redesenhar(m, true);
+  });
+  inp.click();
+}
+
+MODULOS.push({
+  id: 'ferias',
+  titulo: 'Controle de Férias',
+  descricao: 'Prazos legais de férias da equipe, quem está atrasado ou crítico e quem já agendou',
+  icone: IC.calendario,
+  workflow: null,
+  arquivo: 'app_ferias.json', // só a chave do cache no aparelho (os dados vêm ao vivo)
+  etapa: '',
+  ler: async forcar => (await api('ferias', { forcar: !!forcar }, { tempo: 90000 })).conteudo,
+  uiInicial: () => ({ busca: '', status: null, abertos: new Set() }),
+  interpretar: interpretarFerias,
+  desenhar(st, { cont, abas, acoes, inteiro }) {
+    const d = st.dados, ui = st.ui;
+    abas.innerHTML = '';
+    acoes.innerHTML = pode('admin') ? `<button class="icone-btn" data-a="fe-programacao" aria-label="Carregar programação" title="Carregar programação (JSON)">${IC.clipe}</button>` : '';
+    const n = s => d.linhas.filter(l => l.visual === s).length;
+    const topo = `<div class="secao">
+        <div class="numeros rola">${FE_ST.map(([s, r, c]) => `<div class="num" role="button" data-a="fe-status" data-s="${s}"
+          style="${ui.status === s ? `outline:2px solid ${c}` : ''}"><b style="color:${c}">${n(s)}</b><span>${r}</span></div>`).join('')}</div>
+        <div class="pequeno" style="margin-top:8px">Fonte: ${esc(d.fonte || '')}${d.dataBase ? ' · referência ' + esc(d.dataBase.split('-').reverse().join('/')) : ''}.
+          Crítico: até ${d.limiares.critico} dias do limite; atenção: até ${d.limiares.atencao}.</div>
+        ${st.erro ? `<div class="erro-txt">Não consegui buscar dados novos: ${esc(st.erro)}</div>` : ''}
+      </div>
+      <div class="divisor"></div>
+      <div class="secao" style="padding-bottom:0">${campoBusca(ui.busca, 'Buscar colaborador')}</div>`;
+    const focado = document.activeElement && document.activeElement.id === 'busca';
+    if (inteiro || !focado || !$('#fe-corpo')) {
+      trocarHTML(cont, topo + '<div class="secao" id="fe-corpo"></div>');
+      ligarBusca(st, () => { trocarHTML($('#fe-corpo'), feLista(st)); });
+    }
+    trocarHTML($('#fe-corpo'), feLista(st));
+  },
+  acao(nome, el, st) {
+    const ui = st.ui;
+    switch (nome) {
+      case 'abre': alternar(ui.abertos, el.dataset.k); return;
+      case 'fe-status': ui.status = ui.status === el.dataset.s ? null : el.dataset.s; redesenhar(this, true); return false;
+      case 'fe-programacao': feCarregarProgramacao(this, st); return false;
+      case 'limpar-busca': ui.busca = ''; $('#busca').value = ''; $('#busca').blur(); return;
+    }
+    return false;
   },
 });
 

@@ -1,5 +1,5 @@
-// Casca do v3: topo (busca, escritório, tema, tela cheia, sair), menu lateral por área (recolhível, com Favoritos)
-// e abas por módulo aberto. A rota (#/…) manda: abrir um link abre/ativa a aba; clicar na aba muda a rota.
+// Casca do v3: topo (abas por módulo aberto, busca, escritório, tema, tela cheia, sair) e menu lateral por área
+// (recolhível, com Favoritos). As abas ficam na faixa do topo; a busca encosta nos botões à direita. A rota (#/…) manda: abrir um link abre/ativa a aba; clicar na aba muda a rota.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BuscaGlobal } from '../componentes/BuscaGlobal';
 import { ErroTela } from '../componentes/ErroTela';
@@ -8,10 +8,16 @@ import { useSessao } from '../estado/sessao';
 import { abrir, fechar, lerAbasSalvas, renomear, type EstadoAbas } from '../estado/abas';
 import { AREAS, caminhoDoHash, caminhoEntidade, ENTIDADES, hashDe, lerRota, modulosVisiveis } from '../estado/rotas';
 import { aplicarTema, lerTema, proximoTema } from '../estado/tema';
+import { ClienteTela } from '../telas/ClienteTela';
+import { Clientes } from '../telas/Clientes';
 import { Componentes } from '../telas/Componentes';
 import { EmConstrucao, NaoEncontrada } from '../telas/EmConstrucao';
 import { EntidadeTela } from '../telas/EntidadeTela';
+import { Equipe } from '../telas/Equipe';
 import { Inicio } from '../telas/Inicio';
+import { Modelos } from '../telas/Modelos';
+import { ProjetoTela } from '../telas/ProjetoTela';
+import { Projetos } from '../telas/Projetos';
 import { VERSAO } from '../versao';
 
 const lerLS = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -65,6 +71,11 @@ export function Casca() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveAbas]);
 
+  // a aba ativa fica à vista na faixa do topo (no celular a faixa rola na horizontal)
+  useEffect(() => {
+    document.querySelector('.abas .aba.ativa')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [abas.ativa]);
+
   // sem aba aberta: volta ao início
   useEffect(() => { if (abas.ativa === null) location.hash = hashDe('inicio'); }, [abas.ativa]);
 
@@ -106,12 +117,18 @@ export function Casca() {
     const r = lerRota(caminho);
     if (r.tipo === 'desconhecida') return <NaoEncontrada caminho={caminho} />;
     if (r.tipo === 'entidade') {
-      return <EntidadeTela entidade={r.entidade} id={r.id} titulo={titulo}
-        aoRenomear={t => setAbas(a => renomear(a, caminho, t))} />;
+      const aoRenomear = (t: string) => setAbas(a => renomear(a, caminho, t));
+      if (r.entidade === 'cliente') return <ClienteTela id={r.id} aoRenomear={aoRenomear} ir={ir} />;
+      if (r.entidade === 'projeto') return <ProjetoTela id={r.id} aoRenomear={aoRenomear} />;
+      return <EntidadeTela entidade={r.entidade} id={r.id} titulo={titulo} aoRenomear={aoRenomear} />;
     }
     if (!mods.includes(r.modulo)) return <div className="vazio-tela"><h2>Sem acesso</h2><p>Você não tem permissão para {r.modulo.titulo}.</p></div>;
     if (r.modulo.id === 'inicio') return <Inicio />;
     if (r.modulo.id === 'componentes') return <Componentes />;
+    if (r.modulo.id === 'clientes') return <Clientes ir={ir} />;
+    if (r.modulo.id === 'projetos') return <Projetos ir={ir} />;
+    if (r.modulo.id === 'modelos') return <Modelos />;
+    if (r.modulo.id === 'equipe') return <Equipe />;
     return <EmConstrucao titulo={r.modulo.titulo} etapa={r.modulo.etapa} />;
   };
 
@@ -122,6 +139,15 @@ export function Casca() {
         <button type="button" className="topo-bt" aria-label="Menu" aria-expanded={celular() ? menuCel : !recolhido}
           onClick={() => (celular() ? setMenuCel(!menuCel) : setRecolhido(!recolhido))}>☰</button>
         <a className="topo-marca" href={hashDe('inicio')}>PMO <span>v3</span></a>
+        <div className="abas" role="tablist" aria-label="Abas abertas">
+          {abas.abas.map(a => (
+            <div key={a.caminho} className={`aba${a.caminho === abas.ativa ? ' ativa' : ''}`}>
+              <button type="button" role="tab" aria-selected={a.caminho === abas.ativa} title={a.titulo}
+                onClick={() => ir(a.caminho)}>{a.titulo}</button>
+              <button type="button" className="aba-x" aria-label={`Fechar ${a.titulo}`} onClick={() => fecharAba(a.caminho)}>×</button>
+            </div>
+          ))}
+        </div>
         <button type="button" className="topo-busca" onClick={() => setBusca(true)} aria-label="Buscar (Ctrl+K)">
           <span aria-hidden>⌕</span><span className="so-pc"> Buscar…</span><kbd className="so-pc">Ctrl K</kbd>
         </button>
@@ -184,15 +210,6 @@ export function Casca() {
       <div className="menu-veu" onClick={() => setMenuCel(false)} aria-hidden />
 
       <div className="area">
-        <div className="abas" role="tablist" aria-label="Abas abertas">
-          {abas.abas.map(a => (
-            <div key={a.caminho} className={`aba${a.caminho === abas.ativa ? ' ativa' : ''}`}>
-              <button type="button" role="tab" aria-selected={a.caminho === abas.ativa} title={a.titulo}
-                onClick={() => ir(a.caminho)}>{a.titulo}</button>
-              <button type="button" className="aba-x" aria-label={`Fechar ${a.titulo}`} onClick={() => fecharAba(a.caminho)}>×</button>
-            </div>
-          ))}
-        </div>
         <main className="conteudo">
           {abas.abas.map(a => (
             <div key={esc + a.caminho} role="tabpanel" hidden={a.caminho !== abas.ativa} className="painel">

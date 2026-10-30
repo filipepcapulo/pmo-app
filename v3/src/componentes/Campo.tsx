@@ -3,15 +3,15 @@ import { useId, type FormEvent, type ReactNode } from 'react';
 
 type Opcao = { valor: string; rotulo: string };
 
-export function Campo({ rotulo, valor, aoMudar, tipo = 'text', opcoes, erro, ajuda, obrigatorio, ...resto }: {
+export function Campo({ rotulo, valor, aoMudar, tipo = 'text', opcoes, erro, ajuda, obrigatorio, somenteLeitura, ...resto }: {
   rotulo: string; valor: string; aoMudar: (v: string) => void;
   tipo?: 'text' | 'email' | 'number' | 'date' | 'textarea' | 'select' | 'password';
-  opcoes?: Opcao[]; erro?: string | null; ajuda?: string; obrigatorio?: boolean;
+  opcoes?: Opcao[]; erro?: string | null; ajuda?: string; obrigatorio?: boolean; somenteLeitura?: boolean;
   placeholder?: string; autoComplete?: string; inputMode?: 'numeric' | 'email' | 'text'; maxLength?: number; name?: string;
 }) {
   const id = useId();
   const comum = {
-    id, name: resto.name, value: valor, required: obrigatorio, 'aria-invalid': erro ? true : undefined,
+    id, name: resto.name, value: valor, required: obrigatorio, readOnly: somenteLeitura || undefined, 'aria-invalid': erro ? true : undefined,
     'aria-describedby': erro || ajuda ? id + '-a' : undefined,
   };
   return (

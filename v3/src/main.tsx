@@ -5,6 +5,7 @@ import { instalarCapturaErros } from './api/erros';
 import { Casca } from './casca/Casca';
 import { Login } from './casca/Login';
 import { ProvedorToasts } from './componentes/Toasts';
+import { ProvedorEdicao } from './estado/edicao';
 import { ProvedorEquipe } from './estado/equipe';
 import { ProvedorFavoritos } from './estado/favoritos';
 import { ProvedorSessao, useSessao } from './estado/sessao';
@@ -22,7 +23,7 @@ function App() {
   if (!configurado) return <div className="vazio-tela"><h2>Configuração ausente</h2><p>Faltam VITE_SUPABASE_URL e VITE_SUPABASE_KEY no build.</p></div>;
   if (carregando) return <div className="carregando" aria-busy="true"><span className="giro" /> Carregando…</div>;
   if (!sessao || !eu) return <Login erroSessao={erro} />;
-  return <ProvedorFavoritos><ProvedorEquipe><Casca key={eu.escritorio_id ?? 'sem'} /></ProvedorEquipe></ProvedorFavoritos>;
+  return <ProvedorFavoritos><ProvedorEquipe><ProvedorEdicao><Casca key={eu.escritorio_id ?? 'sem'} /></ProvedorEdicao></ProvedorEquipe></ProvedorFavoritos>;
 }
 
 createRoot(document.getElementById('raiz')!).render(

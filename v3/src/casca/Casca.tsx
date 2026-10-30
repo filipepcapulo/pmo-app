@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BuscaGlobal } from '../componentes/BuscaGlobal';
 import { ErroTela } from '../componentes/ErroTela';
+import { Notificacoes } from '../componentes/Notificacoes';
 import { useFavoritos } from '../estado/favoritos';
 import { useSessao } from '../estado/sessao';
 import { abrir, fechar, lerAbasSalvas, renomear, type EstadoAbas } from '../estado/abas';
@@ -11,6 +12,8 @@ import { aplicarTema, lerTema, proximoTema } from '../estado/tema';
 import { ClienteTela } from '../telas/ClienteTela';
 import { Clientes } from '../telas/Clientes';
 import { Componentes } from '../telas/Componentes';
+import { DemandaTela } from '../telas/DemandaTela';
+import { Demandas } from '../telas/Demandas';
 import { EmConstrucao, NaoEncontrada } from '../telas/EmConstrucao';
 import { EntidadeTela } from '../telas/EntidadeTela';
 import { Equipe } from '../telas/Equipe';
@@ -18,6 +21,7 @@ import { Inicio } from '../telas/Inicio';
 import { Modelos } from '../telas/Modelos';
 import { ProjetoTela } from '../telas/ProjetoTela';
 import { Projetos } from '../telas/Projetos';
+import { TarefaTela } from '../telas/TarefaTela';
 import { VERSAO } from '../versao';
 
 const lerLS = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -120,6 +124,8 @@ export function Casca() {
       const aoRenomear = (t: string) => setAbas(a => renomear(a, caminho, t));
       if (r.entidade === 'cliente') return <ClienteTela id={r.id} aoRenomear={aoRenomear} ir={ir} />;
       if (r.entidade === 'projeto') return <ProjetoTela id={r.id} aoRenomear={aoRenomear} />;
+      if (r.entidade === 'demanda') return <DemandaTela id={r.id} aoRenomear={aoRenomear} />;
+      if (r.entidade === 'tarefa') return <TarefaTela id={r.id} aoRenomear={aoRenomear} />;
       return <EntidadeTela entidade={r.entidade} id={r.id} titulo={titulo} aoRenomear={aoRenomear} />;
     }
     if (!mods.includes(r.modulo)) return <div className="vazio-tela"><h2>Sem acesso</h2><p>Você não tem permissão para {r.modulo.titulo}.</p></div>;
@@ -129,6 +135,7 @@ export function Casca() {
     if (r.modulo.id === 'projetos') return <Projetos ir={ir} />;
     if (r.modulo.id === 'modelos') return <Modelos />;
     if (r.modulo.id === 'equipe') return <Equipe />;
+    if (r.modulo.id === 'demandas') return <Demandas />;
     return <EmConstrucao titulo={r.modulo.titulo} etapa={r.modulo.etapa} />;
   };
 
@@ -158,6 +165,7 @@ export function Casca() {
               {eu!.escritorios.map(e => <option key={e.id} value={e.id}>{e.sigla}</option>)}
             </select>
           ) : <span className="topo-esc-fixo" title={escAtual?.nome}>{escAtual?.sigla}</span>}
+          <Notificacoes />
           <button type="button" className="topo-bt" aria-label={`Tema: ${tema}`} title={`Tema: ${tema}`}
             onClick={() => setTema(proximoTema(tema))}>{tema === 'escuro' ? '☾' : tema === 'claro' ? '☀' : '◐'}</button>
           <button type="button" className="topo-bt" aria-label="Tela cheia" aria-pressed={telaCheia} onClick={alternarTelaCheia}>⛶</button>

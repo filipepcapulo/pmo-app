@@ -25,7 +25,7 @@ export const MODULOS: Modulo[] = [
   { id: 'projetos', titulo: 'Projetos', area: 'cadastros', icone: '◫' },
   { id: 'modelos', titulo: 'Modelos de projeto', area: 'cadastros', icone: '⧉', permissao: 'projeto.criar' },
   { id: 'equipe', titulo: 'Equipe', area: 'cadastros', icone: '☺' },
-  { id: 'demandas', titulo: 'Demandas', area: 'execucao', icone: '☰', etapa: 'V6' },
+  { id: 'demandas', titulo: 'Demandas', area: 'execucao', icone: '☰' },
   { id: 'agenda', titulo: 'Agenda da equipe', area: 'execucao', icone: '▦', etapa: 'V8' },
   { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: '✉', etapa: 'V9' },
   { id: 'consultor', titulo: 'Minha agenda', area: 'execucao', icone: '◷', etapa: 'V10a' },

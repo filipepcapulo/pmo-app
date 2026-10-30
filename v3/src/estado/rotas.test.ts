@@ -23,4 +23,11 @@ describe('rotas', () => {
     expect(modulosVisiveis([]).some(m => m.id === 'produtividade')).toBe(false);
     expect(modulosVisiveis(['relatorio.produtividade']).some(m => m.id === 'produtividade')).toBe(true);
   });
+  it('cadastros da V5: clientes, projetos e equipe para todos; modelos com projeto.criar', () => {
+    const ids = modulosVisiveis([]).map(m => m.id);
+    expect(ids).toEqual(expect.arrayContaining(['clientes', 'projetos', 'equipe']));
+    expect(ids).not.toContain('modelos');
+    expect(modulosVisiveis(['projeto.criar']).some(m => m.id === 'modelos')).toBe(true);
+    expect(lerRota('cliente/0f8fad5b-d9cb-469f-a165-70867728950e')).toMatchObject({ tipo: 'entidade', entidade: 'cliente' });
+  });
 });

@@ -21,9 +21,10 @@ export const AREAS: { id: Area; titulo: string }[] = [
 
 export const MODULOS: Modulo[] = [
   { id: 'inicio', titulo: 'Início', area: 'geral', icone: '⌂' },
-  { id: 'clientes', titulo: 'Clientes', area: 'cadastros', icone: '▣', etapa: 'V5' },
-  { id: 'projetos', titulo: 'Projetos', area: 'cadastros', icone: '◫', etapa: 'V5' },
-  { id: 'equipe', titulo: 'Equipe', area: 'cadastros', icone: '☺', etapa: 'V5' },
+  { id: 'clientes', titulo: 'Clientes', area: 'cadastros', icone: '▣' },
+  { id: 'projetos', titulo: 'Projetos', area: 'cadastros', icone: '◫' },
+  { id: 'modelos', titulo: 'Modelos de projeto', area: 'cadastros', icone: '⧉', permissao: 'projeto.criar' },
+  { id: 'equipe', titulo: 'Equipe', area: 'cadastros', icone: '☺' },
   { id: 'demandas', titulo: 'Demandas', area: 'execucao', icone: '☰', etapa: 'V6' },
   { id: 'agenda', titulo: 'Agenda da equipe', area: 'execucao', icone: '▦', etapa: 'V8' },
   { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: '✉', etapa: 'V9' },
@@ -34,7 +35,7 @@ export const MODULOS: Modulo[] = [
 
 export const ENTIDADES = {
   cliente: { titulo: 'Cliente', etapa: 'V5' },
-  projeto: { titulo: 'Projeto', etapa: 'V7' },
+  projeto: { titulo: 'Projeto', etapa: 'V5' },  // cadastro na V5; indicadores, Gantt e 5W2H na V7
   demanda: { titulo: 'Demanda', etapa: 'V6' },
   tarefa: { titulo: 'Tarefa', etapa: 'V6' },
   chamado: { titulo: 'Chamado', etapa: 'V9' },

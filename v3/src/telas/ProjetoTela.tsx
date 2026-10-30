@@ -1,15 +1,20 @@
 // Ficha do projeto (#/projeto/<id>) — parte de cadastro (V5): dados, fase, situação, GP, datas, horas e pedidos de
-// horas. Indicadores, Gantt, 5W2H e drilldown chegam na V7.
+// horas; V6: barra de horas abaixo do nome, demandas/subdemandas com as ações comuns e comentários. Indicadores,
+// Gantt, 5W2H e drilldown completo chegam na V7.
 import { useEffect, useState } from 'react';
 import { api, data, FASES, horas, rotuloSituacao, SITUACOES, TIPOS_PEDIDO, type PedidoHoras, type ProjetoFicha } from '../api/cadastros';
+import { ArvoreDemandas } from '../componentes/ArvoreDemandas';
+import { BarraHoras } from '../componentes/BarraHoras';
 import { Botao } from '../componentes/Botao';
 import { BotaoFavorito } from '../componentes/BotaoFavorito';
 import { Campo, Formulario } from '../componentes/Campo';
+import { Comentarios } from '../componentes/Comentarios';
 import { NomePessoa } from '../componentes/NomePessoa';
 import { Popup } from '../componentes/Popup';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
+import { useEdicao } from '../estado/edicao';
 import { gps, useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
@@ -20,7 +25,8 @@ type Proj = ProjetoFicha['projeto'];
 export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: string) => void }) {
   const esc = useSessao().eu!.escritorio_id!;
   const pode = usePode();
-  const c = useCarga(() => api.projeto(esc, id), [esc, id]);
+  const ed = useEdicao();
+  const c = useCarga(() => api.projeto(esc, id), [esc, id, ed.geracao]);
   const [edit, setEdit] = useState(false);
   const [pedido, setPedido] = useState<Partial<PedidoHoras> | null>(null);
   const p = c.dados?.projeto;
@@ -45,6 +51,7 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
         <div>
           <small className="ajuda"><a href={hashDe(caminhoEntidade('cliente', c.dados.cliente.id))}>{c.dados.cliente.nome}</a> · Projeto</small>
           <h1>{p.nome} <span className="pilula">{p.fase}</span></h1>
+          <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} />
         </div>
         <div className="linha">
           <BotaoFavorito entidade="projeto" id={p.id} />
@@ -78,16 +85,16 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
           vazio="Nenhum pedido de horas." aoClicar={pode('pedido_horas.gravar') ? l => setPedido(l) : undefined} />
       </section>
 
-      {raiz.length > 0 && (
-        <section className="cartao">
-          <h2 className="secao">Demandas</h2>
-          <ul className="lista-simples">
-            {raiz.map(d => <li key={d.id}><a href={hashDe(caminhoEntidade('demanda', d.id))}>{d.nome}</a>
-              {d.horas_previstas != null && <small className="ajuda"> · {horas(d.horas_previstas)}</small>}</li>)}
-          </ul>
-          <p className="ajuda">A gestão das demandas chega na V6; a tela completa do projeto (indicadores, Gantt, 5W2H), na V7.</p>
-        </section>
-      )}
+      <section className="cartao">
+        <div className="pagina-topo"><h2 className="secao">Demandas</h2>
+          {pode('demanda.criar') && p.situacao === 'ativo' && <Botao onClick={() => ed.demanda({ projeto_id: p.id })}>+ Demanda</Botao>}</div>
+        <ArvoreDemandas demandas={c.dados.demandas} vazio="Nenhuma demanda neste projeto." />
+      </section>
+
+      <section className="cartao">
+        <h2 className="secao">Comentários</h2>
+        <Comentarios entidade="projeto" id={p.id} />
+      </section>
 
       <EditarProjeto aberto={edit} projeto={p} aoFechar={() => setEdit(false)} aoGravar={() => { setEdit(false); c.recarregar(); }} />
       <PedidoPopup pedido={pedido} aoFechar={() => setPedido(null)} aoGravar={() => { setPedido(null); c.recarregar(); }} />

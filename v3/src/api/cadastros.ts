@@ -47,9 +47,10 @@ export interface ProjetoFicha {
   projeto: { id: string; cliente_id: string; nome: string; fase: string; gp_id: string | null; situacao: Situacao;
     inicio_previsto: string | null; fim_previsto: string | null; versao: number };
   cliente: { id: string; nome: string; ativo: boolean };
-  totais: { horas_contratadas: number; horas_liberadas: number; horas_previstas: number; horas_reais: number; saldo: number; perc: number | null } | null;
+  totais: { horas_contratadas: number; horas_liberadas: number; horas_previstas: number; horas_reais: number; horas_planejadas: number; saldo: number; perc: number | null } | null;
   pedidos_horas: PedidoHoras[];
-  demandas: { id: string; nome: string; pai_id: string | null; status: string; horas_previstas: number | null; etapa: string | null }[];
+  demandas: { id: string; projeto_id: string; nome: string; pai_id: string | null; status: string; horas_previstas: number | null; etapa: string | null;
+    totais?: { horas_previstas: number | null; horas_reais: number; horas_planejadas: number; inicio: string | null; fim: string | null; perc: number | null; atrasada: boolean } | null }[];
 }
 export interface ModeloDemanda { id?: string; nome: string; etapa: string | null; horas_previstas: number | null; modulo_id: string | null }
 export interface Modelo { id: string; nome: string; fase: string | null; descricao: string | null; ativo: boolean; versao: number; demandas: ModeloDemanda[] }

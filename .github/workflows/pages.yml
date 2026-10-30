@@ -1,0 +1,65 @@
+# Publica o GitHub Pages: o app 2.x (arquivos da raiz, sem build, iguais ao que o Pages servia) + a PWA v3 em /v3/
+# (Vite + React, build aqui). Em PR só testa e faz o build; o deploy é só na main.
+# Pré-requisitos (uma vez): Settings → Pages → Source = "GitHub Actions"; Variables do repositório
+# SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY (a chave publicável do Supabase já é pública no navegador; nada de secret aqui).
+name: Pages (app 2.x + v3)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: v3/package-lock.json
+      - name: Instalar e testar a v3 (Vitest)
+        working-directory: v3
+        run: npm ci && npm test
+      - name: Build da v3
+        working-directory: v3
+        env:
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          export VITE_SUPABASE_WS="${VITE_SUPABASE_URL/https:\/\//wss://}"
+          npm run build
+      - name: Montar o site (2.x na raiz + v3/)
+        run: |
+          mkdir -p _site
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'v3' --exclude '_site' ./ _site/
+          cp -R v3/dist _site/v3
+          test -f _site/index.html && test -f _site/app.js && test -f _site/sw.js && test -f _site/v3/index.html
+          ls -la _site _site/v3
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

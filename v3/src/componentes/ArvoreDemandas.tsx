@@ -1,5 +1,6 @@
 // Peças comuns de execução: árvore demanda → subdemanda (com a barra de horas e as mesmas ações em toda tela) e a
-// lista de tarefas. Ações sempre pelo popup único (useEdicao).
+// lista de tarefas. Ações sempre pelo popup único (useEdicao). Com `tarefas`, cada linha abre as próprias tarefas
+// (drilldown demanda → subdemanda → tarefa da Tela de Projeto); clicar na tarefa abre o formulário.
 import { useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { arvoreDemandas, rotuloModalidade, rotuloPeriodo, rotuloStatusDemanda, rotuloStatusTarefa, type Tarefa, type TotaisDemanda } from '../api/execucao';
@@ -17,13 +18,14 @@ export function StatusPilula({ status, tipo = 'demanda' }: { status: string; tip
   return <span className={`pilula st-${status}`}>{tipo === 'demanda' ? rotuloStatusDemanda(status) : rotuloStatusTarefa(status)}</span>;
 }
 
-function LinhaDemanda({ d, sub, aberta, alternar, nFilhas }: { d: ComTotais; sub?: boolean; aberta?: boolean; alternar?: () => void; nFilhas?: number }) {
+function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTotais; sub?: boolean; aberta?: boolean; alternar?: () => void; nFilhas?: number; tarefas?: Tarefa[] }) {
   const ed = useEdicao();
   const pode = usePode();
+  const [verTarefas, setVerTarefas] = useState(false);
   const t = d.totais;
   const href = hashDe(caminhoEntidade('demanda', d.id));
   // a linha inteira abre a demanda (como as linhas clicáveis das tabelas); links e botões dentro dela seguem os seus
-  const abrir = (e: React.MouseEvent) => { if (!(e.target as HTMLElement).closest('a, button, input, select, textarea')) location.hash = href; };
+  const abrir = (e: React.MouseEvent) => { if (!(e.target as HTMLElement).closest('a, button, input, select, textarea, [role=button]')) location.hash = href; };
   return (
     <div className={`linha-exec${sub ? ' sub' : ''}`} onClick={abrir}>
       <div className="linha-exec-topo">
@@ -37,17 +39,39 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas }: { d: ComTotais; sub
         <span className="linha-exec-bts">
           {!sub && pode('demanda.criar') && <button type="button" className="link" onClick={() => ed.demanda({ projeto_id: d.projeto_id, pai_id: d.id })}>+ Sub</button>}
           {pode('tarefa.criar') && <button type="button" className="link" onClick={() => ed.tarefa({ demanda_id: d.id })}>+ Tarefa</button>}
+          {tarefas && tarefas.length > 0 && <button type="button" className="link" aria-expanded={verTarefas} onClick={() => setVerTarefas(v => !v)}>
+            {verTarefas ? 'Ocultar' : 'Ver'} {tarefas.length} tarefa{tarefas.length > 1 ? 's' : ''}</button>}
           <button type="button" className="link" onClick={() => ed.demanda({ id: d.id })}>Editar</button>
         </span>
       </div>
       <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} compacta={!!sub} />
+      {verTarefas && tarefas && <TarefasDrill tarefas={tarefas} />}
     </div>
   );
 }
 
+function TarefasDrill({ tarefas }: { tarefas: Tarefa[] }) {
+  const ed = useEdicao();
+  return (
+    <ul className="tarefas-drill" aria-label="Tarefas">
+      {tarefas.map(t => (
+        <li key={t.id} role="button" tabIndex={0} onClick={() => ed.tarefa({ id: t.id })}
+          onKeyDown={e => { if (e.key === 'Enter') ed.tarefa({ id: t.id }); }}>
+          <span className="ajuda">{data(t.data)} · {rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim)}</span>
+          <span className="td-nome">{t.nome}</span>
+          <NomePessoa id={t.responsavel_id} />
+          <StatusPilula status={t.status} tipo="tarefa" />
+          <span>{t.horas_reais != null ? <strong>{horas(t.horas_reais)}</strong> : <span className="ajuda">{horas(t.horas_previstas)}</span>}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Demandas com subdemandas recolhíveis logo abaixo. */
-export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.' }: { demandas: ComTotais[]; vazio?: string }) {
+export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.', tarefas }: { demandas: ComTotais[]; vazio?: string; tarefas?: Tarefa[] }) {
   const [fechadas, setFechadas] = useState<Set<string>>(new Set());
+  const tarefasDe = (id: string) => (tarefas ? tarefas.filter(t => t.demanda_id === id) : undefined);
   const arv = arvoreDemandas(demandas);
   if (!arv.length) return <p className="ajuda">{vazio}</p>;
   const comFilhas = arv.filter(x => x.filhas.length).map(x => x.item.id);
@@ -66,10 +90,10 @@ export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.' }: { deman
         const aberta = !fechadas.has(item.id);
         return (
           <li key={item.id}>
-            <LinhaDemanda d={item} sub={!!item.pai_id} nFilhas={filhas.length} aberta={aberta}
+            <LinhaDemanda d={item} sub={!!item.pai_id} nFilhas={filhas.length} aberta={aberta} tarefas={tarefasDe(item.id)}
               alternar={() => setFechadas(s => { const n = new Set(s); if (n.has(item.id)) n.delete(item.id); else n.add(item.id); return n; })} />
             {aberta && filhas.length > 0 && (
-              <ul>{filhas.map(f => <li key={f.id}><LinhaDemanda d={f} sub /></li>)}</ul>
+              <ul>{filhas.map(f => <li key={f.id}><LinhaDemanda d={f} sub tarefas={tarefasDe(f.id)} /></li>)}</ul>
             )}
           </li>
         );

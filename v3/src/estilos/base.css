@@ -342,12 +342,6 @@ textarea { resize: vertical; }
 .descricao { white-space: pre-wrap; margin: 12px 0 0; }
 .texto-longo { white-space: pre-wrap; max-width: 420px; }
 .liberacao { margin-top: 10px; border-color: var(--laranja); display: flex; flex-direction: column; gap: 8px; }
-fieldset.multi { border: 1px solid var(--linha); border-radius: var(--raio); padding: 8px 10px; margin: 8px 0 0; min-width: 0; }
-fieldset.multi legend { font-size: .82rem; font-weight: 600; color: var(--texto-2); padding: 0 4px; }
-.multi-filtro { width: 100%; margin-bottom: 4px; }
-.multi-lista { max-height: 180px; overflow: auto; display: flex; flex-direction: column; }
-.multi-lista .check { margin-top: 4px; }
-.pilula-x { border: 0; background: none; color: inherit; cursor: pointer; margin-left: 4px; padding: 0; font: inherit; }
 .checklist ul { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .checklist li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .checklist li .check { margin-top: 0; }
@@ -378,3 +372,35 @@ fieldset.multi legend { font-size: .82rem; font-weight: 600; color: var(--texto-
 .fav-cliente h3 { margin: 0 0 6px; font-size: 1rem; }
 .fav-cliente ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .fav-cliente .linha { gap: 6px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------- formulários no padrão da agenda do 2.x (chips, caixa da demanda) */
+.form-2x { gap: 14px; }
+.form-2x .campo { gap: 6px; }
+.rotulo, .chips-campo legend { font-size: 11px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; letter-spacing: .02em; }
+.chips-campo { border: 0; margin: 0; padding: 0; min-width: 0; }
+.chips-campo legend { padding: 0; margin-bottom: 6px; }
+.chips-campo legend small, .rotulo small { text-transform: none; font-weight: 600; letter-spacing: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; border: 1px solid var(--linha); border-radius: 8px;
+  background: var(--superficie); color: var(--texto); font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; position: relative; }
+.campo label.chip { font-size: 14px; font-weight: 500; color: var(--texto); text-transform: none; letter-spacing: 0; }
+.campo label.chip.sel { color: var(--verde-texto); font-weight: 700; }
+.chip small { font-size: 11px; color: var(--texto-2); font-weight: 600; }
+.chip:hover { border-color: var(--verde); }
+.chip.sel { background: var(--verde-claro); color: var(--verde-texto); border-color: transparent; font-weight: 700; }
+.chip.sel small { color: inherit; opacity: .8; }
+.chip:has(input:focus-visible) { outline: 2px solid var(--foco); outline-offset: 2px; }
+/* o rádio/caixa fica invisível por cima do chip inteiro: o clique em qualquer parte marca */
+.chip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; clip: auto; cursor: pointer; }
+.chips-campo:disabled .chip { opacity: .5; cursor: default; }
+.chip-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--verde-escuro); color: #fff; font-size: 10px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.chips-filtro { width: 100%; margin-bottom: 8px; }
+.linha-datas { display: flex; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+.linha-datas input { flex: 1 1 auto; min-width: 0; }
+.caixa-escolhida { background: var(--superficie-2); border-radius: var(--raio); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.caixa-escolhida small { font-size: 12px; color: var(--texto-2); }
+.caixa-escolhida strong { font-size: 15px; }
+.caixa-escolhida .link { margin-top: 4px; font-size: 14px; }
+.grade-campos.dupla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 520px) { .grade-campos.dupla { grid-template-columns: minmax(0, 1fr); } }

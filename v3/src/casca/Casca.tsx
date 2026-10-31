@@ -10,6 +10,7 @@ import { useSessao } from '../estado/sessao';
 import { abrir, fechar, lerAbasSalvas, renomear, type EstadoAbas } from '../estado/abas';
 import { AREAS, caminhoDoHash, caminhoEntidade, ENTIDADES, hashDe, lerRota, modulosVisiveis } from '../estado/rotas';
 import { aplicarTema, lerTema, proximoTema } from '../estado/tema';
+import { AgendaEquipe } from '../telas/AgendaEquipe';
 import { ClienteTela } from '../telas/ClienteTela';
 import { Clientes } from '../telas/Clientes';
 import { Componentes } from '../telas/Componentes';
@@ -18,6 +19,7 @@ import { Demandas } from '../telas/Demandas';
 import { EmConstrucao, NaoEncontrada } from '../telas/EmConstrucao';
 import { EntidadeTela } from '../telas/EntidadeTela';
 import { Equipe } from '../telas/Equipe';
+import { EquipeDev } from '../telas/EquipeDev';
 import { Inicio } from '../telas/Inicio';
 import { Modelos } from '../telas/Modelos';
 import { ProjetoTela } from '../telas/ProjetoTela';
@@ -137,6 +139,8 @@ export function Casca() {
     if (r.modulo.id === 'modelos') return <Modelos />;
     if (r.modulo.id === 'equipe') return <Equipe />;
     if (r.modulo.id === 'demandas') return <Demandas />;
+    if (r.modulo.id === 'agenda') return <AgendaEquipe />;
+    if (r.modulo.id === 'equipe-dev') return <EquipeDev />;
     return <EmConstrucao titulo={r.modulo.titulo} etapa={r.modulo.etapa} />;
   };
 

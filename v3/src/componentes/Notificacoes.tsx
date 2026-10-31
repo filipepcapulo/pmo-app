@@ -1,6 +1,7 @@
 // Sino do topo: notificações do usuário (menções, tarefas novas…). Atualiza a cada minuto e ao gravar algo.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { exec, type Notificacao } from '../api/execucao';
+import { Icone } from './Icone';
 import { useEdicao } from '../estado/edicao';
 import { useSessao } from '../estado/sessao';
 
@@ -33,7 +34,7 @@ export function Notificacoes() {
     <div className="notif" ref={caixa}>
       <button type="button" className="topo-bt" aria-label={`Notificações${dados.nao_lidas ? ` (${dados.nao_lidas} não lidas)` : ''}`}
         aria-expanded={aberto} onClick={() => setAberto(!aberto)}>
-        🔔{dados.nao_lidas > 0 && <span className="notif-cont" aria-hidden>{dados.nao_lidas > 99 ? '99+' : dados.nao_lidas}</span>}
+        <Icone nome="sino" />{dados.nao_lidas > 0 && <span className="notif-cont" aria-hidden>{dados.nao_lidas > 99 ? '99+' : dados.nao_lidas}</span>}
       </button>
       {aberto && (
         <div className="notif-caixa" role="dialog" aria-label="Notificações">

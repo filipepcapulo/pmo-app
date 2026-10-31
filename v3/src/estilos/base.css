@@ -615,3 +615,23 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
   .eq-mais { opacity: 1; }
   .cartoes-grade { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* V9 chamados */
+.duas-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 12px; }
+.pri-urgente { background: var(--vermelho); color: #fff; }
+.pri-alta { background: #fde9cf; color: var(--laranja); }
+.pri-normal, .pri-baixa { background: var(--superficie-2); color: var(--texto-2); border: 1px solid var(--linha); }
+.sit-nova, .sit-em_triagem { background: #fde9cf; color: var(--laranja); }
+.sit-em_atendimento { background: #dbe7fb; color: var(--azul); }
+.sit-concluido { background: var(--verde-claro); color: var(--verde-texto); }
+.sit-cancelado, .sit-recusado { background: var(--superficie-2); color: var(--texto-2); }
+.sla { font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--texto-2); }
+.sla-ok, .sla-feito { color: var(--verde-texto); }
+.sla-alerta { color: var(--laranja); }
+.sla-vencido { color: var(--vermelho); }
+.msg-cliente { border-left: 3px solid var(--verde); padding-left: 8px; }
+.extrato { width: 100%; font: inherit; resize: vertical; }
+.ind-linha { display: grid; grid-template-columns: minmax(90px, 200px) 1fr 40px; gap: 8px; align-items: center; padding: 3px 0; font-size: 13px; }
+.ind-barra { height: 8px; border-radius: 4px; background: var(--superficie-2); overflow: hidden; }
+.ind-barra i { display: block; height: 100%; background: var(--verde); }
+.ind-linha strong { text-align: right; }

@@ -100,3 +100,15 @@ describe('fila', () => {
       demandas: [{ id: 'b', versao: 7, inicio: '2026-11-09', fim: '2026-11-09' }], tarefas: [{ id: 't', versao: 2, data: '2026-11-09' }] });
   });
 });
+
+describe('backlog de chamados', () => {
+  it('Backlog Base ordena por prioridade e antiguidade, inclusive entre clientes', () => {
+    const a = arvoreBacklog([
+      back({ id: 'n', nome: 'Normal velho', origem: 'backlog_base', prioridade: 'normal', criado_em: '2026-01-01', cliente_id: 'c1', cliente: 'Almont' }),
+      back({ id: 'u2', nome: 'Urgente novo', origem: 'backlog_base', prioridade: 'urgente', criado_em: '2026-10-02', cliente_id: 'c2', cliente: 'Zeta' }),
+      back({ id: 'u1', nome: 'Urgente velho', origem: 'backlog_base', prioridade: 'urgente', criado_em: '2026-10-01', cliente_id: 'c2', cliente: 'Zeta' }),
+    ], 'backlog_base');
+    expect(a.map(c => c.nome)).toEqual(['Zeta', 'Almont']);
+    expect(a[0].demandas.map(d => d.nome)).toEqual(['Urgente velho', 'Urgente novo']);
+  });
+});

@@ -20,10 +20,10 @@ function Linha({ item, marcado, sub, aoMarcar, aoArrastar }: {
   );
 }
 
-export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar }: {
-  itens: ItemBacklog[] | null; erro: string | null; marcados: Set<string>; aoMarcar: (id: string) => void; aoArrastar: (id: string) => void;
+export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, origemInicial }: {
+  itens: ItemBacklog[] | null; erro: string | null; marcados: Set<string>; aoMarcar: (id: string) => void; aoArrastar: (id: string) => void; origemInicial?: OrigemBacklog;
 }) {
-  const [origem, setOrigem] = useState<OrigemBacklog | ''>('');
+  const [origem, setOrigem] = useState<OrigemBacklog | ''>(origemInicial ?? '');
   const [texto, setTexto] = useState('');
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   const arvore = useMemo(() => arvoreBacklog(itens ?? [], origem, texto), [itens, origem, texto]);

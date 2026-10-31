@@ -41,14 +41,14 @@ export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t
   };
   const colsPessoas: Coluna<PessoaCliente & Record<string, unknown>>[] = [
     { chave: 'nome', titulo: 'Nome' },
-    { chave: 'papel', titulo: 'Papel', render: l => <span className="pilula">{rotuloPapel(l.papel)}</span> },
+    { chave: 'papel', titulo: 'Papel', texto: l => rotuloPapel(l.papel), render: l => <span className="pilula">{rotuloPapel(l.papel)}</span> },
     { chave: 'email', titulo: 'E-mail', render: l => l.email ? <a href={`mailto:${l.email}`} onClick={e => e.stopPropagation()}>{l.email}</a> : '—' },
     { chave: 'telefone', titulo: 'Telefone/WhatsApp', render: l => l.telefone ?? '—' },
   ];
   const colsProj: Coluna<ProjetoResumo & Record<string, unknown>>[] = [
     { chave: 'nome', titulo: 'Projeto' },
     { chave: 'fase', titulo: 'Fase', render: l => <span className="pilula">{l.fase}</span> },
-    { chave: 'situacao', titulo: 'Situação', render: l => rotuloSituacao(l.situacao) },
+    { chave: 'situacao', titulo: 'Situação', texto: l => rotuloSituacao(l.situacao), render: l => rotuloSituacao(l.situacao) },
     { chave: 'gp', titulo: 'GP', render: l => <NomePessoa pessoa={l.gp} /> },
     { chave: 'horas_contratadas', titulo: 'Contratadas', alinhar: 'dir', render: l => horas(l.horas_contratadas) },
     { chave: 'saldo', titulo: 'Saldo', alinhar: 'dir', render: l => horas(l.saldo) },
@@ -83,14 +83,14 @@ export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t
       <section className="cartao">
         <div className="pagina-topo"><h2 className="secao">Pessoas do cliente</h2>
           {editar && <Botao onClick={() => setPessoa({ cliente_id: cli.id, papel: 'usuario_chave' })}>+ Pessoa</Botao>}</div>
-        <Tabela colunas={colsPessoas} linhas={c.dados!.pessoas as (PessoaCliente & Record<string, unknown>)[]} chave={l => l.id}
+        <Tabela id="cliente-pessoas" nome="Pessoas do cliente" colunas={colsPessoas} linhas={c.dados!.pessoas as (PessoaCliente & Record<string, unknown>)[]} chave={l => l.id}
           vazio="Nenhuma pessoa cadastrada." aoClicar={editar ? l => setPessoa(l) : undefined} />
       </section>
 
       <section className="cartao">
         <div className="pagina-topo"><h2 className="secao">Projetos</h2>
           {pode('projeto.criar') && cli.ativo && <Botao onClick={() => setNovoProj(true)}>+ Projeto</Botao>}</div>
-        <Tabela colunas={colsProj} linhas={c.dados!.projetos as (ProjetoResumo & Record<string, unknown>)[]} chave={l => l.id}
+        <Tabela id="cliente-projetos" nome="Projetos do cliente" colunas={colsProj} linhas={c.dados!.projetos as (ProjetoResumo & Record<string, unknown>)[]} chave={l => l.id}
           vazio="Nenhum projeto." aoClicar={l => ir(caminhoEntidade('projeto', l.id), `${cli.nome} · ${l.nome}`)} />
       </section>
 

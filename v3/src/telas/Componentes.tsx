@@ -88,7 +88,7 @@ export function Componentes() {
           </select>
           <FiltrosSalvos tela="componentes" atuais={filtro} aoAplicar={f => setFiltro(f as typeof filtro)} />
         </div>
-        <Tabela colunas={COLS} linhas={linhas} chave={l => l.id} aoClicar={l => avisar(l.demanda)} />
+        <Tabela id="componentes" nome="Componentes" colunas={COLS} linhas={linhas} chave={l => l.id} aoClicar={l => avisar(l.demanda)} />
       </section>
 
       <section className="cartao">

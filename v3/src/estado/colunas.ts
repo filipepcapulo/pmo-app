@@ -1,6 +1,6 @@
 // Layout das colunas de cada tabela (ordem e ocultas), guardado neste navegador — como o seletor de colunas das
 // grades dos dashboards Sankhya. Coluna nova no código entra visível no fim; sempre resta ao menos uma visível.
-export interface Layout { ordem: string[]; ocultas: string[] }
+export interface Layout { ordem: string[]; ocultas: string[]; larguras?: Record<string, number> }
 
 const PREFIXO = 'pmo3:tabela:';
 
@@ -11,7 +11,8 @@ export function normalizar(chaves: string[], salvo: Partial<Layout> | null): Lay
   for (const k of chaves) if (!ordem.includes(k)) ordem.push(k);
   let ocultas = (salvo?.ocultas ?? []).filter(k => existe.has(k));
   if (ocultas.length >= ordem.length) ocultas = [];
-  return { ordem, ocultas };
+  const larguras = Object.fromEntries(Object.entries(salvo?.larguras ?? {}).filter(([, w]) => w >= 40));
+  return Object.keys(larguras).length ? { ordem, ocultas, larguras } : { ordem, ocultas };
 }
 
 /** Move `de` para antes (ou depois) de `para`. */

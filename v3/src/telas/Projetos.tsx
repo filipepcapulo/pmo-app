@@ -30,7 +30,7 @@ export function Projetos({ ir }: { ir: (caminho: string, titulo?: string) => voi
     { chave: 'cliente', titulo: 'Cliente' },
     { chave: 'nome', titulo: 'Projeto' },
     { chave: 'fase', titulo: 'Fase', render: l => <span className="pilula">{l.fase}</span> },
-    { chave: 'situacao', titulo: 'Situação', render: l => rotuloSituacao(l.situacao) },
+    { chave: 'situacao', titulo: 'Situação', texto: l => rotuloSituacao(l.situacao), render: l => rotuloSituacao(l.situacao) },
     { chave: 'gp', titulo: 'GP', render: l => <NomePessoa pessoa={l.gp} /> },
     { chave: 'horas_contratadas', titulo: 'Contratadas', alinhar: 'dir', render: l => horas(l.horas_contratadas) },
     { chave: 'saldo', titulo: 'Saldo', alinhar: 'dir', render: l => <span className={l.saldo < 0 ? 'negativo' : undefined}>{horas(l.saldo)}</span> },
@@ -50,7 +50,7 @@ export function Projetos({ ir }: { ir: (caminho: string, titulo?: string) => voi
         </select>
       </div>
       {c.erro ? <p className="msg-erro">{c.erro}</p>
-        : <Tabela colunas={cols} linhas={linhas as L[]} chave={l => l.id} tamanhoInicial={15}
+        : <Tabela id="projetos" nome="Projetos" colunas={cols} linhas={linhas as L[]} chave={l => l.id} tamanhoInicial={15}
             vazio={c.carregando ? 'Carregando…' : 'Nenhum projeto.'}
             aoClicar={l => ir(caminhoEntidade('projeto', l.id), `${l.cliente} · ${l.nome}`)} />}
       <NovoProjeto aberto={novo} aoFechar={() => setNovo(false)}

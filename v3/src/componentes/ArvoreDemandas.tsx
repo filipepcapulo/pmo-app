@@ -49,7 +49,17 @@ export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.' }: { deman
   const [fechadas, setFechadas] = useState<Set<string>>(new Set());
   const arv = arvoreDemandas(demandas);
   if (!arv.length) return <p className="ajuda">{vazio}</p>;
+  const comFilhas = arv.filter(x => x.filhas.length).map(x => x.item.id);
+  const tudoFechado = comFilhas.length > 0 && comFilhas.every(id => fechadas.has(id));
   return (
+    <>
+    {comFilhas.length > 0 && (
+      <div className="arvore-acoes">
+        <button type="button" className="link" onClick={() => setFechadas(tudoFechado ? new Set() : new Set(comFilhas))}>
+          <Icone nome={tudoFechado ? 'seta' : 'baixo'} tam={14} /> {tudoFechado ? 'Expandir tudo' : 'Recolher tudo'}
+        </button>
+      </div>
+    )}
     <ul className="arvore">
       {arv.map(({ item, filhas }) => {
         const aberta = !fechadas.has(item.id);
@@ -64,6 +74,7 @@ export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.' }: { deman
         );
       })}
     </ul>
+    </>
   );
 }
 

@@ -343,8 +343,14 @@ textarea { resize: vertical; }
 .linha-exec:active { background: var(--superficie-2); }
 .arvore li:last-child > .linha-exec { border-bottom: 0; }
 .linha-exec-topo { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
-.linha-exec-nome { font-weight: 600; color: var(--texto); }
-.linha-exec.sub .linha-exec-nome { font-weight: 500; }
+/* demanda × subdemanda à primeira vista: a demanda tem faixa verde à esquerda e nome maior; a subdemanda é menor, discreta e com ↳ */
+.linha-exec:not(.sub) { box-shadow: inset 4px 0 0 var(--verde); padding-left: 12px; }
+.linha-exec-nome { font-weight: 700; font-size: 16px; color: var(--texto); }
+.linha-exec.sub { padding-top: 6px; padding-bottom: 6px; }
+.linha-exec.sub .linha-exec-nome { font-weight: 500; font-size: 14px; }
+.linha-exec.sub .linha-exec-nome::before { content: '↳ ' / ''; color: var(--texto-2); }
+.arvore-acoes { display: flex; justify-content: flex-end; margin: -4px 0 4px; font-size: 13px; }
+.arvore-acoes .link { display: inline-flex; align-items: center; gap: 4px; }
 .linha-exec-bts { margin-left: auto; display: inline-flex; gap: 12px; font-size: 13px; }
 .linha-exec .barra-horas { margin-left: 26px; }
 .seta { width: 20px; height: 20px; flex: 0 0 20px; border: 0; background: none; color: var(--texto-2); cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center; }

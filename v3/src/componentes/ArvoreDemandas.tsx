@@ -89,14 +89,14 @@ export function ListaTarefas({ tarefas, nomeDemanda, aoMudar }: { tarefas: Taref
     { chave: 'data', titulo: 'Data', render: t => data(t.data) },
     { chave: 'nome', titulo: 'Tarefa', render: t => <><a href={hashDe(caminhoEntidade('tarefa', t.id))}>{t.nome}</a>
       {nomeDemanda?.(t.demanda_id) && <small className="ajuda"> · {nomeDemanda(t.demanda_id)}</small>}</> },
-    { chave: 'responsavel_id', titulo: 'Responsável', ordem: t => porId.get(t.responsavel_id ?? '')?.nome, render: t => <NomePessoa id={t.responsavel_id} /> },
-    { chave: 'periodo', titulo: 'Período', ordem: t => t.hora_ini ?? t.periodo, render: t => rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim) },
+    { chave: 'responsavel_id', titulo: 'Responsável', ordem: t => porId.get(t.responsavel_id ?? '')?.nome ?? '', render: t => <NomePessoa id={t.responsavel_id} /> },
+    { chave: 'periodo', titulo: 'Período', ordem: t => t.hora_ini ?? t.periodo, texto: t => rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim), render: t => rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim) },
     { chave: 'modalidade', titulo: 'Agenda', ordem: t => rotuloModalidade(t.modalidade), render: t => rotuloModalidade(t.modalidade) },
     { chave: 'status', titulo: 'Status', ordem: t => rotuloStatusTarefa(t.status), render: t => <StatusPilula status={t.status} tipo="tarefa" /> },
-    { chave: 'horas', titulo: 'Horas', alinhar: 'dir', ordem: t => t.horas_reais ?? t.horas_previstas,
+    { chave: 'horas', titulo: 'Horas', alinhar: 'dir', valor: t => t.horas_reais ?? t.horas_previstas,
       render: t => <span title={t.horas_reais != null ? 'Horas reais (OS/app)' : 'Previstas (sem apontamento)'}>
         {t.horas_reais != null ? <strong>{horas(t.horas_reais)}</strong> : <span className="ajuda">{horas(t.horas_previstas)}</span>}</span> },
     { chave: 'acoes', titulo: 'Ações', fixa: true, render: t => <button type="button" className="link" onClick={() => ed.tarefa({ id: t.id }, aoMudar)}>Editar</button> },
   ];
-  return <Tabela id="tarefas" colunas={cols} linhas={tarefas as L[]} chave={t => t.id} tamanhoInicial={30} />;
+  return <Tabela id="tarefas" nome="Tarefas" colunas={cols} linhas={tarefas as L[]} chave={t => t.id} tamanhoInicial={30} />;
 }

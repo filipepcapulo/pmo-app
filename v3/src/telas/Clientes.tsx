@@ -40,7 +40,7 @@ export function Clientes({ ir }: { ir: (caminho: string, titulo?: string) => voi
         <label className="check"><input type="checkbox" checked={inativos} onChange={e => setInativos(e.target.checked)} /> Mostrar inativos</label>
       </div>
       {c.erro ? <p className="msg-erro">{c.erro}</p>
-        : <Tabela colunas={cols} linhas={linhas as (ClienteLinha & Record<string, unknown>)[]} chave={l => l.id} tamanhoInicial={15}
+        : <Tabela id="clientes" nome="Clientes" colunas={cols} linhas={linhas as (ClienteLinha & Record<string, unknown>)[]} chave={l => l.id} tamanhoInicial={15}
             vazio={c.carregando ? 'Carregando…' : 'Nenhum cliente.'}
             aoClicar={l => ir(caminhoEntidade('cliente', l.id), l.nome)} />}
       <NovoCliente aberto={novo} aoFechar={() => setNovo(false)} esc={esc}

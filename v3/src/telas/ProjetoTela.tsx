@@ -37,12 +37,12 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   const t = c.dados.totais;
   const cols: Coluna<PedidoHoras & Record<string, unknown>>[] = [
     { chave: 'numero', titulo: 'Nº do pedido' },
-    { chave: 'tipo', titulo: 'Tipo', render: l => rotuloTipo(l.tipo) },
+    { chave: 'tipo', titulo: 'Tipo', texto: l => rotuloTipo(l.tipo), render: l => rotuloTipo(l.tipo) },
     { chave: 'horas', titulo: 'Horas', alinhar: 'dir', render: l => horas(l.horas) },
     { chave: 'data', titulo: 'Data', render: l => data(l.data) },
     { chave: 'vigencia_ate', titulo: 'Vigência até', render: l => data(l.vigencia_ate) },
     { chave: 'observacao', titulo: 'Observação', render: l => l.observacao ?? '' },
-    { chave: 'origem', titulo: 'Origem', render: l => (l.origem === 'sankhya_om' ? 'Sankhya OM' : 'Manual') },
+    { chave: 'origem', titulo: 'Origem', texto: l => (l.origem === 'sankhya_om' ? 'Sankhya OM' : 'Manual'), render: l => (l.origem === 'sankhya_om' ? 'Sankhya OM' : 'Manual') },
   ];
   const raiz = c.dados.demandas.filter(d => !d.pai_id);
   return (
@@ -81,7 +81,7 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
       <section className="cartao">
         <div className="pagina-topo"><h2 className="secao">Pedidos de horas</h2>
           {pode('pedido_horas.gravar') && <Botao onClick={() => setPedido({ projeto_id: p.id, tipo: 'empreito' })}>+ Pedido</Botao>}</div>
-        <Tabela colunas={cols} linhas={c.dados.pedidos_horas as (PedidoHoras & Record<string, unknown>)[]} chave={l => l.id}
+        <Tabela id="pedidos-horas" nome="Pedidos de horas" colunas={cols} linhas={c.dados.pedidos_horas as (PedidoHoras & Record<string, unknown>)[]} chave={l => l.id}
           vazio="Nenhum pedido de horas." aoClicar={pode('pedido_horas.gravar') ? l => setPedido(l) : undefined} />
       </section>
 

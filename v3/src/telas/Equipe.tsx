@@ -58,7 +58,7 @@ function Pessoas({ aoAbrir }: { aoAbrir: (id: string) => void }) {
     { chave: 'email', titulo: 'E-mail' },
     { chave: 'papeis', titulo: 'Papéis', ordem: l => l.papeis.map(rotuloPapel).join(', '), render: l => <span className="pilulas">{l.papeis.map(p => <span key={p} className="pilula pilula-neutra">{rotuloPapel(p)}</span>)}</span> },
     { chave: 'perfil_nome', titulo: 'Perfil' },
-    { chave: 'skills', titulo: 'Skills', alinhar: 'dir', ordem: l => l.skills.filter(s => s.certificado).length * 1000 + l.skills.length, render: l => `${l.skills.filter(s => s.certificado).length} cert. / ${l.skills.length}` },
+    { chave: 'skills', titulo: 'Skills', alinhar: 'dir', texto: l => `${l.skills.filter(s => s.certificado).length} cert. / ${l.skills.length}`, ordem: l => l.skills.filter(s => s.certificado).length * 1000 + l.skills.length, render: l => `${l.skills.filter(s => s.certificado).length} cert. / ${l.skills.length}` },
   ];
   return (
     <>
@@ -70,7 +70,7 @@ function Pessoas({ aoAbrir }: { aoAbrir: (id: string) => void }) {
         </select>
         <label className="check"><input type="checkbox" checked={inativos} onChange={e => setInativos(e.target.checked)} /> Mostrar inativos</label>
       </div>
-      <Tabela colunas={cols} linhas={linhas as L[]} chave={l => l.id} tamanhoInicial={30}
+      <Tabela id="equipe" nome="Equipe" colunas={cols} linhas={linhas as L[]} chave={l => l.id} tamanhoInicial={30}
         vazio={carregada ? 'Ninguém encontrado.' : 'Carregando…'} aoClicar={l => aoAbrir(l.id)} />
     </>
   );
@@ -351,7 +351,7 @@ function Catalogo() {
         {editar && <Botao onClick={() => setEdit({})}>+ Módulo</Botao>}
       </div>
       {c.erro && <p className="msg-erro">{c.erro}</p>}
-      <Tabela colunas={cols} linhas={(c.dados ?? []) as L[]} chave={l => l.id} tamanhoInicial={30}
+      <Tabela id="skills" nome="Catálogo de skills" colunas={cols} linhas={(c.dados ?? []) as L[]} chave={l => l.id} tamanhoInicial={30}
         vazio={c.carregando ? 'Carregando…' : 'Nenhum módulo.'} aoClicar={editar ? l => setEdit(l) : undefined} />
       <Popup aberto={!!edit} titulo={edit?.id ? 'Módulo' : 'Novo módulo'} aoFechar={() => setEdit(null)}
         rodape={<>

@@ -24,6 +24,8 @@ const P: Record<string, ReactNode> = {
   seta: <path d="M9 5l7 7-7 7" />,
   baixo: <path d="M6 9l6 6 6-6" />,
   x: <path d="M6 6l12 12M18 6L6 18" />,
+  funil: <path d="M3 5h18l-7 8v6l-4 2v-8z" />,
+  baixar: <path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v3h16v-3" />,
 };
 export function Icone({ nome, tam = 20, cheio = false, className }: { nome: string; tam?: number; cheio?: boolean; className?: string }) {
   return (

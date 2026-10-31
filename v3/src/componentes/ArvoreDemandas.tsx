@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { arvoreDemandas, rotuloModalidade, rotuloPeriodo, rotuloStatusDemanda, rotuloStatusTarefa, type Tarefa, type TotaisDemanda } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
-import { usePode } from '../estado/equipe';
+import { useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { BarraHoras } from './BarraHoras';
 import { Icone } from './Icone';
 import { NomePessoa } from './NomePessoa';
+import { Tabela, type Coluna } from './Tabela';
 
 type ComTotais = { id: string; nome: string; pai_id: string | null; status: string; projeto_id: string; totais?: Partial<TotaisDemanda> | null; extra?: string };
 
@@ -81,30 +82,21 @@ export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.' }: { deman
 /** Tarefas (agenda) com responsável, data, período e horas; clicar abre o mesmo formulário. */
 export function ListaTarefas({ tarefas, nomeDemanda, aoMudar }: { tarefas: Tarefa[]; nomeDemanda?: (id: string) => string | null; aoMudar?: () => void }) {
   const ed = useEdicao();
+  const { porId } = useEquipe();
   if (!tarefas.length) return <p className="ajuda">Nenhuma tarefa.</p>;
-  return (
-    <div className="tabela-caixa">
-      <div className="tabela-rolagem">
-        <table className="tabela">
-          <thead><tr><th>Data</th><th>Tarefa</th><th>Responsável</th><th>Período</th><th>Agenda</th><th>Status</th><th className="dir">Horas</th><th /></tr></thead>
-          <tbody>
-            {tarefas.map(t => (
-              <tr key={t.id}>
-                <td>{data(t.data)}</td>
-                <td><a href={hashDe(caminhoEntidade('tarefa', t.id))}>{t.nome}</a>
-                  {nomeDemanda?.(t.demanda_id) && <small className="ajuda"> · {nomeDemanda(t.demanda_id)}</small>}</td>
-                <td><NomePessoa id={t.responsavel_id} /></td>
-                <td>{rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim)}</td>
-                <td>{rotuloModalidade(t.modalidade)}</td>
-                <td><StatusPilula status={t.status} tipo="tarefa" /></td>
-                <td className="dir" title={t.horas_reais != null ? 'Horas reais (OS/app)' : 'Previstas (sem apontamento)'}>
-                  {t.horas_reais != null ? <strong>{horas(t.horas_reais)}</strong> : <span className="ajuda">{horas(t.horas_previstas)}</span>}</td>
-                <td><button type="button" className="link" onClick={() => ed.tarefa({ id: t.id }, aoMudar)}>Editar</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  type L = Tarefa & Record<string, unknown>;
+  const cols: Coluna<L>[] = [
+    { chave: 'data', titulo: 'Data', render: t => data(t.data) },
+    { chave: 'nome', titulo: 'Tarefa', render: t => <><a href={hashDe(caminhoEntidade('tarefa', t.id))}>{t.nome}</a>
+      {nomeDemanda?.(t.demanda_id) && <small className="ajuda"> · {nomeDemanda(t.demanda_id)}</small>}</> },
+    { chave: 'responsavel_id', titulo: 'Responsável', ordem: t => porId.get(t.responsavel_id ?? '')?.nome, render: t => <NomePessoa id={t.responsavel_id} /> },
+    { chave: 'periodo', titulo: 'Período', ordem: t => t.hora_ini ?? t.periodo, render: t => rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim) },
+    { chave: 'modalidade', titulo: 'Agenda', ordem: t => rotuloModalidade(t.modalidade), render: t => rotuloModalidade(t.modalidade) },
+    { chave: 'status', titulo: 'Status', ordem: t => rotuloStatusTarefa(t.status), render: t => <StatusPilula status={t.status} tipo="tarefa" /> },
+    { chave: 'horas', titulo: 'Horas', alinhar: 'dir', ordem: t => t.horas_reais ?? t.horas_previstas,
+      render: t => <span title={t.horas_reais != null ? 'Horas reais (OS/app)' : 'Previstas (sem apontamento)'}>
+        {t.horas_reais != null ? <strong>{horas(t.horas_reais)}</strong> : <span className="ajuda">{horas(t.horas_previstas)}</span>}</span> },
+    { chave: 'acoes', titulo: 'Ações', fixa: true, render: t => <button type="button" className="link" onClick={() => ed.tarefa({ id: t.id }, aoMudar)}>Editar</button> },
+  ];
+  return <Tabela id="tarefas" colunas={cols} linhas={tarefas as L[]} chave={t => t.id} tamanhoInicial={30} />;
 }

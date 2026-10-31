@@ -107,6 +107,22 @@ textarea { resize: vertical; }
 .tabela th { background: var(--superficie-2); position: sticky; top: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--texto-2); }
 .tabela th button { border: 0; background: none; font: inherit; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--texto-2); cursor: pointer; padding: 0; text-align: inherit; }
 .tabela .dir { text-align: right; }
+/* colunas que se movem (arrastar o título) — padrão das grades dos dashboards Sankhya */
+.tabela th.movel { cursor: grab; user-select: none; -webkit-user-select: none; }
+.tabela th button { display: inline-flex; align-items: center; gap: 2px; border-radius: 6px; }
+.th-ordem { display: inline-block; min-width: .8em; font-size: 12px; color: var(--verde); }
+.tabela th.drag-origem { opacity: .45; }
+.tabela th.drop-esq { box-shadow: inset 4px 0 0 var(--verde); }
+.tabela th.drop-dir { box-shadow: inset -4px 0 0 var(--verde); }
+.tabela-rodape-esq { display: inline-flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.tabela-colunas { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.lista-colunas { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lista-colunas li { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--linha); border-radius: 10px; }
+.lista-colunas li.oculta label { color: var(--texto-2); }
+.lista-colunas label { flex: 1; display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.seta-col { width: 34px; height: 34px; border: 1px solid var(--linha); border-radius: 8px; background: var(--superficie); color: var(--texto); font: inherit; }
+.seta-col:disabled { opacity: .35; cursor: default; }
+@media (hover: hover) { .seta-col:hover:not(:disabled) { background: var(--superficie-2); } }
 .tabela tr.clicavel { cursor: pointer; }
 .tabela tr.clicavel:hover td { background: var(--superficie-2); }
 .tabela-vazia { text-align: center !important; color: var(--texto-2); padding: 24px !important; }

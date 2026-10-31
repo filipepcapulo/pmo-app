@@ -56,9 +56,9 @@ function Pessoas({ aoAbrir }: { aoAbrir: (id: string) => void }) {
   const cols: Coluna<L>[] = [
     { chave: 'nome', titulo: 'Nome', render: l => <><NomePessoa id={l.id} comAvatar />{!l.ativo && <span className="pilula pilula-neutra"> Inativo</span>}</> },
     { chave: 'email', titulo: 'E-mail' },
-    { chave: 'papeis', titulo: 'Papéis', render: l => <span className="pilulas">{l.papeis.map(p => <span key={p} className="pilula pilula-neutra">{rotuloPapel(p)}</span>)}</span> },
+    { chave: 'papeis', titulo: 'Papéis', ordem: l => l.papeis.map(rotuloPapel).join(', '), render: l => <span className="pilulas">{l.papeis.map(p => <span key={p} className="pilula pilula-neutra">{rotuloPapel(p)}</span>)}</span> },
     { chave: 'perfil_nome', titulo: 'Perfil' },
-    { chave: 'skills', titulo: 'Skills', alinhar: 'dir', render: l => `${l.skills.filter(s => s.certificado).length} cert. / ${l.skills.length}` },
+    { chave: 'skills', titulo: 'Skills', alinhar: 'dir', ordem: l => l.skills.filter(s => s.certificado).length * 1000 + l.skills.length, render: l => `${l.skills.filter(s => s.certificado).length} cert. / ${l.skills.length}` },
   ];
   return (
     <>

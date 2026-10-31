@@ -1,6 +1,7 @@
 // Visão da equipe (V8): grade semana a semana, backlog lateral, mover tarefas, fila dev, bloqueio, ausências e as regras
 // puras da tela (semanas, árvore do backlog, mover em massa, situação na fila e reprogramação sugerida).
 import { novaOperacao, rpc } from './cliente';
+import { STATUS_DEMANDA } from './execucao';
 import { diaNum, hojeIso, somarDias, type Dependencia } from './projeto';
 
 // ---------------------------------------------------------------- tipos
@@ -72,9 +73,9 @@ export const ausenciaEm = (lista: Ausencia[], consultor: string, data: string) =
 export interface NoDemanda { id: string; nome: string; item: ItemBacklog | null; subs: ItemBacklog[] }
 export interface NoCliente { id: string; nome: string; demandas: NoDemanda[]; total: number; pedidos: number }
 const RANK_PRIORIDADE = ['urgente', 'alta', 'normal', 'baixa'];
-export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = ''): NoCliente[] {
+export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = '', statusFora: ReadonlySet<string> = new Set()): NoCliente[] {
   const t = texto.trim().toLowerCase();
-  const vis = itens.filter(i => (!origem || i.origem === origem)
+  const vis = itens.filter(i => !statusFora.has(i.status) && (!origem || i.origem === origem)
     && (!t || [i.nome, i.pai ?? '', i.cliente, i.projeto].some(x => x.toLowerCase().includes(t))));
   const clientes = new Map<string, NoCliente>();
   for (const i of vis) {
@@ -100,6 +101,39 @@ export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' =
   }
   return lista.sort((a, b) => b.pedidos - a.pedidos || a.nome.localeCompare(b.nome));
 }
+
+/** Status presentes no backlog, na ordem do fluxo, com a quantidade (opções do filtro). */
+export function statusBacklog(itens: ItemBacklog[]): { valor: string; rotulo: string; total: number }[] {
+  const conta = new Map<string, number>();
+  for (const i of itens) conta.set(i.status, (conta.get(i.status) ?? 0) + 1);
+  return STATUS_DEMANDA.filter(s => conta.has(s.valor)).map(s => ({ ...s, total: conta.get(s.valor)! }));
+}
+
+// ---------------------------------------------------------------- turno e carga do dia (cores da agenda do 2.x)
+export type Turno = 'manha' | 'tarde' | 'dia' | 'noite' | '';
+export const TURNOS: { valor: Exclude<Turno, ''>; rotulo: string }[] = [
+  { valor: 'manha', rotulo: 'Manhã' }, { valor: 'tarde', rotulo: 'Tarde' }, { valor: 'dia', rotulo: 'Dia inteiro' }, { valor: 'noite', rotulo: 'Noite' },
+];
+const horaNum = (h: string) => Number(h.slice(0, 2)) + Number(h.slice(3, 5)) / 60;
+const JANELAS: Record<string, [number, number]> = { manha: [8, 12], tarde: [14, 18], dia: [8, 18], noite: [18, 22] };
+/** Janela da agenda em horas decimais; horário livre vem de início/fim. */
+export function faixaTarefa(t: Pick<TarefaGrade, 'periodo' | 'hora_ini' | 'hora_fim'>): [number, number] | null {
+  if (t.hora_ini && t.hora_fim) return [horaNum(t.hora_ini), horaNum(t.hora_fim)];
+  return JANELAS[t.periodo] ?? null;
+}
+/** Mesma regra do 2.x (agendaTurno_): começa às 18h ou depois = noite; pega manhã e tarde = dia inteiro. */
+export function turnoDe(t: Pick<TarefaGrade, 'periodo' | 'hora_ini' | 'hora_fim'>): Turno {
+  if (t.periodo !== 'livre') return t.periodo as Turno;
+  const f = faixaTarefa(t);
+  if (!f) return '';
+  if (f[0] >= 18) return 'noite';
+  const manha = f[0] < 12, tarde = f[1] > 12;
+  return manha && tarde ? 'dia' : manha ? 'manha' : tarde ? 'tarde' : '';
+}
+/** Faixa de cor da carga do dia (mesmos degraus do 2.x). */
+export const nivelCarga = (h: number) => (h === 0 ? 'livre' : h <= 7 ? 'parcial' : h === 8 ? 'cheio' : h <= 12 ? 'acima' : 'excesso');
+export const horasTexto = (h: number) => `${String(Math.round(h * 100) / 100).replace('.', ',')} h`;
+export const rotuloAgenda = (m: string | null) => ({ presencial: 'Presencial', interno: 'Interno', remoto: 'Remoto' })[m ?? ''] ?? '';
 
 // ---------------------------------------------------------------- mover (arrastar uma ou várias)
 /** Soltar leva a tarefa arrastada para o destino: as demais andam os mesmos dias e, se eram do mesmo consultor, trocam junto. */

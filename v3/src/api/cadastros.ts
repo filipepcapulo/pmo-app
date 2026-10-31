@@ -1,6 +1,7 @@
 // Cadastros (V5): clientes e pessoas, projetos e pedidos de horas, modelos de projeto, equipe/usuários, acessos e skills.
 // Leitura e gravação só pelas funções `api.v1_*` (0028); gravação sempre com id_operacao novo.
 import { novaOperacao, rpc } from './cliente';
+import type { DemandaProjeto } from './projeto';
 
 export interface Pessoa { id: string; nome: string; iniciais: string | null; cor: string | null }
 export interface Gravado<R = Record<string, unknown>> { ok: true; id: string; versao: number; registro: R }
@@ -47,10 +48,11 @@ export interface ProjetoFicha {
   projeto: { id: string; cliente_id: string; nome: string; fase: string; gp_id: string | null; situacao: Situacao;
     inicio_previsto: string | null; fim_previsto: string | null; versao: number };
   cliente: { id: string; nome: string; ativo: boolean };
-  totais: { horas_contratadas: number; horas_liberadas: number; horas_previstas: number; horas_reais: number; horas_planejadas: number; saldo: number; perc: number | null } | null;
+  totais: { horas_contratadas: number; horas_liberadas: number; horas_previstas: number; horas_reais: number; horas_planejadas: number; saldo: number;
+    perc: number | null; go_live?: string | null; demandas_atrasadas?: number } | null;
   pedidos_horas: PedidoHoras[];
-  demandas: { id: string; projeto_id: string; nome: string; pai_id: string | null; status: string; horas_previstas: number | null; etapa: string | null;
-    totais?: { horas_previstas: number | null; horas_reais: number; horas_planejadas: number; inicio: string | null; fim: string | null; perc: number | null; atrasada: boolean } | null }[];
+  liberacoes_horas?: { id: string; horas: number; justificativa: string; liberado_por: string | null; criado_em: string }[];
+  demandas: DemandaProjeto[];
 }
 export interface ModeloDemanda { id?: string; nome: string; etapa: string | null; horas_previstas: number | null; modulo_id: string | null }
 export interface Modelo { id: string; nome: string; fase: string | null; descricao: string | null; ativo: boolean; versao: number; demandas: ModeloDemanda[] }

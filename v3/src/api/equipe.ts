@@ -23,7 +23,7 @@ export const ORIGENS: { valor: OrigemBacklog; rotulo: string }[] = [
 export interface PedidoBacklog { id: string; versao: number; horas: number; motivo: string; solicitante: string }
 export interface ItemBacklog {
   id: string; pai_id: string | null; pai: string | null; nome: string; prioridade: string; status: string; cliente_id: string; cliente: string;
-  projeto_id: string; projeto: string; origem: OrigemBacklog; horas: number; pedidos: PedidoBacklog[];
+  projeto_id: string; projeto: string; origem: OrigemBacklog; horas: number; pedidos: PedidoBacklog[]; criado_em?: string;
 }
 export interface ItemFila {
   fila_id: string; id: string; nome: string; pai: string | null; status: string; inicio: string | null; fim: string | null; horas: number | null;
@@ -71,6 +71,7 @@ export const ausenciaEm = (lista: Ausencia[], consultor: string, data: string) =
 // ---------------------------------------------------------------- backlog: Cliente → Demanda → Subdemanda
 export interface NoDemanda { id: string; nome: string; item: ItemBacklog | null; subs: ItemBacklog[] }
 export interface NoCliente { id: string; nome: string; demandas: NoDemanda[]; total: number; pedidos: number }
+const RANK_PRIORIDADE = ['urgente', 'alta', 'normal', 'baixa'];
 export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = ''): NoCliente[] {
   const t = texto.trim().toLowerCase();
   const vis = itens.filter(i => (!origem || i.origem === origem)
@@ -86,7 +87,18 @@ export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' =
     if (!n) { n = { id: raiz, nome: i.pai ?? i.nome, item: null, subs: [] }; c.demandas.push(n); }
     if (i.pai_id) n.subs.push(i); else n.item = i;
   }
-  return [...clientes.values()].sort((a, b) => b.pedidos - a.pedidos || a.nome.localeCompare(b.nome));
+  const lista = [...clientes.values()];
+  // chamados (Backlog Base): prioridade × antiguidade, inclusive entre clientes
+  if (origem === 'backlog_base') {
+    const ordem = (n: NoDemanda) => n.item ?? n.subs[0];
+    const compara = (a: NoDemanda, b: NoDemanda) => {
+      const x = ordem(a), y = ordem(b);
+      return RANK_PRIORIDADE.indexOf(x.prioridade) - RANK_PRIORIDADE.indexOf(y.prioridade) || (x.criado_em ?? '').localeCompare(y.criado_em ?? '');
+    };
+    for (const c of lista) c.demandas.sort(compara);
+    return lista.sort((a, b) => compara(a.demandas[0], b.demandas[0]));
+  }
+  return lista.sort((a, b) => b.pedidos - a.pedidos || a.nome.localeCompare(b.nome));
 }
 
 // ---------------------------------------------------------------- mover (arrastar uma ou várias)

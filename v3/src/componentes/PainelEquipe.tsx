@@ -1,7 +1,7 @@
 // Grade + backlog lateral, usados pela Agenda da equipe e pela equipe dev. Um item solto na grade abre o popup único de
 // tarefa; vários abrem a alocação em lote (uma tarefa por demanda). Pedido de agenda do item alocado fica atendido.
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { equipe, TIPOS_AUSENCIA, type Ausencia, type ItemBacklog } from '../api/equipe';
+import { equipe, TIPOS_AUSENCIA, type Ausencia, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
 import { exec, MODALIDADES, PERIODOS } from '../api/execucao';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
@@ -81,7 +81,7 @@ function FormAusencia({ alvo, aoFechar, aoGravar }: { alvo: Partial<Ausencia>; a
   );
 }
 
-export function PainelEquipe({ soDev }: { soDev?: boolean }) {
+export function PainelEquipe({ soDev, origemInicial }: { soDev?: boolean; origemInicial?: OrigemBacklog }) {
   const esc = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
   const avisar = useToast();
@@ -113,7 +113,7 @@ export function PainelEquipe({ soDev }: { soDev?: boolean }) {
   };
   return (
     <div className="painel-equipe">
-      <BacklogLateral itens={b.dados} erro={b.erro} marcados={marcados} aoArrastar={id => { arrastado.current = id; }}
+      <BacklogLateral itens={b.dados} erro={b.erro} marcados={marcados} origemInicial={origemInicial} aoArrastar={id => { arrastado.current = id; }}
         aoMarcar={id => setMarcados(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
       <GradeEquipe soDev={soDev} backlogMarcado={marcados.size > 0} aoSoltarBacklog={soltar} aoEditarAusencia={setAusencia} geracaoExtra={gerAus} />
       {lote && <AlocarLote {...lote} aoFechar={() => setLote(null)} aoGravar={ok => { setLote(null); atender(ok); }} />}

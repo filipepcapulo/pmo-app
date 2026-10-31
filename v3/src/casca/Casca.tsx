@@ -11,13 +11,14 @@ import { abrir, fechar, lerAbasSalvas, renomear, type EstadoAbas } from '../esta
 import { AREAS, caminhoDoHash, caminhoEntidade, ENTIDADES, hashDe, lerRota, modulosVisiveis } from '../estado/rotas';
 import { aplicarTema, lerTema, proximoTema } from '../estado/tema';
 import { AgendaEquipe } from '../telas/AgendaEquipe';
+import { ChamadoTela } from '../telas/ChamadoTela';
+import { Chamados } from '../telas/Chamados';
 import { ClienteTela } from '../telas/ClienteTela';
 import { Clientes } from '../telas/Clientes';
 import { Componentes } from '../telas/Componentes';
 import { DemandaTela } from '../telas/DemandaTela';
 import { Demandas } from '../telas/Demandas';
 import { EmConstrucao, NaoEncontrada } from '../telas/EmConstrucao';
-import { EntidadeTela } from '../telas/EntidadeTela';
 import { Equipe } from '../telas/Equipe';
 import { EquipeDev } from '../telas/EquipeDev';
 import { Inicio } from '../telas/Inicio';
@@ -120,7 +121,7 @@ export function Casca() {
   };
 
   const mods = useMemo(() => modulosVisiveis(eu!.permissoes), [eu]);
-  const conteudo = (caminho: string, titulo: string): ReactNode => {
+  const conteudo = (caminho: string): ReactNode => {
     const r = lerRota(caminho);
     if (r.tipo === 'desconhecida') return <NaoEncontrada caminho={caminho} />;
     if (r.tipo === 'entidade') {
@@ -129,7 +130,7 @@ export function Casca() {
       if (r.entidade === 'projeto') return <ProjetoTela id={r.id} aoRenomear={aoRenomear} />;
       if (r.entidade === 'demanda') return <DemandaTela id={r.id} aoRenomear={aoRenomear} />;
       if (r.entidade === 'tarefa') return <TarefaTela id={r.id} aoRenomear={aoRenomear} />;
-      return <EntidadeTela entidade={r.entidade} id={r.id} titulo={titulo} aoRenomear={aoRenomear} />;
+      return <ChamadoTela id={r.id} aoRenomear={aoRenomear} />;
     }
     if (!mods.includes(r.modulo)) return <div className="vazio-tela"><h2>Sem acesso</h2><p>Você não tem permissão para {r.modulo.titulo}.</p></div>;
     if (r.modulo.id === 'inicio') return <Inicio />;
@@ -141,6 +142,7 @@ export function Casca() {
     if (r.modulo.id === 'demandas') return <Demandas />;
     if (r.modulo.id === 'agenda') return <AgendaEquipe />;
     if (r.modulo.id === 'equipe-dev') return <EquipeDev />;
+    if (r.modulo.id === 'chamados') return <Chamados ir={ir} />;
     return <EmConstrucao titulo={r.modulo.titulo} etapa={r.modulo.etapa} />;
   };
 
@@ -226,7 +228,7 @@ export function Casca() {
         <main className="conteudo">
           {abas.abas.map(a => (
             <div key={esc + a.caminho} role="tabpanel" hidden={a.caminho !== abas.ativa} className="painel">
-              <ErroTela nome={a.caminho}>{conteudo(a.caminho, a.titulo)}</ErroTela>
+              <ErroTela nome={a.caminho}>{conteudo(a.caminho)}</ErroTela>
             </div>
           ))}
         </main>

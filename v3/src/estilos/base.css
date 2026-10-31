@@ -408,7 +408,7 @@ textarea { resize: vertical; }
 .montador .chip { background: var(--superficie); }
 .montador .chip.sel { background: var(--verde-claro); }
 .combos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.combo { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 4px 4px 4px 6px; border-radius: 99px;
+.combo { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 4px 4px 4px 6px; border-radius: 18px;
   background: var(--verde-claro); color: var(--verde-texto); font-size: 14px; }
 .combo-texto { min-width: 0; overflow-wrap: anywhere; }
 .combo-x { flex: none; width: 26px; height: 26px; border-radius: 13px; border: 0; background: rgba(0,0,0,.08); color: inherit;

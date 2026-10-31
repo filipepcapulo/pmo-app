@@ -1,9 +1,10 @@
 // Popup único de tarefa (escopo §2.4), no formato do formulário de agenda do 2.x. Tarefa nova: monta combinações de
-// consultor + data + período (ex.: Airton 30/10 08h-12h e Jeferson 03/11 08h-18h); cada pílula vira uma tarefa com o
+// consultor + data + período + tipo de agenda (ex.: Airton 30/10 08h-12h Presencial e Jeferson 03/11 08h-18h Remoto); cada
+// pílula vira uma tarefa com o
 // restante dos dados. Cada combinação é gravada numa chamada própria (grupo próprio = tarefa própria no ClickUp).
 import { useEffect, useState } from 'react';
 import { horas } from '../api/cadastros';
-import { exec, MODALIDADES, PERIODOS, rotuloPeriodo, STATUS_TAREFA, type OpcoesExecucao, type Tarefa } from '../api/execucao';
+import { exec, MODALIDADES, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, type OpcoesExecucao, type Tarefa } from '../api/execucao';
 import type { AlvoTarefa } from '../estado/edicao';
 import { usePode, useEquipe } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
@@ -14,10 +15,11 @@ import { CaixaEscolhida, dataCurta, hojeLocal, opcoesDe, proximoDiaUtil } from '
 import { Popup } from './Popup';
 import { useToast } from './Toasts';
 
-interface Combinacao { resp: string; data: string; periodo: string; ini: string; fim: string }
+interface Combinacao { resp: string; data: string; periodo: string; ini: string; fim: string; modalidade: string }
 // horário curto da pílula: "08h-12h" (ou "09:30–11:00" no horário livre)
 const horarioCurto = (c: Combinacao) => /\(([^)]+)\)/.exec(rotuloPeriodo(c.periodo, c.ini, c.fim))?.[1] ?? rotuloPeriodo(c.periodo, c.ini, c.fim);
-const chave = (c: Combinacao) => [c.resp, c.data, c.periodo, c.ini, c.fim].join('|');
+const chave = (c: Combinacao) => [c.resp, c.data, c.periodo, c.ini, c.fim, c.modalidade].join('|');
+const AGENDAS = MODALIDADES.filter(m => m.valor);
 const horarioInvalido = (c: { periodo: string; ini: string; fim: string }) =>
   c.periodo === 'livre' && (!/^\d\d:\d\d$/.test(c.ini) || !/^\d\d:\d\d$/.test(c.fim) || c.fim <= c.ini);
 
@@ -33,9 +35,9 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
   const [f, setF] = useState({ demanda: alvo.demanda_id ?? '', nome: '', modalidade: '', status: 'planejada', detalhamento: '', etapa: '',
     agendamento: '', experience: '', apontamento: '', periodo: 'manha', ini: '', fim: '', data: dataInicial, resp: '' });
   const umResp = alvo.responsaveis?.length === 1 ? alvo.responsaveis[0] : '';
-  const [mont, setMont] = useState<Combinacao>({ resp: umResp, data: dataInicial, periodo: 'manha', ini: '', fim: '' });
+  const [mont, setMont] = useState<Combinacao>({ resp: umResp, data: dataInicial, periodo: 'manha', ini: '', fim: '', modalidade: 'remoto' });
   const [combos, setCombos] = useState<Combinacao[]>(
-    (alvo.responsaveis?.length ?? 0) > 1 ? alvo.responsaveis!.map(r => ({ resp: r, data: dataInicial, periodo: 'manha', ini: '', fim: '' })) : []);
+    (alvo.responsaveis?.length ?? 0) > 1 ? alvo.responsaveis!.map(r => ({ resp: r, data: dataInicial, periodo: 'manha', ini: '', fim: '', modalidade: 'remoto' })) : []);
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
   const novo = !alvo.id;
@@ -89,7 +91,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
       let feitas = 0;
       try {
         for (const c of lista) {
-          await exec.tarefasSalvar(esc, { demanda_id: f.demanda, ...comuns, ...horario(c), responsaveis: [c.resp], datas: [c.data] });
+          await exec.tarefasSalvar(esc, { demanda_id: f.demanda, ...comuns, ...horario(c), modalidade: c.modalidade || null, responsaveis: [c.resp], datas: [c.data] });
           feitas++;
         }
         avisar(`${feitas} tarefa(s) criada(s)`, 'ok');
@@ -139,7 +141,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
 
         {novo ? (
           <fieldset className="campo chips-campo montador">
-            <legend>Consultor, data e período <span className="obrig" aria-hidden>*</span> <small>— cada combinação vira uma tarefa</small></legend>
+            <legend>Consultor, data, período e agenda <span className="obrig" aria-hidden>*</span> <small>— cada combinação vira uma tarefa</small></legend>
             <div className="grade-campos dupla">
               <Campo rotulo="Consultor" tipo="select" valor={mont.resp} aoMudar={v => setMont({ ...mont, resp: v })} opcoes={opPessoas} />
               <Campo rotulo="Data" tipo="date" valor={mont.data} aoMudar={v => setMont({ ...mont, data: v })} />
@@ -152,6 +154,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
                 <Campo rotulo="Fim" tipo="text" valor={mont.fim} aoMudar={v => setMont({ ...mont, fim: v })} placeholder="12:00" maxLength={5} />
               </div>
             )}
+            <EscolhaChips rotulo="Tipo de agenda" valor={mont.modalidade} aoMudar={v => setMont({ ...mont, modalidade: v })} opcoes={AGENDAS} />
             <div className="linha">
               <Botao onClick={() => adicionar()} disabled={!montadorPronto}>+ Adicionar combinação</Botao>
               {combos.length > 0 && <Botao variante="fantasma" onClick={repetirDiaUtil}>+ dia útil</Botao>}
@@ -163,14 +166,14 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
                   return (
                     <li key={chave(c)} className="combo">
                       <span className="chip-avatar" style={{ background: p?.cor ?? undefined }} aria-hidden>{p?.iniciais ?? p?.nome.slice(0, 2).toUpperCase()}</span>
-                      <span className="combo-texto"><strong>{p?.nome ?? 'Consultor'}</strong> · {dataCurta(c.data)} · {horarioCurto(c)}</span>
+                      <span className="combo-texto"><strong>{p?.nome ?? 'Consultor'}</strong> · {dataCurta(c.data)} · {horarioCurto(c)}{c.modalidade ? ` · ${rotuloModalidade(c.modalidade)}` : ''}</span>
                       <button type="button" className="combo-x" aria-label={`Tirar ${p?.nome ?? ''} ${dataCurta(c.data)}`}
                         onClick={() => setCombos(combos.filter(x => chave(x) !== chave(c)))}>×</button>
                     </li>
                   );
                 })}
               </ul>
-            ) : <small className="ajuda">Escolha consultor, data e período e toque em “Adicionar combinação”; repita para outras pessoas, dias ou horários. Sem adicionar, grava só o que está escolhido.</small>}
+            ) : <small className="ajuda">Escolha consultor, data, período e tipo de agenda e toque em “Adicionar combinação”; repita para outras pessoas, dias ou horários. Sem adicionar, grava só o que está escolhido.</small>}
           </fieldset>
         ) : <>
           <div className="grade-campos dupla">
@@ -185,9 +188,9 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
               <Campo rotulo="Fim" tipo="text" valor={f.fim} aoMudar={v => setF({ ...f, fim: v })} placeholder="12:00" maxLength={5} />
             </div>
           )}
+          <EscolhaChips rotulo="Tipo de agenda" valor={f.modalidade} aoMudar={v => setF({ ...f, modalidade: v })} opcoes={AGENDAS} />
         </>}
 
-        <EscolhaChips rotulo="Tipo de agenda" valor={f.modalidade} aoMudar={v => setF({ ...f, modalidade: v })} opcoes={MODALIDADES.filter(m => m.valor)} />
         <EscolhaChips rotulo="Status" valor={f.status} aoMudar={v => setF({ ...f, status: v })} opcoes={STATUS_TAREFA} />
         <div className="grade-campos dupla">
           <Campo rotulo="Etapa" tipo="select" valor={f.etapa} aoMudar={v => setF({ ...f, etapa: v })} opcoes={opcoesDe(opcoes?.etapas, f.etapa)} />

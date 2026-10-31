@@ -31,7 +31,14 @@
 html, body { margin: 0; height: 100%; }
 body { background: var(--fundo); color: var(--texto); -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
 a { color: var(--verde); text-decoration: none; font-weight: 600; }
-a:hover { text-decoration: underline; }
+/* links nunca sublinham: o que está sob o mouse ganha um destaque suave (sem mexer no layout) e a mãozinha */
+a, button:not(:disabled), summary, label:has(> input[type=checkbox]:not(:disabled)), [role=button], [role=tab] { cursor: pointer; }
+a:hover, a:focus, a:active { text-decoration: none; }
+a:not([class]), .link { border-radius: 6px; transition: background-color .12s, box-shadow .12s; }
+@media (hover: hover) {
+  a:not([class]):hover, .link:hover:not(:disabled) { background: var(--verde-claro); box-shadow: 0 0 0 4px var(--verde-claro); }
+}
+a:not([class]):active, .link:active:not(:disabled) { background: var(--verde-claro); box-shadow: 0 0 0 4px var(--verde-claro); }
 .icone { flex: none; display: block; }
 code { font-size: .85em; background: var(--superficie-2); padding: 1px 4px; border-radius: 4px; word-break: break-all; }
 h1 { font-size: 1.4rem; margin: 0; font-weight: 700; }
@@ -52,7 +59,6 @@ h2 { font-size: 1.05rem; }
 .bt-perigo { background: var(--vermelho); border-color: var(--vermelho); color: #fff; }
 .bt-fantasma { background: transparent; border-color: transparent; color: var(--verde); padding: 0 8px; }
 .link { background: none; border: 0; padding: 0; color: var(--verde); font: inherit; font-weight: 600; cursor: pointer; }
-.link:hover:not(:disabled) { text-decoration: underline; }
 .link:disabled { color: var(--texto-2); cursor: default; }
 .giro { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
   display: inline-block; animation: giro .7s linear infinite; }
@@ -197,7 +203,8 @@ textarea { resize: vertical; }
   overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; }
 .abas::-webkit-scrollbar { display: none; }
 .aba { display: flex; align-items: center; max-width: 210px; flex: none; border-bottom: 3px solid transparent; border-top: 3px solid transparent; }
-.aba:hover { border-bottom-color: rgba(255,255,255,.35); }
+.aba { border-radius: 8px 8px 0 0; }
+.aba:hover:not(.ativa) { background: rgba(255,255,255,.12); }
 .aba button[role=tab] { border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: inherit; opacity: .78; padding: 0 2px 0 10px; height: 100%; cursor: pointer;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
 .aba.ativa { border-bottom-color: #fff; }
@@ -331,7 +338,9 @@ textarea { resize: vertical; }
 :root[data-tema="escuro"] .st-em_andamento { background: #22324f; } :root[data-tema="escuro"] .st-pausada { background: #4a3215; }
 .arvore, .arvore ul { list-style: none; margin: 0; padding: 0; }
 .arvore ul { padding-left: 26px; border-left: 2px solid var(--linha); margin-left: 9px; }
-.linha-exec { padding: 8px 0; border-bottom: 1px solid var(--linha); }
+.linha-exec { padding: 8px; margin: 0 -8px; border-bottom: 1px solid var(--linha); border-radius: 10px; cursor: pointer; transition: background-color .12s; }
+@media (hover: hover) { .linha-exec:hover { background: var(--superficie-2); } }
+.linha-exec:active { background: var(--superficie-2); }
 .arvore li:last-child > .linha-exec { border-bottom: 0; }
 .linha-exec-topo { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .linha-exec-nome { font-weight: 600; color: var(--texto); }

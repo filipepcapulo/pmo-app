@@ -20,12 +20,15 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas }: { d: ComTotais; sub
   const ed = useEdicao();
   const pode = usePode();
   const t = d.totais;
+  const href = hashDe(caminhoEntidade('demanda', d.id));
+  // a linha inteira abre a demanda (como as linhas clicáveis das tabelas); links e botões dentro dela seguem os seus
+  const abrir = (e: React.MouseEvent) => { if (!(e.target as HTMLElement).closest('a, button, input, select, textarea')) location.hash = href; };
   return (
-    <div className={`linha-exec${sub ? ' sub' : ''}`}>
+    <div className={`linha-exec${sub ? ' sub' : ''}`} onClick={abrir}>
       <div className="linha-exec-topo">
         {nFilhas ? <button type="button" className="seta" aria-expanded={aberta} aria-label={aberta ? 'Recolher' : 'Expandir'} onClick={alternar}><Icone nome={aberta ? 'baixo' : 'seta'} tam={16} /></button>
           : <span className="seta" aria-hidden />}
-        <a href={hashDe(caminhoEntidade('demanda', d.id))} className="linha-exec-nome">{d.nome}</a>
+        <a href={href} className="linha-exec-nome">{d.nome}</a>
         {d.extra && <small className="ajuda">{d.extra}</small>}
         <StatusPilula status={d.status} />
         {t?.atrasada && <span className="pilula st-atrasada">Atrasada</span>}

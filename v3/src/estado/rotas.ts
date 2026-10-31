@@ -35,7 +35,7 @@ export const MODULOS: Modulo[] = [
 
 export const ENTIDADES = {
   cliente: { titulo: 'Cliente', etapa: 'V5' },
-  projeto: { titulo: 'Projeto', etapa: 'V5' },  // cadastro na V5; indicadores, Gantt e 5W2H na V7
+  projeto: { titulo: 'Projeto', etapa: 'V7' },  // cadastro na V5; indicadores, Gantt, 5W2H e histórico na V7
   demanda: { titulo: 'Demanda', etapa: 'V6' },
   tarefa: { titulo: 'Tarefa', etapa: 'V6' },
   chamado: { titulo: 'Chamado', etapa: 'V9' },

@@ -473,3 +473,71 @@ body.redimensionando, body.redimensionando * { cursor: col-resize !important; us
 .combo-x { flex: none; width: 26px; height: 26px; border-radius: 13px; border: 0; background: rgba(0,0,0,.08); color: inherit;
   font-size: 1.05rem; line-height: 1; cursor: pointer; }
 .combo-x:hover { background: rgba(0,0,0,.16); }
+
+/* ---------------------------------------------------------------- V7: Tela de Projeto */
+.risco { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.risco-critico { background: var(--vermelho); color: #fff; }
+.risco-alto { background: var(--laranja); color: #fff; }
+.risco-moderado { background: var(--superficie-2); color: var(--texto-2); }
+.lista-marcos { list-style: none; margin: 0; padding: 0; }
+.lista-marcos li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 0; border-bottom: 1px solid var(--linha); }
+.lista-marcos li:last-child { border-bottom: 0; }
+.lista-marcos .marco-data { font-variant-numeric: tabular-nums; color: var(--texto-2); min-width: 86px; }
+.lista-marcos .marco-nome { flex: 1 1 160px; min-width: 0; }
+.grade-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.barras-mes { display: flex; flex-direction: column; gap: 6px; }
+.barras-mes .bm { display: grid; grid-template-columns: 64px 1fr 120px; align-items: center; gap: 8px; font-size: 13px; }
+.barras-mes .bm-trilho { display: flex; height: 10px; border-radius: 5px; background: var(--superficie-2); overflow: hidden; }
+.barras-mes .bm-real { background: var(--real); }
+.barras-mes .bm-plan { background: var(--plan); }
+.barras-mes .bm small { text-align: right; color: var(--texto-2); font-variant-numeric: tabular-nums; }
+.tarefas-drill { list-style: none; margin: 2px 0 6px 34px; padding: 0; border-left: 2px solid var(--linha); }
+.tarefas-drill li { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; padding: 4px 10px; font-size: 13px; border-radius: 8px; cursor: pointer; }
+.tarefas-drill li .td-nome { flex: 1 1 140px; min-width: 0; }
+@media (hover: hover) { .tarefas-drill li:hover { background: var(--superficie-2); } }
+.historico { list-style: none; margin: 0; padding: 0; }
+.historico li { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--linha); }
+.historico .h-corpo { flex: 1; min-width: 0; }
+.historico .h-campos { margin: 4px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--texto-2); }
+.historico .h-campos li { padding: 0; border: 0; display: block; overflow-wrap: anywhere; }
+.historico del { color: var(--texto-2); }
+
+/* Gantt */
+.gantt-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.gantt-barra .segmentos { margin-bottom: 0; border-bottom: 0; }
+.gantt-barra .check { margin-top: 0; }
+.gantt-export { margin-left: auto; display: flex; gap: 12px; }
+.gantt-corpo { display: flex; border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; margin-top: 8px; background: var(--superficie); }
+.gantt-rotulos { flex: none; border-right: 1px solid var(--linha); }
+.gantt-rolagem { flex: 1; min-width: 0; overflow-x: auto; }
+.gantt svg { display: block; font-family: inherit; }
+.g-hdr { fill: var(--superficie-2); }
+.g-hdr-t, .g-mes { fill: var(--texto-2); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.g-dia { fill: var(--texto-2); font-size: 10px; }
+.g-impar { fill: var(--superficie); }
+.g-par { fill: var(--superficie-2); fill-opacity: .45; }
+.g-fds { fill: var(--texto-2); fill-opacity: .07; }
+.g-grade { stroke: var(--linha); stroke-width: 1; }
+.g-grade-mes { stroke: var(--texto-2); stroke-opacity: .35; stroke-width: 1; }
+.g-hoje { stroke: var(--vermelho); stroke-width: 2; stroke-dasharray: 4 3; }
+.g-nome { fill: var(--texto); font-size: 13px; font-weight: 600; }
+.g-nome.sub { font-weight: 400; font-size: 12px; }
+.g-vazio { fill: var(--texto-2); font-size: 13px; }
+.g-rot { cursor: pointer; }
+.g-barra { cursor: grab; outline: none; }
+.g-barra.arrastando { cursor: grabbing; }
+.g-barra .g-corpo { fill: var(--verde); fill-opacity: .55; }
+.g-barra .g-prog { fill: var(--verde); }
+.g-barra.resumo .g-corpo { fill: var(--verde-escuro); fill-opacity: 1; }
+.g-barra.plano .g-corpo, .g-barra.plano .g-prog { fill: var(--azul); }
+.g-barra.concluida .g-corpo { fill-opacity: .3; }
+.g-barra.atrasada .g-corpo { stroke: var(--vermelho); stroke-width: 2; }
+.g-barra:focus-visible .g-corpo { stroke: var(--foco); stroke-width: 3; }
+.g-ponta { fill: transparent; cursor: ew-resize; }
+.g-dica { fill: var(--texto); font-size: 11px; font-weight: 600; }
+.g-dep { fill: none; stroke: var(--texto-2); stroke-width: 1.5; }
+.g-dep.violada { stroke: var(--vermelho); stroke-width: 2; }
+.g-seta { fill: var(--texto-2); }
+.g-seta.violada { fill: var(--vermelho); }
+.g-barra, .g-ponta { touch-action: none; }
+@media (max-width: 700px) { .gantt-rotulos { width: 140px; } .gantt-export { margin-left: 0; } }

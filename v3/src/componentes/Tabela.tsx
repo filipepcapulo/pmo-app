@@ -1,11 +1,12 @@
 // Tabela paginada (10/15/30/50) no padrão das grades dos dashboards Sankhya: toda coluna ordena pelo cabeçalho
 // (▴/▾), tem funil de filtro (condição + lista de valores, os filtros se somam), alça para a largura (duplo clique
 // restaura) e muda de lugar arrastando o título; o botão "Colunas" mostra/oculta e reordena (também no celular) e
-// "Excel" baixa um .xlsx das linhas filtradas, na ordem e com as colunas da tela. Layout salvo neste navegador.
+// "Excel" baixa um .xlsx (e "CSV" um .csv) das linhas filtradas, na ordem e com as colunas da tela. Layout salvo neste navegador.
 import { useEffect, useMemo, useState, type DragEvent, type PointerEvent as PE, type ReactNode } from 'react';
 import { alternar, deslocar, gravarLayout, lerLayout, mover, normalizar, type Layout } from '../estado/colunas';
 import { ativo, deduzirTipo, normal, OPS_NUMERO, OPS_TEXTO, passa, type Filtro, type Operador, type TipoColuna } from '../estado/filtro';
 import { ordenar, paginar, TAMANHOS, valorOrdem } from '../estado/paginacao';
+import { baixarCsv } from '../util/csv';
 import { baixarXlsx, type TipoXlsx } from '../util/xlsx';
 import { Icone } from './Icone';
 import { Popup } from './Popup';
@@ -136,6 +137,11 @@ export function Tabela<T extends Record<string, unknown>>({ id, nome, colunas, l
       linhas: ordenadas.map(l => cols.map((c, j) => (ts[j] === 'S' ? textoDe(c, l) : valorDe(c, l)))),
     });
   };
+  // CSV (";" e vírgula decimal): o texto de cada célula, como na tela
+  const csv = () => {
+    const cols = visiveis.filter(c => !c.fixa);
+    baixarCsv(nome ?? id ?? 'tabela', cols.map(c => c.titulo), ordenadas.map(l => cols.map(c => textoDe(c, l))));
+  };
 
   const fixa = !!largs;
   const colFunil = funil ? porChave.get(funil) : undefined;
@@ -197,6 +203,9 @@ export function Tabela<T extends Record<string, unknown>>({ id, nome, colunas, l
           )}
           <button type="button" className="link tabela-acao" onClick={excel} disabled={!ordenadas.length} title="Baixar as linhas filtradas em Excel (.xlsx)">
             <Icone nome="baixar" tam={14} /> Excel
+          </button>
+          <button type="button" className="link tabela-acao" onClick={csv} disabled={!ordenadas.length} title="Baixar as linhas filtradas em CSV">
+            <Icone nome="baixar" tam={14} /> CSV
           </button>
         </span>
         <span className="tabela-rotulo">

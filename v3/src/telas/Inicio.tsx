@@ -3,6 +3,7 @@ import { data } from '../api/cadastros';
 import { exec } from '../api/execucao';
 import { StatusPilula } from '../componentes/ArvoreDemandas';
 import { BarraHoras } from '../componentes/BarraHoras';
+import { Icone } from '../componentes/Icone';
 import { NomePessoa } from '../componentes/NomePessoa';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
@@ -63,7 +64,7 @@ export function Inicio() {
           <div className="grade-atalhos">
             {soltos.map(f => (
               <a key={f.entidade + f.entidade_id} className="atalho" href={hashDe(caminhoEntidade(f.entidade, f.entidade_id))}>
-                <span className="atalho-icone">★</span><span>{f.nome}</span>
+                <span className="atalho-icone"><Icone nome="estrela" tam={22} /></span><span className="atalho-nome">{f.nome}</span>
               </a>
             ))}
           </div>
@@ -78,8 +79,9 @@ export function Inicio() {
             <div className="grade-atalhos">
               {lista.map(m => (
                 <a key={m.id} className="atalho" href={hashDe(m.id)}>
-                  <span className="atalho-icone">{m.icone}</span><span>{m.titulo}</span>
+                  <span className="atalho-icone"><Icone nome={m.icone} tam={24} /></span><span className="atalho-nome">{m.titulo}</span>
                   {m.etapa && <small className="pilula">{m.etapa}</small>}
+                  <Icone nome="seta" tam={18} className="atalho-seta" />
                 </a>
               ))}
             </div>

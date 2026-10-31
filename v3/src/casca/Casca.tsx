@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BuscaGlobal } from '../componentes/BuscaGlobal';
 import { ErroTela } from '../componentes/ErroTela';
+import { Icone } from '../componentes/Icone';
 import { Notificacoes } from '../componentes/Notificacoes';
 import { useFavoritos } from '../estado/favoritos';
 import { useSessao } from '../estado/sessao';
@@ -144,7 +145,7 @@ export function Casca() {
     <div className={`casca${recolhido ? ' recolhido' : ''}${menuCel ? ' menu-cel-aberto' : ''}${telaCheia ? ' tela-cheia' : ''}`}>
       <header className="topo">
         <button type="button" className="topo-bt" aria-label="Menu" aria-expanded={celular() ? menuCel : !recolhido}
-          onClick={() => (celular() ? setMenuCel(!menuCel) : setRecolhido(!recolhido))}>☰</button>
+          onClick={() => (celular() ? setMenuCel(!menuCel) : setRecolhido(!recolhido))}><Icone nome="menu" tam={22} /></button>
         <a className="topo-marca" href={hashDe('inicio')}>PMO <span>v3</span></a>
         <div className="abas" role="tablist" aria-label="Abas abertas">
           {abas.abas.map(a => (
@@ -156,7 +157,7 @@ export function Casca() {
           ))}
         </div>
         <button type="button" className="topo-busca" onClick={() => setBusca(true)} aria-label="Buscar (Ctrl+K)">
-          <span aria-hidden>⌕</span><span className="so-pc"> Buscar…</span><kbd className="so-pc">Ctrl K</kbd>
+          <Icone nome="busca" tam={18} /><span className="so-pc">Buscar…</span><kbd className="so-pc">Ctrl K</kbd>
         </button>
         <div className="topo-dir">
           {eu!.escritorios.length > 1 ? (
@@ -167,8 +168,8 @@ export function Casca() {
           ) : <span className="topo-esc-fixo" title={escAtual?.nome}>{escAtual?.sigla}</span>}
           <Notificacoes />
           <button type="button" className="topo-bt" aria-label={`Tema: ${tema}`} title={`Tema: ${tema}`}
-            onClick={() => setTema(proximoTema(tema))}>{tema === 'escuro' ? '☾' : tema === 'claro' ? '☀' : '◐'}</button>
-          <button type="button" className="topo-bt" aria-label="Tela cheia" aria-pressed={telaCheia} onClick={alternarTelaCheia}>⛶</button>
+            onClick={() => setTema(proximoTema(tema))}><Icone nome={tema === 'escuro' ? 'lua' : tema === 'claro' ? 'sol' : 'auto'} /></button>
+          <button type="button" className="topo-bt" aria-label="Tela cheia" aria-pressed={telaCheia} onClick={alternarTelaCheia}><Icone nome="expandir" /></button>
           <button type="button" className="topo-avatar" style={{ background: eu!.usuario.cor ?? undefined }}
             title={`${eu!.usuario.nome} — sair`} aria-label="Sair" onClick={() => { if (confirm('Sair do PMO v3?')) sair(); }}>
             {eu!.usuario.iniciais ?? eu!.usuario.nome.slice(0, 2).toUpperCase()}
@@ -180,7 +181,7 @@ export function Casca() {
         <div className="menu-rolagem">
           <section className="menu-grupo">
             <button type="button" className="menu-titulo" aria-expanded={favAberto} onClick={() => setFavAberto(!favAberto)}>
-              <span className="menu-icone">★</span><span className="menu-texto">Favoritos</span>
+              <span className="menu-icone"><Icone nome="estrela" cheio /></span><span className="menu-texto">Favoritos</span><Icone nome="baixo" tam={16} className={`menu-chev menu-texto${favAberto ? ' aberto' : ''}`} />
             </button>
             {favAberto && (fav.lista.length === 0
               ? <p className="menu-vazio menu-texto">Marque ☆ num item para ele aparecer aqui.</p>
@@ -189,7 +190,7 @@ export function Casca() {
                 return (
                   <a key={c} href={hashDe(c)} className={`menu-item${abas.ativa === c ? ' ativo' : ''}`} title={f.nome}
                     onClick={() => titulosConhecidos.set(c, f.nome)}>
-                    <span className="menu-icone">·</span><span className="menu-texto">{f.nome}</span>
+                    <span className="menu-icone"><Icone nome="estrela" tam={16} /></span><span className="menu-texto">{f.nome}</span>
                   </a>
                 );
               }))}
@@ -203,7 +204,7 @@ export function Casca() {
                 {lista.map(m => (
                   <a key={m.id} href={hashDe(m.id)} title={m.titulo}
                     className={`menu-item${abas.ativa === m.id ? ' ativo' : ''}${abas.abas.some(x => x.caminho === m.id) ? ' aberto' : ''}`}>
-                    <span className="menu-icone">{m.icone}</span><span className="menu-texto">{m.titulo}</span>
+                    <span className="menu-icone"><Icone nome={m.icone} /></span><span className="menu-texto">{m.titulo}</span>
                   </a>
                 ))}
               </section>

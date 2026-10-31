@@ -6,7 +6,7 @@ export interface Modulo {
   id: string;
   titulo: string;
   area: Area;
-  icone: string;
+  icone: string;           // nome do ícone SVG (componentes/Icone.tsx)
   etapa?: string;          // etapa do plano v3 que entrega a tela (enquanto não chega: "em construção")
   permissao?: string;      // funcionalidade exigida (app.funcionalidades); sem ela o item some do menu
 }
@@ -20,17 +20,17 @@ export const AREAS: { id: Area; titulo: string }[] = [
 ];
 
 export const MODULOS: Modulo[] = [
-  { id: 'inicio', titulo: 'Início', area: 'geral', icone: '⌂' },
-  { id: 'clientes', titulo: 'Clientes', area: 'cadastros', icone: '▣' },
-  { id: 'projetos', titulo: 'Projetos', area: 'cadastros', icone: '◫' },
-  { id: 'modelos', titulo: 'Modelos de projeto', area: 'cadastros', icone: '⧉', permissao: 'projeto.criar' },
-  { id: 'equipe', titulo: 'Equipe', area: 'cadastros', icone: '☺' },
-  { id: 'demandas', titulo: 'Demandas', area: 'execucao', icone: '☰' },
-  { id: 'agenda', titulo: 'Agenda da equipe', area: 'execucao', icone: '▦', etapa: 'V8' },
-  { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: '✉', etapa: 'V9' },
-  { id: 'consultor', titulo: 'Minha agenda', area: 'execucao', icone: '◷', etapa: 'V10a' },
-  { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: '▤', etapa: 'V10a', permissao: 'relatorio.produtividade' },
-  { id: 'componentes', titulo: 'Componentes', area: 'sistema', icone: '◇' },
+  { id: 'inicio', titulo: 'Início', area: 'geral', icone: 'casa' },
+  { id: 'clientes', titulo: 'Clientes', area: 'cadastros', icone: 'predio' },
+  { id: 'projetos', titulo: 'Projetos', area: 'cadastros', icone: 'pasta' },
+  { id: 'modelos', titulo: 'Modelos de projeto', area: 'cadastros', icone: 'copia', permissao: 'projeto.criar' },
+  { id: 'equipe', titulo: 'Equipe', area: 'cadastros', icone: 'pessoas' },
+  { id: 'demandas', titulo: 'Demandas', area: 'execucao', icone: 'lista' },
+  { id: 'agenda', titulo: 'Agenda da equipe', area: 'execucao', icone: 'calendario', etapa: 'V8' },
+  { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: 'chamado', etapa: 'V9' },
+  { id: 'consultor', titulo: 'Minha agenda', area: 'execucao', icone: 'relogio', etapa: 'V10a' },
+  { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: 'grafico', etapa: 'V10a', permissao: 'relatorio.produtividade' },
+  { id: 'componentes', titulo: 'Componentes', area: 'sistema', icone: 'grade' },
 ];
 
 export const ENTIDADES = {

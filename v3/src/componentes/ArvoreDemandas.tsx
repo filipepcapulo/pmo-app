@@ -7,6 +7,7 @@ import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { BarraHoras } from './BarraHoras';
+import { Icone } from './Icone';
 import { NomePessoa } from './NomePessoa';
 
 type ComTotais = { id: string; nome: string; pai_id: string | null; status: string; projeto_id: string; totais?: Partial<TotaisDemanda> | null; extra?: string };
@@ -22,7 +23,7 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas }: { d: ComTotais; sub
   return (
     <div className={`linha-exec${sub ? ' sub' : ''}`}>
       <div className="linha-exec-topo">
-        {nFilhas ? <button type="button" className="seta" aria-expanded={aberta} aria-label={aberta ? 'Recolher' : 'Expandir'} onClick={alternar}>{aberta ? '▾' : '▸'}</button>
+        {nFilhas ? <button type="button" className="seta" aria-expanded={aberta} aria-label={aberta ? 'Recolher' : 'Expandir'} onClick={alternar}><Icone nome={aberta ? 'baixo' : 'seta'} tam={16} /></button>
           : <span className="seta" aria-hidden />}
         <a href={hashDe(caminhoEntidade('demanda', d.id))} className="linha-exec-nome">{d.nome}</a>
         {d.extra && <small className="ajuda">{d.extra}</small>}

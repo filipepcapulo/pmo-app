@@ -1,14 +1,16 @@
 // Relatório de apontamentos (escopo §6.4): filtro por origem e período, total OS + app. Com `equipe`, é o de Produtividade
-// (todos ou um consultor). Só o apontamento do próprio usuário feito pelo app se altera.
-import { useMemo, useState } from 'react';
+// (todos ou um consultor), onde a gerência confere ou reabre. Conferido, nem o próprio consultor altera (0036).
+import { useCallback, useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
+import { traduzirErro } from '../api/mensagens';
 import { consultor, type LinhaApontamento, type OrigemFiltro } from '../api/consultor';
 import { hojeIso, somarDias } from '../api/projeto';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
-import { useEquipe } from '../estado/equipe';
+import { useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
+import { Botao } from './Botao';
 import { Tabela, type Coluna } from './Tabela';
 
 const ROTULO_ORIGEM = { sankhya_om: 'Sankhya OM', app: 'Apontamento no APP', manual: 'Manual' };
@@ -23,6 +25,13 @@ export function RelatorioApontamentos({ equipe }: { equipe?: boolean }) {
   const [de, setDe] = useState(() => somarDias(hojeIso(), -30));
   const [ate, setAte] = useState(hojeIso);
   const [pessoa, setPessoa] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
+  const pode = usePode();
+  const conferente = !!equipe && pode('relatorio.produtividade');
+  const conferir = useCallback(async (ids: string[], sim: boolean) => {
+    setErro(null);
+    try { await consultor.conferir(esc, ids, sim); ed.mudou(); } catch (e) { setErro(traduzirErro(e).mensagem); }
+  }, [esc, ed]);
   const c = useCarga(() => consultor.apontamentos(esc, { de, ate, origem, equipe, consultor: pessoa }), [esc, de, ate, origem, equipe, pessoa, ed.geracao]);
   const colunas = useMemo<Coluna<LinhaApontamento>[]>(() => [
     { chave: 'data', titulo: 'Data', texto: a => data(a.data) },
@@ -37,9 +46,14 @@ export function RelatorioApontamentos({ equipe }: { equipe?: boolean }) {
     { chave: 'demanda', titulo: 'Demanda' },
     { chave: 'tarefa', titulo: 'Tarefa', render: a => <a href={hashDe(caminhoEntidade('tarefa', a.tarefa_id))}>{a.tarefa}</a>, texto: a => a.tarefa },
     { chave: 'texto', titulo: 'Texto' },
-    { chave: 'acao', titulo: '', fixa: true, render: a => (a.origem === 'app' && a.consultor_id === eu!.usuario.id
-      ? <button type="button" className="link" onClick={() => ed.apontar({ tarefa_id: a.tarefa_id, nome: a.tarefa, data: a.data, apontamento: a })}>Editar</button> : null) },
-  ], [equipe, ed, eu]);
+    { chave: 'conferido', titulo: 'Conferência', valor: a => a.conferido_em, texto: a => (a.origem !== 'app' ? '' : a.conferido_em ? 'Conferido' : 'Pendente'),
+      render: a => (a.origem !== 'app' ? null : <span className={`pilula${a.conferido_em ? '' : ' pilula-neutra'}`}>{a.conferido_em ? 'Conferido' : 'Pendente'}</span>) },
+    { chave: 'acao', titulo: '', fixa: true, render: a => (a.origem !== 'app' ? null : <span className="linha">
+      {!a.conferido_em && a.consultor_id === eu!.usuario.id && <button type="button" className="link" onClick={() => ed.apontar({ tarefa_id: a.tarefa_id, nome: a.tarefa, data: a.data, apontamento: a })}>Editar</button>}
+      {conferente && <button type="button" className="link" onClick={() => conferir([a.apontamento_id], !a.conferido_em)}>{a.conferido_em ? 'Reabrir' : 'Conferir'}</button>}
+    </span>) },
+  ], [equipe, ed, eu, conferente, conferir]);
+  const pendentes = (c.dados?.itens ?? []).filter(a => a.origem === 'app' && !a.conferido_em);
   const r = c.dados;
   return (
     <>
@@ -55,8 +69,9 @@ export function RelatorioApontamentos({ equipe }: { equipe?: boolean }) {
         </select>
         <label className="ajuda">De <input type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} aria-label="De" /></label>
         <label className="ajuda">Até <input type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} aria-label="Até" /></label>
+        {conferente && pendentes.length > 0 && <Botao variante="primario" onClick={() => conferir(pendentes.map(a => a.apontamento_id), true)}>Conferir {pendentes.length} do filtro</Botao>}
       </div>
-      {c.erro && <p className="msg-erro">{c.erro}</p>}
+      {(c.erro || erro) && <p className="msg-erro">{c.erro || erro}</p>}
       {r && <>
         <section className="indicadores" aria-label="Total de horas">
           <div className="indicador"><small>Total (OS + app)</small><strong data-testid="total-horas">{horas(r.horas)}</strong></div>

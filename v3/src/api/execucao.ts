@@ -19,7 +19,7 @@ export const PRIORIDADES: Op[] = [
   { valor: 'baixa', rotulo: 'Baixa' }, { valor: 'normal', rotulo: 'Normal' }, { valor: 'alta', rotulo: 'Alta' }, { valor: 'urgente', rotulo: 'Urgente' },
 ];
 export const PERIODOS: Op[] = [
-  { valor: 'manha', rotulo: 'Manhã (08h-12h)' }, { valor: 'tarde', rotulo: 'Tarde (13h-17h)' }, { valor: 'dia', rotulo: 'Dia (08h-18h)' },
+  { valor: 'manha', rotulo: 'Manhã (08h-12h)' }, { valor: 'tarde', rotulo: 'Tarde (14h-18h)' }, { valor: 'dia', rotulo: 'Dia (08h-18h)' },
   { valor: 'noite', rotulo: 'Noite (18h-22h)' }, { valor: 'livre', rotulo: 'Horário livre' },
 ];
 export const MODALIDADES: Op[] = [

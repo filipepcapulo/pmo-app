@@ -16,6 +16,8 @@ import { GradeEquipe, type Soltar } from './GradeEquipe';
 import { Popup } from './Popup';
 import { useToast } from './Toasts';
 
+const CHAVE_RECOLHIDO = 'pmo3.backlog.recolhido';
+
 function AlocarLote({ itens, alvo, aoFechar, aoGravar }: { itens: ItemBacklog[]; alvo: Soltar; aoFechar: () => void; aoGravar: (ok: ItemBacklog[]) => void }) {
   const esc = useSessao().eu!.escritorio_id!;
   const avisar = useToast();
@@ -93,6 +95,8 @@ export function PainelEquipe({ soDev, origemInicial }: { soDev?: boolean; origem
   const [ausencia, setAusencia] = useState<Partial<Ausencia> | null>(null);
   const [gerAus, setGerAus] = useState(0);
   const porId = useMemo(() => new Map((b.dados ?? []).map(i => [i.id, i])), [b.dados]);
+  const [semBacklog, setSemBacklog] = useState(() => { try { return localStorage.getItem(CHAVE_RECOLHIDO) === '1'; } catch { return false; } });
+  const recolher = (r: boolean) => { setSemBacklog(r); try { localStorage.setItem(CHAVE_RECOLHIDO, r ? '1' : '0'); } catch { /* */ } };
 
   const atender = useCallback(async (itens: ItemBacklog[]) => {
     try {
@@ -112,8 +116,8 @@ export function PainelEquipe({ soDev, origemInicial }: { soDev?: boolean; origem
     else setLote({ itens, alvo: s });
   };
   return (
-    <div className="painel-equipe">
-      <BacklogLateral itens={b.dados} erro={b.erro} marcados={marcados} origemInicial={origemInicial} aoArrastar={id => { arrastado.current = id; }}
+    <div className={`painel-equipe${semBacklog ? ' sem-backlog' : ''}`}>
+      <BacklogLateral itens={b.dados} erro={b.erro} marcados={marcados} origemInicial={origemInicial} recolhido={semBacklog} aoRecolher={recolher} aoArrastar={id => { arrastado.current = id; }}
         aoMarcar={id => setMarcados(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
       <GradeEquipe soDev={soDev} backlogMarcado={marcados.size > 0} aoSoltarBacklog={soltar} aoEditarAusencia={setAusencia} geracaoExtra={gerAus} />
       {lote && <AlocarLote {...lote} aoFechar={() => setLote(null)} aoGravar={ok => { setLote(null); atender(ok); }} />}

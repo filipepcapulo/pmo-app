@@ -1,13 +1,15 @@
 // Casca do v3: topo (abas por módulo aberto, busca, escritório, tema, tela cheia, sair) e menu lateral por área
 // (recolhível, com Favoritos). As abas ficam na faixa do topo; a busca encosta nos botões à direita. A rota (#/…) manda: abrir um link abre/ativa a aba; clicar na aba muda a rota.
+// O Início é o fundo: fica sempre montado e aparece quando nenhuma aba está ativa.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AbasTopo } from '../componentes/AbasTopo';
 import { BuscaGlobal } from '../componentes/BuscaGlobal';
 import { ErroTela } from '../componentes/ErroTela';
 import { Icone } from '../componentes/Icone';
 import { Notificacoes } from '../componentes/Notificacoes';
 import { useFavoritos } from '../estado/favoritos';
 import { useSessao } from '../estado/sessao';
-import { abrir, fechar, lerAbasSalvas, renomear, type EstadoAbas } from '../estado/abas';
+import { abrir, fechar, fecharTodas, INICIO, lerAbasSalvas, mover, renomear, type EstadoAbas } from '../estado/abas';
 import { AREAS, caminhoDoHash, caminhoEntidade, ENTIDADES, hashDe, lerRota, modulosVisiveis } from '../estado/rotas';
 import { aplicarTema, lerTema, proximoTema } from '../estado/tema';
 import { AgendaEquipe } from '../telas/AgendaEquipe';
@@ -79,11 +81,6 @@ export function Casca() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveAbas]);
 
-  // a aba ativa fica à vista na faixa do topo (no celular a faixa rola na horizontal)
-  useEffect(() => {
-    document.querySelector('.abas .aba.ativa')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
-  }, [abas.ativa]);
-
   // sem aba aberta: volta ao início
   useEffect(() => { if (abas.ativa === null) location.hash = hashDe('inicio'); }, [abas.ativa]);
 
@@ -119,6 +116,10 @@ export function Casca() {
     setAbas(novo);
     if (novo.ativa && novo.ativa !== abas.ativa) history.replaceState(null, '', hashDe(novo.ativa));
   };
+  const fecharTudo = () => {
+    setAbas(fecharTodas());
+    history.replaceState(null, '', hashDe(INICIO));
+  };
 
   const mods = useMemo(() => modulosVisiveis(eu!.permissoes), [eu]);
   const conteudo = (caminho: string): ReactNode => {
@@ -153,15 +154,8 @@ export function Casca() {
         <button type="button" className="topo-bt" aria-label="Menu" aria-expanded={celular() ? menuCel : !recolhido}
           onClick={() => (celular() ? setMenuCel(!menuCel) : setRecolhido(!recolhido))}><Icone nome="menu" tam={22} /></button>
         <a className="topo-marca" href={hashDe('inicio')}>PMO <span>v3</span></a>
-        <div className="abas" role="tablist" aria-label="Abas abertas">
-          {abas.abas.map(a => (
-            <div key={a.caminho} className={`aba${a.caminho === abas.ativa ? ' ativa' : ''}`}>
-              <button type="button" role="tab" aria-selected={a.caminho === abas.ativa} title={a.titulo}
-                onClick={() => ir(a.caminho)}>{a.titulo}</button>
-              <button type="button" className="aba-x" aria-label={`Fechar ${a.titulo}`} onClick={() => fecharAba(a.caminho)}>×</button>
-            </div>
-          ))}
-        </div>
+        <AbasTopo abas={abas.abas} ativa={abas.ativa} aoIr={ir} aoFechar={fecharAba} aoFecharTodas={fecharTudo}
+          aoMover={(c, alvo, depois) => setAbas(a => mover(a, c, alvo, depois))} />
         <button type="button" className="topo-busca" onClick={() => setBusca(true)} aria-label="Buscar (Ctrl+K)">
           <Icone nome="busca" tam={18} /><span className="so-pc">Buscar…</span><kbd className="so-pc">Ctrl K</kbd>
         </button>
@@ -226,6 +220,9 @@ export function Casca() {
 
       <div className="area">
         <main className="conteudo">
+          <div role="tabpanel" hidden={abas.ativa !== null && abas.ativa !== INICIO} className="painel">
+            <ErroTela nome={INICIO}>{conteudo(INICIO)}</ErroTela>
+          </div>
           {abas.abas.map(a => (
             <div key={esc + a.caminho} role="tabpanel" hidden={a.caminho !== abas.ativa} className="painel">
               <ErroTela nome={a.caminho}>{conteudo(a.caminho)}</ErroTela>

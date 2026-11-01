@@ -1,8 +1,9 @@
 // Grade da equipe (escopo §4): consultores × dias, rolagem infinita (busca uma semana ao chegar perto da borda), abre em
 // hoje, ausências bloqueiam a célula. Arrastar a tarefa move; arrastar do backlog pede a alocação. Sem mouse (celular):
-// "Selecionar" + tocar na tarefa/backlog e "Mover para…"/tocar na célula.
+// "Selecionar" + tocar na tarefa/backlog e "Mover para…"/tocar na célula. Como no 2.x: soma do dia, cor por turno e consultor
+// recolhido mostra só a ocupação em horas.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { equipe, ausenciaEm, diasEntre, fimDeSemana, itensMover, janelaInicial, rotuloAusencia, type Ausencia, type TarefaGrade } from '../api/equipe';
+import { equipe, ausenciaEm, diasEntre, faixaTarefa, fimDeSemana, horasTexto, itensMover, janelaInicial, nivelCarga, rotuloAgenda, rotuloAusencia, TURNOS, turnoDe, type Ausencia, type TarefaGrade } from '../api/equipe';
 import { hojeIso, somarDias } from '../api/projeto';
 import { rotuloPeriodo } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
@@ -10,6 +11,7 @@ import { useEquipe, usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
 import { Botao } from './Botao';
 import { dataCurta } from './FormComum';
+import { Icone } from './Icone';
 import { NomePessoa } from './NomePessoa';
 import { useToast } from './Toasts';
 
@@ -17,6 +19,25 @@ const COL = 150;       // largura do dia (igual à grade aberta do 2.x)
 const BORDA = 240;     // a esta distância da borda busca mais uma semana
 const CAPACIDADE = 8;  // horas/dia: acima disso a célula avisa
 const JANELA = 91;     // dias por chamada ao recarregar (a API aceita 93)
+const INI_DIA = 8, FIM_DIA = 18;  // mini-faixa de cada dia, como no 2.x
+const CHAVE_RECOLHIDOS = 'pmo3.grade.recolhidos';
+const lerRecolhidos = () => { try { return new Set<string>(JSON.parse(localStorage.getItem(CHAVE_RECOLHIDOS) || '[]')); } catch { return new Set<string>(); } };
+
+/** Mini-faixa 08h–18h do dia com os períodos ocupados, na cor do turno. */
+function MiniFaixa({ itens }: { itens: TarefaGrade[] }) {
+  const tot = FIM_DIA - INI_DIA;
+  return (
+    <span className="eq-faixa">
+      <i className="almoco" />
+      {itens.map(t => {
+        const f = faixaTarefa(t);
+        if (!f) return null;
+        const a = Math.max(INI_DIA, f[0]), b = Math.min(FIM_DIA, f[1]);
+        return b > a ? <i key={t.id} className={`tu-${turnoDe(t)}`} style={{ left: `${(a - INI_DIA) / tot * 100}%`, width: `${(b - a) / tot * 100}%` }} /> : null;
+      })}
+    </span>
+  );
+}
 
 export interface Soltar { data: string; consultor: string }
 export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAusencia, geracaoExtra = 0 }: {
@@ -40,6 +61,7 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [destino, setDestino] = useState({ data: '', consultor: '' });
   const [carregando, setCarregando] = useState(false);
+  const [recolhidos, setRecolhidos] = useState(lerRecolhidos);
   const caixa = useRef<HTMLDivElement>(null);
   const buscando = useRef(false);
   const ajuste = useRef(0);      // colunas acrescentadas à esquerda: compensa a rolagem
@@ -166,6 +188,14 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
     for (const t of tarefas) { const k = t.consultor_id + t.data; m.set(k, [...(m.get(k) ?? []), t]); }
     return m;
   }, [tarefas]);
+  const somaDia = useMemo(() => {
+    const m = new Map<string, number>(), vis = new Set(pessoas.map(p => p.id));
+    for (const t of tarefas) if (vis.has(t.consultor_id)) m.set(t.data, (m.get(t.data) ?? 0) + Number(t.horas_previstas ?? 0));
+    return m;
+  }, [tarefas, pessoas]);
+  useEffect(() => { try { localStorage.setItem(CHAVE_RECOLHIDOS, JSON.stringify([...recolhidos])); } catch { /* */ } }, [recolhidos]);
+  const alternarConsultor = (id: string) => setRecolhidos(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const todosRecolhidos = pessoas.length > 0 && pessoas.every(p => recolhidos.has(p.id));
   const podeMover = pode('tarefa.editar');
   const podeCriar = pode('tarefa.criar');
 
@@ -177,6 +207,7 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
         <input type="date" value={ate} onChange={e => setAte(e.target.value)} aria-label="Até" />
         <Botao onClick={aplicarFiltro}>Filtrar</Botao>
         <Botao onClick={voltarHoje}>Hoje</Botao>
+        <Botao aria-pressed={todosRecolhidos} onClick={() => setRecolhidos(todosRecolhidos ? new Set() : new Set(pessoas.map(p => p.id)))}>{todosRecolhidos ? 'Expandir consultores' : 'Recolher consultores'}</Botao>
         {podeMover && <Botao aria-pressed={selecionando} onClick={() => { setSelecionando(!selecionando); setSel(new Set()); }}>{selecionando ? 'Concluir seleção' : 'Selecionar'}</Botao>}
         {pode('equipe.editar') && <Botao onClick={() => aoEditarAusencia({})}>+ Ausência</Botao>}
         {carregando && <span className="giro" aria-label="Carregando" />}
@@ -199,13 +230,25 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
           <thead>
             <tr>
               <th className="col-nome">Consultor</th>
-              {dias.map(d => <th key={d} data-dia={d} className={`dia${d === hoje ? ' hoje' : ''}${fimDeSemana(d) ? ' fds' : ''}`}><span>{dataCurta(d)}</span></th>)}
+              {dias.map(d => {
+                const soma = somaDia.get(d) ?? 0;
+                return <th key={d} data-dia={d} className={`dia${d === hoje ? ' hoje' : ''}${fimDeSemana(d) ? ' fds' : ''}`}>
+                  <span>{dataCurta(d)}</span>{soma > 0 && <small className="eq-soma-dia" title="Horas alocadas na equipe no dia">{horasTexto(soma)}</small>}</th>;
+              })}
             </tr>
           </thead>
           <tbody>
-            {pessoas.map(p => (
-              <tr key={p.id}>
-                <th scope="row" className="col-nome"><NomePessoa id={p.id} comAvatar /></th>
+            {pessoas.map(p => {
+              const recolhido = recolhidos.has(p.id);
+              return (
+              <tr key={p.id} className={recolhido ? 'recolhida' : undefined}>
+                <th scope="row" className="col-nome">
+                  <div className="eq-nome">
+                    <NomePessoa id={p.id} comAvatar />
+                    <button type="button" className={`eq-chev${recolhido ? '' : ' aberto'}`} aria-expanded={!recolhido} aria-label={`${recolhido ? 'Expandir' : 'Recolher'} ${p.nome}`}
+                      onClick={() => alternarConsultor(p.id)}><Icone nome="baixo" tam={16} /></button>
+                  </div>
+                </th>
                 {dias.map(d => {
                   const lista = porCelula.get(p.id + d) ?? [];
                   const aus = ausenciaEm(ausencias, p.id, d);
@@ -220,28 +263,35 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
                         <button type="button" className="eq-ausencia" disabled={aus.origem === 'clickup' || !pode('equipe.editar')}
                           title={aus.motivo ?? undefined} onClick={() => aoEditarAusencia(aus)}>{rotuloAusencia(aus.tipo)}</button>
                       )}
-                      {lista.map(t => (
+                      {horas > 0 && <small className={`eq-carga ${nivelCarga(horas)}`}>{horasTexto(horas)}</small>}
+                      {recolhido && lista.length > 0 && <MiniFaixa itens={lista} />}
+                      {!recolhido && lista.map(t => (
                         <button key={t.id} type="button" draggable={podeMover} data-tarefa={t.id}
-                          className={`eq-tarefa st-${t.status}${sel.has(t.id) ? ' marcada' : ''}`} aria-pressed={sel.has(t.id)}
-                          title={`${t.cliente} · ${t.projeto} · ${t.demanda}`}
+                          className={`eq-tarefa tu-${turnoDe(t)} st-${t.status}${sel.has(t.id) ? ' marcada' : ''}`} aria-pressed={sel.has(t.id)}
+                          title={`${t.cliente} · ${t.projeto} · ${t.demanda} · ${horasTexto(Number(t.horas_previstas ?? 0))}`}
                           onDragStart={e => { arrastada.current = t.id; e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; }}
                           onDragEnd={() => { arrastada.current = null; }}
                           onClick={e => { if (selecionando || e.ctrlKey || e.metaKey) alternar(t.id); else ed.tarefa({ id: t.id }); }}>
-                          <b>{t.cliente}</b><span>{t.nome}</span><small>{rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim).replace(/ \(.*/, '')}</small>
+                          <b>{t.cliente}</b><span>{t.nome}</span><small className="eq-tarefa-pe"><span>{rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim).replace(/ \(.*/, '').replace(/:00/g, 'h').replace('–', '-')}</span>
+                            {rotuloAgenda(t.modalidade) && <i className={`eq-agenda ag-${t.modalidade}`}>{rotuloAgenda(t.modalidade)}</i>}</small>
                         </button>
                       ))}
                       {!aus && podeCriar && (
                         <button type="button" className={`eq-mais${backlogMarcado ? ' visivel' : ''}`} aria-label={`Agendar ${p.nome} em ${dataCurta(d)}`}
                           onClick={() => (backlogMarcado ? aoSoltarBacklog({ data: d, consultor: p.id }) : ed.tarefa({ data: d, responsaveis: [p.id] }))}>+</button>
                       )}
-                      {horas > CAPACIDADE && <small className="eq-horas">{horas} h</small>}
                     </td>
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
+      </div>
+      <div className="eq-legenda" aria-label="Legenda da grade">
+        {[['livre', 'livre'], ['parcial', 'até 7 h'], ['cheio', '8 h'], ['acima', 'até 12 h'], ['excesso', 'mais de 12 h']].map(([c, r]) => <span key={c} className={`eq-carga ${c}`}>{r}</span>)}
+        {TURNOS.map(t => <span key={t.valor} className="eq-leg-turno"><i className={`tu-${t.valor}`} />{t.rotulo}</span>)}
       </div>
       {pessoas.length === 0 && !carregando && <p className="ajuda">{soDev ? 'Marque o papel Desenvolvedor em Equipe para aparecer aqui.' : 'Ninguém com esse filtro.'}</p>}
     </section>

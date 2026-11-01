@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreBacklog, ausenciaEm, diasEntre, itensMover, janelaInicial, paraGravar, segundaDe, situacaoFila, sugerirReprogramacao, wip,
+import { arvoreBacklog, ausenciaEm, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, paraGravar, rotuloAgenda, segundaDe, situacaoFila, statusBacklog, sugerirReprogramacao, turnoDe, wip,
   type Ausencia, type DepFila, type ItemBacklog, type ItemFila, type TarefaGrade } from './equipe';
 
 const item = (o: Partial<ItemFila>): ItemFila => ({ fila_id: 'f', id: 'a', nome: 'A', pai: null, status: 'planejada', inicio: null, fim: null, horas: 8,
@@ -110,5 +110,32 @@ describe('backlog de chamados', () => {
     ], 'backlog_base');
     expect(a.map(c => c.nome)).toEqual(['Zeta', 'Almont']);
     expect(a[0].demandas.map(d => d.nome)).toEqual(['Urgente velho', 'Urgente novo']);
+  });
+});
+
+describe('agenda como no 2.x', () => {
+  it('turno pela janela: manhã, tarde, dia inteiro e noite (horário livre incluído)', () => {
+    const t = (periodo: string, hora_ini: string | null = null, hora_fim: string | null = null) => ({ periodo, hora_ini, hora_fim });
+    expect(turnoDe(t('manha'))).toBe('manha');
+    expect(turnoDe(t('tarde'))).toBe('tarde');
+    expect(turnoDe(t('livre', '09:00:00', '10:00:00'))).toBe('manha');
+    expect(turnoDe(t('livre', '13:00:00', '17:00:00'))).toBe('tarde');
+    expect(turnoDe(t('livre', '09:00:00', '18:00:00'))).toBe('dia');
+    expect(turnoDe(t('livre', '18:00:00', '22:00:00'))).toBe('noite');
+    expect(faixaTarefa(t('tarde'))).toEqual([14, 18]);
+    expect(faixaTarefa(t('livre', '09:30:00', '11:00:00'))).toEqual([9.5, 11]);
+  });
+  it('carga do dia nos degraus do 2.x', () => {
+    expect([0, 4, 7, 8, 10, 13].map(nivelCarga)).toEqual(['livre', 'parcial', 'parcial', 'cheio', 'acima', 'excesso']);
+    expect(horasTexto(7.5)).toBe('7,5 h');
+  });
+  it('pílula do tipo de agenda', () => {
+    expect(['presencial', 'interno', 'remoto', null].map(rotuloAgenda)).toEqual(['Presencial', 'Interno', 'Remoto', '']);
+  });
+  it('backlog filtra por status e lista só os presentes, na ordem do fluxo', () => {
+    const it0 = { id: 'a', pai_id: null, pai: null, nome: 'A', prioridade: 'normal', status: 'planejada', cliente_id: 'c', cliente: 'C', projeto_id: 'p', projeto: 'P', origem: 'demanda', horas: 0, pedidos: [] } as ItemBacklog;
+    const itens = [it0, { ...it0, id: 'b', status: 'backlog' }, { ...it0, id: 'c', status: 'backlog' }];
+    expect(statusBacklog(itens).map(s => [s.valor, s.total])).toEqual([['backlog', 2], ['planejada', 1]]);
+    expect(arvoreBacklog(itens, '', '', new Set(['backlog']))[0].total).toBe(1);
   });
 });

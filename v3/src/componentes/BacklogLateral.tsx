@@ -1,12 +1,25 @@
 // Backlog lateral da grade (escopo §4): recolhido por Cliente → Demanda → Subdemanda. Arrastar para a grade (ou marcar e
 // tocar numa célula) abre a alocação; pedidos de "mais agenda" ficam destacados. Recolhe numa barra fina e filtra por status
-// (a escolha fica guardada no aparelho).
+// (a escolha fica guardada no aparelho). Todo nível tem o lápis: cliente e projeto levam à tela própria; demanda e subdemanda
+// abrem o popup único de edição.
 import { useEffect, useMemo, useState } from 'react';
-import { arvoreBacklog, ORIGENS, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
+import { arvoreBacklog, ORIGENS, porProjeto, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
 import { rotuloPrioridade } from '../api/execucao';
+import { useEdicao } from '../estado/edicao';
+import { usePode } from '../estado/equipe';
+import { caminhoEntidade, hashDe, type Entidade } from '../estado/rotas';
 import { Icone } from './Icone';
 
 const lerFora = (k: string) => { try { return new Set<string>(JSON.parse(localStorage.getItem(k) || '[]')); } catch { return new Set<string>(); } };
+
+function IrPara({ entidade, id, nome }: { entidade: Entidade; id: string; nome: string }) {
+  return <a className="bl-editar" href={hashDe(caminhoEntidade(entidade, id))} aria-label={`Abrir ${entidade} ${nome}`} title={`Abrir ${entidade}`}><Icone nome="lapis" tam={15} /></a>;
+}
+function EditarDemanda({ id, nome }: { id: string; nome: string }) {
+  const ed = useEdicao();
+  if (!usePode()('demanda.editar')) return null;
+  return <button type="button" className="bl-editar" aria-label={`Editar ${nome}`} title="Editar" onClick={() => ed.demanda({ id })}><Icone nome="lapis" tam={15} /></button>;
+}
 
 function Linha({ item, marcado, sub, aoMarcar, aoArrastar }: {
   item: ItemBacklog; marcado: boolean; sub?: boolean; aoMarcar: (id: string) => void; aoArrastar: (id: string) => void;
@@ -14,10 +27,13 @@ function Linha({ item, marcado, sub, aoMarcar, aoArrastar }: {
   return (
     <div className={`bl-item${sub ? ' sub' : ''}${item.pedidos.length ? ' pedido' : ''}`} draggable data-backlog={item.id}
       onDragStart={e => { aoArrastar(item.id); e.dataTransfer.setData('text/plain', item.id); e.dataTransfer.effectAllowed = 'move'; }}>
-      <label className="bl-marca">
-        <input type="checkbox" checked={marcado} onChange={() => aoMarcar(item.id)} aria-label={`Marcar ${item.nome}`} />
-        <span className="bl-nome">{sub && '↳ '}{item.nome}</span>
-      </label>
+      <div className="bl-linha">
+        <label className="bl-marca">
+          <input type="checkbox" checked={marcado} onChange={() => aoMarcar(item.id)} aria-label={`Marcar ${item.nome}`} />
+          <span className="bl-nome">{sub && '↳ '}{item.nome}</span>
+        </label>
+        <EditarDemanda id={item.id} nome={item.nome} />
+      </div>
       <small>{item.horas > 0 ? `${item.horas} h` : ''}{item.prioridade !== 'normal' ? ` · ${rotuloPrioridade(item.prioridade)}` : ''}</small>
       {item.pedidos.map(p => <small key={p.id} className="bl-pedido">Pedido de agenda: {p.horas} h — {p.motivo}</small>)}
     </div>
@@ -75,16 +91,24 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
       <div className="bl-lista">
         {arvore.map(c => (
           <section key={c.id} className="bl-cliente">
-            <button type="button" className="bl-titulo" aria-expanded={aberto(c.id)} onClick={() => alternar(c.id)}>
-              <span>{c.nome}</span>
-              {c.pedidos > 0 && <span className="selo bl-selo">{c.pedidos} pedido(s)</span>}
-              <small>{c.total}</small>
-            </button>
-            {aberto(c.id) && c.demandas.map(d => (
-              <div key={d.id} className="bl-demanda">
-                {d.item ? <Linha item={d.item} marcado={marcados.has(d.item.id)} aoMarcar={aoMarcar} aoArrastar={aoArrastar} />
-                  : <p className="bl-mae">{d.nome}</p>}
-                {d.subs.map(s => <Linha key={s.id} item={s} sub marcado={marcados.has(s.id)} aoMarcar={aoMarcar} aoArrastar={aoArrastar} />)}
+            <div className="bl-linha">
+              <button type="button" className="bl-titulo" aria-expanded={aberto(c.id)} onClick={() => alternar(c.id)}>
+                <span>{c.nome}</span>
+                {c.pedidos > 0 && <span className="selo bl-selo">{c.pedidos} pedido(s)</span>}
+                <small>{c.total}</small>
+              </button>
+              <IrPara entidade="cliente" id={c.id} nome={c.nome} />
+            </div>
+            {aberto(c.id) && porProjeto(c.demandas).map(p => (
+              <div key={p.id} className="bl-projeto">
+                <div className="bl-linha"><span className="bl-projeto-nome">{p.nome}</span><IrPara entidade="projeto" id={p.id} nome={p.nome} /></div>
+                {p.demandas.map(d => (
+                  <div key={d.id} className="bl-demanda">
+                    {d.item ? <Linha item={d.item} marcado={marcados.has(d.item.id)} aoMarcar={aoMarcar} aoArrastar={aoArrastar} />
+                      : <div className="bl-linha"><p className="bl-mae">{d.nome}</p><EditarDemanda id={d.id} nome={d.nome} /></div>}
+                    {d.subs.map(s => <Linha key={s.id} item={s} sub marcado={marcados.has(s.id)} aoMarcar={aoMarcar} aoArrastar={aoArrastar} />)}
+                  </div>
+                ))}
               </div>
             ))}
           </section>

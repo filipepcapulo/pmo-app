@@ -70,7 +70,8 @@ export const ausenciaEm = (lista: Ausencia[], consultor: string, data: string) =
   lista.find(a => a.consultor_id === consultor && a.de <= data && a.ate >= data) ?? null;
 
 // ---------------------------------------------------------------- backlog: Cliente → Demanda → Subdemanda
-export interface NoDemanda { id: string; nome: string; item: ItemBacklog | null; subs: ItemBacklog[] }
+export interface NoDemanda { id: string; nome: string; projeto_id: string; projeto: string; item: ItemBacklog | null; subs: ItemBacklog[] }
+export interface NoProjeto { id: string; nome: string; demandas: NoDemanda[] }
 export interface NoCliente { id: string; nome: string; demandas: NoDemanda[]; total: number; pedidos: number }
 const RANK_PRIORIDADE = ['urgente', 'alta', 'normal', 'baixa'];
 export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = '', statusFora: ReadonlySet<string> = new Set()): NoCliente[] {
@@ -85,7 +86,7 @@ export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' =
     c.pedidos += i.pedidos.length;
     const raiz = i.pai_id ?? i.id;
     let n = c.demandas.find(d => d.id === raiz);
-    if (!n) { n = { id: raiz, nome: i.pai ?? i.nome, item: null, subs: [] }; c.demandas.push(n); }
+    if (!n) { n = { id: raiz, nome: i.pai ?? i.nome, projeto_id: i.projeto_id, projeto: i.projeto, item: null, subs: [] }; c.demandas.push(n); }
     if (i.pai_id) n.subs.push(i); else n.item = i;
   }
   const lista = [...clientes.values()];
@@ -100,6 +101,17 @@ export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' =
     return lista.sort((a, b) => compara(a.demandas[0], b.demandas[0]));
   }
   return lista.sort((a, b) => b.pedidos - a.pedidos || a.nome.localeCompare(b.nome));
+}
+
+/** Nível de projeto da árvore: agrupa as demandas do cliente, mantendo a ordem em que vieram. */
+export function porProjeto(demandas: NoDemanda[]): NoProjeto[] {
+  const m = new Map<string, NoProjeto>();
+  for (const d of demandas) {
+    const p = m.get(d.projeto_id) ?? { id: d.projeto_id, nome: d.projeto, demandas: [] };
+    m.set(d.projeto_id, p);
+    p.demandas.push(d);
+  }
+  return [...m.values()];
 }
 
 /** Status presentes no backlog, na ordem do fluxo, com a quantidade (opções do filtro). */
@@ -129,6 +141,11 @@ export function turnoDe(t: Pick<TarefaGrade, 'periodo' | 'hora_ini' | 'hora_fim'
   if (f[0] >= 18) return 'noite';
   const manha = f[0] < 12, tarde = f[1] > 12;
   return manha && tarde ? 'dia' : manha ? 'manha' : tarde ? 'tarde' : '';
+}
+/** Agendas do dia na ordem das horas: pelo início, depois pelo fim; sem horário vai para o fim. */
+export function ordenarDia<T extends Pick<TarefaGrade, 'periodo' | 'hora_ini' | 'hora_fim'>>(lista: T[]): T[] {
+  const chave = (t: T) => faixaTarefa(t) ?? [99, 99];
+  return [...lista].sort((a, b) => chave(a)[0] - chave(b)[0] || chave(a)[1] - chave(b)[1]);
 }
 /** Faixa de cor da carga do dia (mesmos degraus do 2.x). */
 export const nivelCarga = (h: number) => (h === 0 ? 'livre' : h <= 7 ? 'parcial' : h === 8 ? 'cheio' : h <= 12 ? 'acima' : 'excesso');

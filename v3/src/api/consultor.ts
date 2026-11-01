@@ -14,6 +14,7 @@ export interface LinhaApontamento extends Record<string, unknown> {
   apontamento_id: string; versao: number; origem: 'sankhya_om' | 'app' | 'manual'; numero_os: string | null; numero_interno: number | null;
   data: string; hora_ini: string | null; intervalo_min: number; hora_fim: string | null; horas: number; texto: string | null;
   consultor_id: string; consultor: string; tarefa_id: string; tarefa: string; demanda: string; projeto: string; cliente: string;
+  conferido_em: string | null; conferido_por: string | null;
 }
 export interface RelatorioApontamentos { horas: number; horas_os: number; horas_app: number; total: number; itens: LinhaApontamento[] }
 export type SituacaoPedido = 'aberto' | 'atendido' | 'recusado';
@@ -35,6 +36,7 @@ export const consultor = {
   pedidos: (esc: string, f: { projeto?: string; meus?: boolean }) =>
     rpc<PedidoAgenda[]>('v1_pedidos_agenda', { p_escritorio: esc, p_projeto: f.projeto ?? null, p_meus: !!f.meus }),
   apontar: (esc: string, d: Record<string, unknown>) => gravar('v1_apontamento_salvar', esc, d),
+  conferir: (esc: string, ids: string[], conferido: boolean) => gravar<{ ok: true; alterados: number }>('v1_apontamentos_conferir', esc, { ids, conferido }),
   pedir: (esc: string, d: { tarefa_id?: string; demanda_id?: string; horas: number; motivo: string }) => gravar('v1_pedido_agenda_salvar', esc, d),
   pedidoSituacao: (esc: string, id: string, versao: number, situacao: SituacaoPedido) => gravar('v1_pedido_agenda_salvar', esc, { id, versao, situacao }),
 };

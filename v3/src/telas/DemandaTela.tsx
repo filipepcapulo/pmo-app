@@ -16,6 +16,7 @@ import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
+import { Resumo } from '../componentes/Resumo';
 
 type Aba = 'tarefas' | 'checklist' | 'anexos' | 'comentarios';
 
@@ -41,11 +42,11 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
       <header className="pagina-topo">
         <div className="titulo-exec">
           <small className="ajuda">
-            <a href={hashDe(caminhoEntidade('cliente', cliente.id))}>{cliente.nome}</a> ·{' '}
-            <a href={hashDe(caminhoEntidade('projeto', projeto.id))}>{projeto.nome}</a>
-            {pai && <> · <a href={hashDe(caminhoEntidade('demanda', pai.id))}>{pai.nome}</a></>} · {pai ? 'Subdemanda' : 'Demanda'}
+            <Resumo tipo="cliente" id={cliente.id}><a href={hashDe(caminhoEntidade('cliente', cliente.id))}>{cliente.nome}</a></Resumo> ·{' '}
+            <Resumo tipo="projeto" id={projeto.id}><a href={hashDe(caminhoEntidade('projeto', projeto.id))}>{projeto.nome}</a></Resumo>
+            {pai && <> · <Resumo tipo="demanda" id={pai.id}><a href={hashDe(caminhoEntidade('demanda', pai.id))}>{pai.nome}</a></Resumo></>} · {pai ? 'Subdemanda' : 'Demanda'}
           </small>
-          <h1>{d.nome} <StatusPilula status={d.status} />{t?.atrasada && <span className="pilula st-atrasada">Atrasada</span>}</h1>
+          <h1><Resumo tipo="demanda" id={d.id}>{d.nome}</Resumo> <StatusPilula status={d.status} />{t?.atrasada && <span className="pilula st-atrasada">Atrasada</span>}</h1>
           <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} />
         </div>
         <div className="linha">

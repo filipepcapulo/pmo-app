@@ -1,2 +1,2 @@
 // Versão da PWA v3 (aparece no rodapé do menu e vai junto em cada erro registrado).
-export const VERSAO = '3.5.2';
+export const VERSAO = '3.6.0';

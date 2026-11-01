@@ -11,6 +11,7 @@ import { useCarga } from '../estado/carga';
 import { gps, useEquipe, usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
 import { caminhoEntidade } from '../estado/rotas';
+import { Resumo } from '../componentes/Resumo';
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
@@ -23,7 +24,7 @@ export function Clientes({ ir }: { ir: (caminho: string, titulo?: string) => voi
   const c = useCarga(() => api.clientes(esc, inativos), [esc, inativos]);
   const linhas = useMemo(() => (c.dados ?? []).filter(l => !texto || semAcento(l.nome).includes(semAcento(texto))), [c.dados, texto]);
   const cols: Coluna<ClienteLinha & Record<string, unknown>>[] = [
-    { chave: 'nome', titulo: 'Cliente', render: l => <>{l.nome}{!l.ativo && <span className="pilula pilula-neutra"> Inativo</span>}</> },
+    { chave: 'nome', titulo: 'Cliente', render: l => <><Resumo tipo="cliente" id={l.id}>{l.nome}</Resumo>{!l.ativo && <span className="pilula pilula-neutra"> Inativo</span>}</> },
     { chave: 'gp', titulo: 'GP', render: l => <NomePessoa pessoa={l.gp} /> },
     { chave: 'projetos', titulo: 'Projetos abertos', alinhar: 'dir' },
     { chave: 'pessoas', titulo: 'Pessoas', alinhar: 'dir' },

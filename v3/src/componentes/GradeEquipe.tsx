@@ -14,6 +14,7 @@ import { dataCurta } from './FormComum';
 import { Icone } from './Icone';
 import { NomePessoa } from './NomePessoa';
 import { useToast } from './Toasts';
+import { Resumo } from './Resumo';
 
 const COL = 150;       // largura do dia (igual à grade aberta do 2.x)
 const BORDA = 240;     // a esta distância da borda busca mais uma semana
@@ -269,12 +270,11 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
                       {!recolhido && lista.map(t => (
                         <button key={t.id} type="button" draggable={podeMover} data-tarefa={t.id}
                           className={`eq-tarefa tu-${turnoDe(t)} st-${t.status}${sel.has(t.id) ? ' marcada' : ''}`} aria-pressed={sel.has(t.id)}
-                          title={`${t.cliente} · ${t.projeto} · ${t.demanda} · ${horasTexto(Number(t.horas_previstas ?? 0))}`}
                           onDragStart={e => { arrastada.current = t.id; e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; }}
                           onDragEnd={() => { arrastada.current = null; }}
                           onClick={e => { if (selecionando || e.ctrlKey || e.metaKey) alternar(t.id); else ed.tarefa({ id: t.id }); }}>
-                          <b>{t.cliente}</b><span>{t.nome}</span><small className="eq-tarefa-pe"><span>{rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim).replace(/ \(.*/, '').replace(/:00/g, 'h').replace('–', '-')}</span>
-                            {rotuloAgenda(t.modalidade) && <i className={`eq-agenda ag-${t.modalidade}`}>{rotuloAgenda(t.modalidade)}</i>}</small>
+                          <Resumo tipo="demanda" id={t.demanda_id} local={`${t.cliente} · ${t.projeto}`}><b>{t.cliente}</b><span>{t.nome}</span><small className="eq-tarefa-pe"><span>{rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim).replace(/ \(.*/, '').replace(/:00/g, 'h').replace('–', '-')}</span>
+                            {rotuloAgenda(t.modalidade) && <i className={`eq-agenda ag-${t.modalidade}`}>{rotuloAgenda(t.modalidade)}</i>}</small></Resumo>
                         </button>
                       ))}
                       {!aus && podeCriar && (

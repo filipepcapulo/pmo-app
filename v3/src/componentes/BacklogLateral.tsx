@@ -9,6 +9,7 @@ import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe, type Entidade } from '../estado/rotas';
 import { Icone } from './Icone';
+import { Resumo } from './Resumo';
 
 const lerFora = (k: string) => { try { return new Set<string>(JSON.parse(localStorage.getItem(k) || '[]')); } catch { return new Set<string>(); } };
 
@@ -30,7 +31,7 @@ function Linha({ item, marcado, sub, aoMarcar, aoArrastar }: {
       <div className="bl-linha">
         <label className="bl-marca">
           <input type="checkbox" checked={marcado} onChange={() => aoMarcar(item.id)} aria-label={`Marcar ${item.nome}`} />
-          <span className="bl-nome">{sub && '↳ '}{item.nome}</span>
+          <span className="bl-nome"><Resumo tipo="demanda" id={item.id} comGp>{sub && '↳ '}{item.nome}</Resumo></span>
         </label>
         <EditarDemanda id={item.id} nome={item.nome} />
       </div>
@@ -93,7 +94,7 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
           <section key={c.id} className="bl-cliente">
             <div className="bl-linha">
               <button type="button" className="bl-titulo" aria-expanded={aberto(c.id)} onClick={() => alternar(c.id)}>
-                <span>{c.nome}</span>
+                <span><Resumo tipo="cliente" id={c.id} comGp>{c.nome}</Resumo></span>
                 {c.pedidos > 0 && <span className="selo bl-selo">{c.pedidos} pedido(s)</span>}
                 <small>{c.total}</small>
               </button>
@@ -101,11 +102,11 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
             </div>
             {aberto(c.id) && porProjeto(c.demandas).map(p => (
               <div key={p.id} className="bl-projeto">
-                <div className="bl-linha"><span className="bl-projeto-nome">{p.nome}</span><IrPara entidade="projeto" id={p.id} nome={p.nome} /></div>
+                <div className="bl-linha"><span className="bl-projeto-nome"><Resumo tipo="projeto" id={p.id} comGp>{p.nome}</Resumo></span><IrPara entidade="projeto" id={p.id} nome={p.nome} /></div>
                 {p.demandas.map(d => (
                   <div key={d.id} className="bl-demanda">
                     {d.item ? <Linha item={d.item} marcado={marcados.has(d.item.id)} aoMarcar={aoMarcar} aoArrastar={aoArrastar} />
-                      : <div className="bl-linha"><p className="bl-mae">{d.nome}</p><EditarDemanda id={d.id} nome={d.nome} /></div>}
+                      : <div className="bl-linha"><p className="bl-mae"><Resumo tipo="demanda" id={d.id} comGp>{d.nome}</Resumo></p><EditarDemanda id={d.id} nome={d.nome} /></div>}
                     {d.subs.map(s => <Linha key={s.id} item={s} sub marcado={marcados.has(s.id)} aoMarcar={aoMarcar} aoArrastar={aoArrastar} />)}
                   </div>
                 ))}

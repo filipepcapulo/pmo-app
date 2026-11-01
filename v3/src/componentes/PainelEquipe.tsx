@@ -15,6 +15,7 @@ import { dataCurta } from './FormComum';
 import { GradeEquipe, type Soltar } from './GradeEquipe';
 import { Popup } from './Popup';
 import { useToast } from './Toasts';
+import { Resumo } from './Resumo';
 
 const CHAVE_RECOLHIDO = 'pmo3.backlog.recolhido';
 
@@ -43,7 +44,7 @@ function AlocarLote({ itens, alvo, aoFechar, aoGravar }: { itens: ItemBacklog[];
     <Popup aberto titulo="Alocar agenda" aoFechar={aoFechar}
       rodape={<><Botao onClick={aoFechar}>Cancelar</Botao><Botao variante="primario" carregando={gravando} onClick={enviar}>Criar {itens.length} tarefa(s)</Botao></>}>
       <p className="ajuda">{porId.get(alvo.consultor)?.nome} em {dataCurta(alvo.data)}</p>
-      <ul className="lista-simples">{itens.map(i => <li key={i.id}>{i.cliente} · {i.nome}</li>)}</ul>
+      <ul className="lista-simples">{itens.map(i => <li key={i.id}><Resumo tipo="cliente" id={i.cliente_id}>{i.cliente}</Resumo> · <Resumo tipo="demanda" id={i.id}>{i.nome}</Resumo></li>)}</ul>
       <EscolhaChips rotulo="Período" valor={periodo} aoMudar={setPeriodo} opcoes={PERIODOS.filter(p => p.valor !== 'livre')} />
       <EscolhaChips rotulo="Tipo de agenda" valor={modalidade} aoMudar={setModalidade} opcoes={MODALIDADES.filter(m => m.valor)} />
     </Popup>

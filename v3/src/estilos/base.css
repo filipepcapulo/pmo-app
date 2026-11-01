@@ -691,3 +691,28 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .ind-barra { height: 8px; border-radius: 4px; background: var(--superficie-2); overflow: hidden; }
 .ind-barra i { display: block; height: 100%; background: var(--verde); }
 .ind-linha strong { text-align: right; }
+
+/* ---------------------------------------------------------------- resumo flutuante (Resumo.tsx) */
+:root { --fora: #fdeeee; }
+@media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) { --fora: #3a2424; } }
+:root[data-tema="escuro"] { --fora: #3a2424; }
+.res { border-radius: 4px; }
+.res-fora { background: var(--fora); box-shadow: 0 0 0 2px var(--fora); }
+.bl-item:has(.res-fora), .bl-linha:has(.res-fora), .linha-exec:has(> .linha-exec-topo .res-fora), .tabela tr:has(.res-fora) > td { background: var(--fora); }
+.pilula-gp { margin-right: 4px; background: var(--verde-claro); color: var(--verde-texto); text-transform: none; letter-spacing: 0; vertical-align: 1px; }
+.res-plano { margin-left: 4px; color: var(--laranja); font-weight: 700; }
+.res-dica { position: fixed; z-index: 70; width: 300px; max-width: calc(100vw - 16px); background: var(--superficie); color: var(--texto);
+  border: 1px solid var(--linha); border-radius: var(--raio); box-shadow: var(--sombra-alta); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+  font-size: 13px; font-weight: 400; line-height: 1.35; text-transform: none; text-align: left; white-space: normal; letter-spacing: 0; pointer-events: none; cursor: default; }
+.res-dica.acima { transform: translateY(-100%); }
+.res-dica small { color: var(--texto-2); }
+.res-dica strong { font-size: 14px; overflow-wrap: anywhere; }
+.res-dica em { font-style: normal; font-weight: 600; color: var(--vermelho); }
+.res-campos { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
+.res-campos span { color: var(--texto-2); }
+.res-campos b { text-align: right; font-weight: 600; }
+.eq-tarefa > .res { display: flex; flex-direction: column; gap: inherit; width: 100%; min-width: 0; }
+.eq-tarefa > .res > .res-plano { position: absolute; top: 2px; right: 4px; margin: 0; }
+.eq-tarefa { position: relative; }
+.eq-tarefa .res-dica, .eq-tarefa .res-dica span { white-space: normal; overflow: visible; text-overflow: clip; }
+.res-dica small, .bl-item .res-dica small { padding: 0; color: var(--texto-2); }

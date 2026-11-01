@@ -1,12 +1,14 @@
 // Visão do consultor (#/consultor, escopo §6): Minha agenda (dia/semana, celular primeiro), Minhas demandas e Meus
-// apontamentos. O consultor não edita a tarefa: grava só apontamento e pedido de agenda.
+// apontamentos e Meus desvios. O consultor não edita a tarefa: grava só apontamento, pedido de agenda e desvio.
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { consultor, diasDaSemana, nomeDia, podeApontar, type LinhaAgenda } from '../api/consultor';
+import { podeDesviar } from '../api/desvios';
 import { ordenarDia } from '../api/equipe';
 import { rotuloModalidade, rotuloPeriodo, rotuloStatusTarefa } from '../api/execucao';
 import { hojeIso, somarDias } from '../api/projeto';
 import { Botao } from '../componentes/Botao';
+import { ListaDesvios } from '../componentes/ListaDesvios';
 import { RelatorioApontamentos } from '../componentes/RelatorioApontamentos';
 import { Resumo } from '../componentes/Resumo';
 import { useCarga } from '../estado/carga';
@@ -16,9 +18,10 @@ import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Demandas } from './Demandas';
 
-type Aba = 'agenda' | 'demandas' | 'apontamentos';
+type Aba = 'agenda' | 'demandas' | 'apontamentos' | 'desvios';
 const ABAS: { id: Aba; rotulo: string }[] = [
   { id: 'agenda', rotulo: 'Minha agenda' }, { id: 'demandas', rotulo: 'Minhas demandas' }, { id: 'apontamentos', rotulo: 'Meus apontamentos' },
+  { id: 'desvios', rotulo: 'Meus desvios' },
 ];
 const SITUACAO = { aberto: 'Aberto', atendido: 'Atendido', recusado: 'Recusado' };
 
@@ -44,6 +47,7 @@ function CartaoTarefa({ t, hoje }: { t: LinhaAgenda; hoje: string }) {
           <Botao variante={apontado ? 'secundario' : 'primario'} onClick={() => ed.apontar({ tarefa_id: t.tarefa_id, nome: t.tarefa, data: t.data, periodo: t.periodo, hora_ini: t.hora_ini, hora_fim: t.hora_fim })}>Apontar</Botao>
         )}
         {pode('agenda.solicitar') && <Botao onClick={() => ed.pedirAgenda({ tarefa_id: t.tarefa_id, nome: t.tarefa })}>Preciso de mais agenda</Botao>}
+        {pode('desvio.informar') && podeDesviar(t, hoje) && <Botao onClick={() => ed.informarDesvio({ tarefa_id: t.tarefa_id, nome: t.tarefa, data: t.data, periodo: t.periodo, hora_ini: t.hora_ini, hora_fim: t.hora_fim })}>Informar desvio</Botao>}
       </div>
     </article>
   );
@@ -110,6 +114,17 @@ function MinhaAgenda() {
   );
 }
 
+function MeusDesvios() {
+  const hoje = hojeIso();
+  const [de, setDe] = useState(() => somarDias(hoje, -90));
+  return (
+    <>
+      <div className="barra-filtros"><label className="ajuda">Desde <input type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} aria-label="Desde" /></label></div>
+      <ListaDesvios meus de={de} ate={hoje} />
+    </>
+  );
+}
+
 export function Consultor() {
   const [aba, setAba] = useState<Aba>('agenda');
   return (
@@ -121,6 +136,7 @@ export function Consultor() {
       {aba === 'agenda' && <MinhaAgenda />}
       {aba === 'demandas' && <Demandas minhas />}
       {aba === 'apontamentos' && <RelatorioApontamentos />}
+      {aba === 'desvios' && <MeusDesvios />}
     </div>
   );
 }

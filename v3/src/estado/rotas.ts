@@ -30,6 +30,8 @@ export const MODULOS: Modulo[] = [
   { id: 'equipe-dev', titulo: 'Equipe dev', area: 'execucao', icone: 'pessoas' },
   { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: 'chamado' },
   { id: 'consultor', titulo: 'Minha agenda', area: 'execucao', icone: 'relogio' },
+  { id: 'desvios', titulo: 'Desvios de agenda', area: 'execucao', icone: 'seta', permissao: 'desvio.aprovar' },
+  { id: 'envio-agendas', titulo: 'Envio de agendas', area: 'execucao', icone: 'calendario', permissao: 'agenda.enviar' },
   { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: 'grafico', permissao: 'relatorio.produtividade' },
   { id: 'componentes', titulo: 'Componentes', area: 'sistema', icone: 'grade' },
 ];

@@ -731,3 +731,11 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .cons-pedidos li:last-child { border-bottom: 0; padding-bottom: 0; }
 .cons-pedidos li > div:first-child { min-width: 0; flex: 1 1 220px; overflow-wrap: anywhere; }
 @media (max-width: 520px) { .cons-acoes .bt { flex: 1 1 auto; min-height: 44px; } }
+
+/* Envio de agendas (V10b) */
+.envio-cliente { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.envio-cliente.desmarcado { opacity: .65; }
+.envio-topo { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.envio-marca { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+.envio-tabela { overflow-x: auto; }
+.envio-resultado { margin: 0; padding-left: 18px; }

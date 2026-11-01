@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { podeApontar } from '../api/consultor';
+import { podeDesviar } from '../api/desvios';
 import { exec, rotuloModalidade, rotuloPeriodo } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { Anexos } from '../componentes/Anexos';
@@ -56,6 +57,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
           {pode('tarefa.criar') && <Botao onClick={() => ed.tarefa({ demanda_id: demanda.id, data: t.data })}>+ Tarefa na demanda</Botao>}
           {pode('agenda.solicitar') && (souResp || pode('tarefa.editar')) && <Botao onClick={() => ed.pedirAgenda({ tarefa_id: t.id, nome: t.nome })}>Preciso de mais agenda</Botao>}
           {souResp && pode('apontamento.gravar') && podeApontar(t, hojeIso()) && <Botao onClick={() => ed.apontar({ tarefa_id: t.id, nome: t.nome, data: t.data, periodo: t.periodo, hora_ini: t.hora_ini, hora_fim: t.hora_fim })}>Apontar</Botao>}
+          {souResp && pode('desvio.informar') && podeDesviar({ data: t.data, status: t.status, horas_reais: t.horas_reais }, hojeIso()) && <Botao onClick={() => ed.informarDesvio({ tarefa_id: t.id, nome: t.nome, data: t.data, periodo: t.periodo, hora_ini: t.hora_ini, hora_fim: t.hora_fim })}>Informar desvio</Botao>}
           {pode('tarefa.editar') && <Botao variante="primario" onClick={() => ed.tarefa({ id: t.id })}>Editar</Botao>}
         </div>
       </header>

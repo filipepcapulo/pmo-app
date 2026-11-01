@@ -53,7 +53,8 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
           <BotaoFavorito entidade="demanda" id={d.id} />
           {pode('tarefa.criar') && <Botao onClick={() => ed.tarefa({ demanda_id: d.id })}>+ Tarefa</Botao>}
           {!pai && pode('demanda.criar') && <Botao onClick={() => ed.demanda({ projeto_id: projeto.id, pai_id: d.id })}>+ Subdemanda</Botao>}
-          <Botao variante="primario" onClick={() => ed.demanda({ id: d.id })}>Editar</Botao>
+          {pode('agenda.solicitar') && <Botao onClick={() => ed.pedirAgenda({ demanda_id: d.id, nome: d.nome })}>Preciso de mais agenda</Botao>}
+          {pode('demanda.editar') && <Botao variante="primario" onClick={() => ed.demanda({ id: d.id })}>Editar</Botao>}
         </div>
       </header>
 

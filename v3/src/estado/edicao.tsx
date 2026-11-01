@@ -2,7 +2,9 @@
 // useEdicao().demanda({...}) / .tarefa({...}); depois de gravar, `geracao` muda e as telas abertas recarregam.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { exec, type OpcoesExecucao } from '../api/execucao';
+import { FormApontamento, type AlvoApontamento } from '../componentes/FormApontamento';
 import { FormDemanda } from '../componentes/FormDemanda';
+import { FormPedidoAgenda, type AlvoPedido } from '../componentes/FormPedidoAgenda';
 import { FormTarefa } from '../componentes/FormTarefa';
 import { useSessao } from './sessao';
 
@@ -12,6 +14,8 @@ interface Edicao {
   geracao: number;
   demanda: (a: AlvoDemanda, aoGravar?: (id: string) => void) => void;
   tarefa: (a: AlvoTarefa, aoGravar?: () => void) => void;
+  apontar: (a: AlvoApontamento) => void;
+  pedirAgenda: (a: AlvoPedido) => void;
   mudou: () => void;
   opcoes: OpcoesExecucao | null;
 }
@@ -23,6 +27,8 @@ export function ProvedorEdicao({ children }: { children: ReactNode }) {
   const [geracao, setGeracao] = useState(0);
   const [dem, setDem] = useState<{ alvo: AlvoDemanda; cb?: (id: string) => void } | null>(null);
   const [tar, setTar] = useState<{ alvo: AlvoTarefa; cb?: () => void } | null>(null);
+  const [apt, setApt] = useState<AlvoApontamento | null>(null);
+  const [ped, setPed] = useState<AlvoPedido | null>(null);
   const [opcoes, setOpcoes] = useState<OpcoesExecucao | null>(null);
   useEffect(() => { if (esc) exec.opcoes(esc).then(setOpcoes).catch(() => setOpcoes(null)); }, [esc]);
   const mudou = useCallback(() => setGeracao(g => g + 1), []);
@@ -30,6 +36,8 @@ export function ProvedorEdicao({ children }: { children: ReactNode }) {
     geracao, mudou, opcoes,
     demanda: (alvo, cb) => setDem({ alvo, cb }),
     tarefa: (alvo, cb) => setTar({ alvo, cb }),
+    apontar: setApt,
+    pedirAgenda: setPed,
   }), [geracao, mudou, opcoes]);
   return (
     <Ctx.Provider value={valor}>
@@ -38,6 +46,8 @@ export function ProvedorEdicao({ children }: { children: ReactNode }) {
         aoGravar={id => { const cb = dem.cb; setDem(null); mudou(); cb?.(id); }} />}
       {tar && <FormTarefa alvo={tar.alvo} opcoes={opcoes} aoFechar={() => setTar(null)}
         aoGravar={() => { const cb = tar.cb; setTar(null); mudou(); cb?.(); }} />}
+      {apt && <FormApontamento alvo={apt} aoFechar={() => setApt(null)} aoGravar={() => { setApt(null); mudou(); }} />}
+      {ped && <FormPedidoAgenda alvo={ped} aoFechar={() => setPed(null)} aoGravar={() => { setPed(null); mudou(); }} />}
     </Ctx.Provider>
   );
 }

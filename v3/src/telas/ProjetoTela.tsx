@@ -20,6 +20,7 @@ import { Gantt } from '../componentes/Gantt';
 import { Icone } from '../componentes/Icone';
 import { NomePessoa } from '../componentes/NomePessoa';
 import { Popup } from '../componentes/Popup';
+import { PedidosProjeto } from '../componentes/PedidosAgenda';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
@@ -185,6 +186,7 @@ function AbaIndicadores({ ficha }: { ficha: ProjetoFicha }) {
           <div><dt>Demandas</dt><dd>{raiz.length} ({ficha.demandas.length - raiz.length} subdemandas)</dd></div>
         </dl>
       </section>
+      <PedidosProjeto projeto={p.id} />
     </>
   );
 }

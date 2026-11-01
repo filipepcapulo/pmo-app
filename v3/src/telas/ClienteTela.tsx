@@ -14,6 +14,7 @@ import { gps, useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { NovoProjeto } from './Projetos';
+import { Resumo } from '../componentes/Resumo';
 
 const rotuloPapel = (p: string) => PAPEIS_CLIENTE.find(x => x.valor === p)?.rotulo ?? p;
 
@@ -46,7 +47,7 @@ export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t
     { chave: 'telefone', titulo: 'Telefone/WhatsApp', render: l => l.telefone ?? '—' },
   ];
   const colsProj: Coluna<ProjetoResumo & Record<string, unknown>>[] = [
-    { chave: 'nome', titulo: 'Projeto' },
+    { chave: 'nome', titulo: 'Projeto', render: l => <Resumo tipo="projeto" id={l.id}>{l.nome}</Resumo> },
     { chave: 'fase', titulo: 'Fase', render: l => <span className="pilula">{l.fase}</span> },
     { chave: 'situacao', titulo: 'Situação', texto: l => rotuloSituacao(l.situacao), render: l => rotuloSituacao(l.situacao) },
     { chave: 'gp', titulo: 'GP', render: l => <NomePessoa pessoa={l.gp} /> },

@@ -10,6 +10,7 @@ import { useEdicao } from '../estado/edicao';
 import { useSessao } from '../estado/sessao';
 import { useFavoritos } from '../estado/favoritos';
 import { AREAS, caminhoEntidade, hashDe, modulosVisiveis } from '../estado/rotas';
+import { Resumo } from '../componentes/Resumo';
 
 const PERFIS: Record<string, string> = { admin: 'Admin', gp: 'GP', lider_tech: 'Líder Tech', consultor: 'Consultor', triagem: 'Triagem' };
 
@@ -38,13 +39,14 @@ export function Inicio() {
           <div className="grade-cartoes">
             {home.dados!.map(g => (
               <article key={g.cliente.id} className="cartao fav-cliente">
-                <h3><a href={hashDe(caminhoEntidade('cliente', g.cliente.id))}>{g.cliente.nome}</a></h3>
+                <h3><Resumo tipo="cliente" id={g.cliente.id}><a href={hashDe(caminhoEntidade('cliente', g.cliente.id))}>{g.cliente.nome}</a></Resumo></h3>
                 <ul>
                   {g.itens.map(i => (
                     <li key={i.entidade + i.id}>
                       <div className="linha">
                         <span className="ajuda">{i.entidade === 'projeto' ? 'Projeto' : i.entidade === 'tarefa' ? 'Tarefa' : i.subdemanda ? 'Subdemanda' : 'Demanda'}</span>
-                        <a href={hashDe(caminhoEntidade(i.entidade, i.id))}>{i.nome}</a>
+                        {i.entidade === 'tarefa' ? <a href={hashDe(caminhoEntidade(i.entidade, i.id))}>{i.nome}</a>
+                          : <Resumo tipo={i.entidade} id={i.id}><a href={hashDe(caminhoEntidade(i.entidade, i.id))}>{i.nome}</a></Resumo>}
                         {i.entidade !== 'projeto' && <StatusPilula status={i.status} tipo={i.entidade === 'tarefa' ? 'tarefa' : 'demanda'} />}
                         {i.totais?.atrasada && <span className="pilula st-atrasada">Atrasada</span>}
                       </div>

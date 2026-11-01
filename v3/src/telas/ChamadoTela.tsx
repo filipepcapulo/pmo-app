@@ -19,6 +19,7 @@ import { useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { PilulaSituacao } from './Chamados';
+import { Resumo } from '../componentes/Resumo';
 
 type Aba = 'interacoes' | 'tarefas' | 'anexos' | 'relacionados';
 
@@ -187,9 +188,9 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
       <header className="pagina-topo">
         <div className="titulo-exec">
           <small className="ajuda">
-            <a href={hashDe(caminhoEntidade('cliente', ch.cliente_id))}>{ch.cliente}</a> · <a href={hashDe(caminhoEntidade('projeto', f.projeto.id))}>{f.projeto.nome}</a> · Chamado #{ch.numero}
+            <Resumo tipo="cliente" id={ch.cliente_id}><a href={hashDe(caminhoEntidade('cliente', ch.cliente_id))}>{ch.cliente}</a></Resumo> · <Resumo tipo="projeto" id={f.projeto.id}><a href={hashDe(caminhoEntidade('projeto', f.projeto.id))}>{f.projeto.nome}</a></Resumo> · Chamado #{ch.numero}
           </small>
-          <h1>{f.demanda.nome} <PilulaSituacao s={ch.situacao} /></h1>
+          <h1><Resumo tipo="demanda" id={f.demanda.id}>{f.demanda.nome}</Resumo> <PilulaSituacao s={ch.situacao} /></h1>
         </div>
         <div className="linha">
           <BotaoFavorito entidade="chamado" id={ch.id} />

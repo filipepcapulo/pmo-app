@@ -28,6 +28,7 @@ import { gps, useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { baixarCsv, nomeArquivo } from '../util/csv';
+import { Resumo } from '../componentes/Resumo';
 
 const rotuloTipo = (t: string) => TIPOS_PEDIDO.find(x => x.valor === t)?.rotulo ?? t;
 type Proj = ProjetoFicha['projeto'];
@@ -75,8 +76,8 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
     <div className="pagina">
       <header className="pagina-topo">
         <div>
-          <small className="ajuda"><a href={hashDe(caminhoEntidade('cliente', c.dados.cliente.id))}>{c.dados.cliente.nome}</a> · Projeto</small>
-          <h1>{p.nome} <span className="pilula">{p.fase}</span></h1>
+          <small className="ajuda"><Resumo tipo="cliente" id={c.dados.cliente.id}><a href={hashDe(caminhoEntidade('cliente', c.dados.cliente.id))}>{c.dados.cliente.nome}</a></Resumo> · Projeto</small>
+          <h1><Resumo tipo="projeto" id={p.id}>{p.nome}</Resumo> <span className="pilula">{p.fase}</span></h1>
           <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} />
         </div>
         <div className="linha">
@@ -150,7 +151,7 @@ function AbaIndicadores({ ficha }: { ficha: ProjetoFicha }) {
               {rs.map(r => (
                 <li key={r.d.id}>
                   <span className={`risco risco-${r.nivel}`}>{r.nivel === 'critico' ? 'Crítico' : r.nivel === 'alto' ? 'Alto' : 'Moderado'}</span>
-                  <a className="marco-nome" href={hashDe(caminhoEntidade('demanda', r.d.id))}>{r.d.nome}</a>
+                  <Resumo tipo="demanda" id={r.d.id}><a className="marco-nome" href={hashDe(caminhoEntidade('demanda', r.d.id))}>{r.d.nome}</a></Resumo>
                   <span className="marco-data">{r.venc ? data(r.venc) : 'sem prazo'}</span>
                   <NomePessoa id={r.d.responsavel_id} />
                 </li>
@@ -165,7 +166,7 @@ function AbaIndicadores({ ficha }: { ficha: ProjetoFicha }) {
               {ms.map(m => (
                 <li key={m.d.id}>
                   <span className="marco-data">{data(m.fim)}</span>
-                  <a className="marco-nome" href={hashDe(caminhoEntidade('demanda', m.d.id))}>{m.d.nome}</a>
+                  <Resumo tipo="demanda" id={m.d.id}><a className="marco-nome" href={hashDe(caminhoEntidade('demanda', m.d.id))}>{m.d.nome}</a></Resumo>
                   {m.golive && <span className="pilula">Go Live</span>}
                   <StatusPilula status={m.d.status} />
                 </li>
@@ -208,7 +209,7 @@ function AbaHoras({ ficha, painel, aoPedido }: { ficha: ProjetoFicha; painel: Pa
     return { id: d.id, nome: d.nome, previsto: prev, real, planejado: plan, saldo: prev != null ? prev - real - plan : null, perc: tt?.perc ?? null };
   });
   const colsCons: Coluna<LinhaConsumo>[] = [
-    { chave: 'nome', titulo: 'Demanda', render: l => <a href={hashDe(caminhoEntidade('demanda', l.id))}>{l.nome}</a> },
+    { chave: 'nome', titulo: 'Demanda', render: l => <Resumo tipo="demanda" id={l.id}><a href={hashDe(caminhoEntidade('demanda', l.id))}>{l.nome}</a></Resumo> },
     { chave: 'previsto', titulo: 'Previstas', alinhar: 'dir', render: l => horas(l.previsto) },
     { chave: 'real', titulo: 'Reais', alinhar: 'dir', render: l => horas(l.real) },
     { chave: 'planejado', titulo: 'Planejadas', alinhar: 'dir', render: l => horas(l.planejado) },
@@ -365,7 +366,7 @@ function Lista5W2H({ planos, aoAbrir }: { planos: DemandaProjeto[]; aoAbrir: (d:
   const w = (d: DemandaProjeto) => d.w5h2 ?? {};
   const nivel = new Map(riscos(planos).map(r => [r.d.id, r.nivel]));
   const cols: Coluna<Linha5W2H>[] = [
-    { chave: 'nome', titulo: 'O quê', render: l => <strong>{l.nome}</strong> },
+    { chave: 'nome', titulo: 'O quê', render: l => <Resumo tipo="demanda" id={l.id}><strong>{l.nome}</strong></Resumo> },
     { chave: 'why', titulo: 'Por quê', valor: l => w(l).why ?? '' },
     { chave: 'where', titulo: 'Onde', valor: l => w(l).where ?? '' },
     { chave: 'fim', titulo: 'Quando', valor: l => l.fim ?? w(l).when ?? null, render: l => data(l.fim ?? w(l).when) },

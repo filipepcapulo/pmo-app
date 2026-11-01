@@ -4,6 +4,7 @@ import { rpc, type ResultadoBusca } from '../api/cliente';
 import { useSessao } from '../estado/sessao';
 import { caminhoEntidade, type Entidade } from '../estado/rotas';
 import { Popup } from './Popup';
+import { Resumo } from './Resumo';
 
 interface Item { entidade: Entidade; id: string; nome: string; sub?: string }
 
@@ -58,7 +59,7 @@ export function BuscaGlobal({ aberto, aoFechar, aoAbrir }: {
           {itens.map((i, n) => (
             <li key={i.entidade + i.id} role="option" aria-selected={n === marcado}>
               <button type="button" onClick={() => abrir(i)} onMouseEnter={() => setMarcado(n)}>
-                <strong>{i.nome}</strong><small>{i.sub}</small>
+                <strong>{i.entidade === 'cliente' || i.entidade === 'projeto' || i.entidade === 'demanda' ? <Resumo tipo={i.entidade} id={i.id}>{i.nome}</Resumo> : i.nome}</strong><small>{i.sub}</small>
               </button>
             </li>
           ))}

@@ -14,6 +14,7 @@ import { usePode } from '../estado/equipe';
 import { TAMANHOS } from '../estado/paginacao';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
+import { Resumo } from '../componentes/Resumo';
 
 type Aba = 'busca' | 'backlog' | 'indicadores';
 
@@ -37,7 +38,7 @@ function Lista({ itens, alocar }: { itens: ChamadoLinha[]; alocar?: (c: ChamadoL
             return (
               <tr key={c.id}>
                 <td><a href={hashDe(caminhoEntidade('chamado', c.id))}>#{c.numero}</a></td>
-                <td>{c.cliente}</td>
+                <td><Resumo tipo="cliente" id={c.cliente_id}>{c.cliente}</Resumo></td>
                 <td><a href={hashDe(caminhoEntidade('chamado', c.id))}>{c.titulo}</a><br /><small className="ajuda">{[c.tipo, rotuloFila(c.fila)].filter(Boolean).join(' · ')}</small></td>
                 <td><PilulaPrioridade p={c.prioridade} /></td>
                 <td><PilulaSituacao s={c.situacao} /></td>

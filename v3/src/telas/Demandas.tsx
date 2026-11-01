@@ -9,6 +9,7 @@ import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
+import { Resumo } from '../componentes/Resumo';
 
 const ABERTAS = ['backlog', 'planejada', 'em_andamento', 'pausada'];
 
@@ -54,7 +55,7 @@ export function Demandas() {
       {c.dados && c.dados.total > c.dados.itens.length && <p className="ajuda">Mostrando {c.dados.itens.length} de {c.dados.total}; refine o filtro.</p>}
       {grupos.map(g => (
         <section key={g.projeto_id} className="cartao">
-          <h2 className="secao"><a href={hashDe(caminhoEntidade('projeto', g.projeto_id))}>{g.cliente} · {g.projeto}</a></h2>
+          <h2 className="secao"><Resumo tipo="projeto" id={g.projeto_id}><a href={hashDe(caminhoEntidade('projeto', g.projeto_id))}>{g.cliente} · {g.projeto}</a></Resumo></h2>
           <ArvoreDemandas demandas={g.itens} />
         </section>
       ))}

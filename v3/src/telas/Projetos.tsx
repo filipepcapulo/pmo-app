@@ -12,6 +12,7 @@ import { useCarga } from '../estado/carga';
 import { gps, useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
+import { Resumo } from '../componentes/Resumo';
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 type L = ProjetoLinha & Record<string, unknown>;
@@ -27,8 +28,8 @@ export function Projetos({ ir }: { ir: (caminho: string, titulo?: string) => voi
     (situacao === '' || (situacao === 'abertos' ? ['ativo', 'pausado'].includes(l.situacao) : l.situacao === situacao))
     && (!texto || semAcento(`${l.cliente} ${l.nome} ${l.fase}`).includes(semAcento(texto)))), [c.dados, texto, situacao]);
   const cols: Coluna<L>[] = [
-    { chave: 'cliente', titulo: 'Cliente' },
-    { chave: 'nome', titulo: 'Projeto' },
+    { chave: 'cliente', titulo: 'Cliente', render: l => <Resumo tipo="cliente" id={l.cliente_id}>{l.cliente}</Resumo> },
+    { chave: 'nome', titulo: 'Projeto', render: l => <Resumo tipo="projeto" id={l.id}>{l.nome}</Resumo> },
     { chave: 'fase', titulo: 'Fase', render: l => <span className="pilula">{l.fase}</span> },
     { chave: 'situacao', titulo: 'Situação', texto: l => rotuloSituacao(l.situacao), render: l => rotuloSituacao(l.situacao) },
     { chave: 'gp', titulo: 'GP', render: l => <NomePessoa pessoa={l.gp} /> },

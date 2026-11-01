@@ -15,6 +15,7 @@ import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { useEquipe, usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
+import { Resumo } from '../componentes/Resumo';
 
 const data = (d: string | null) => (d ? dataCurta(d) : '—');
 const ROTULOS: Record<SituacaoFila, string> = { agora: 'Agora', proxima: 'Próximas', bloqueada: 'Bloqueadas' };
@@ -70,7 +71,7 @@ function ItemDaFila({ item, dados, indice, total, aoMover, aoTirar, aoMudou }: {
     <li className={`fila-item fila-${situacao}`} data-fila={item.id}>
       <span className="fila-pos">{indice + 1}</span>
       <div className="fila-corpo">
-        <a href={`#/demanda/${item.id}`}>{item.nome}</a>
+        <Resumo tipo="demanda" id={item.id}><a href={`#/demanda/${item.id}`}>{item.nome}</a></Resumo>
         <small>{item.cliente} · {item.projeto}{item.pai ? ` · ${item.pai}` : ''}</small>
         <small>{rotuloStatusDemanda(item.status)} · {data(item.inicio)} – {data(item.fim)}{item.horas ? ` · ${item.horas} h` : ''}</small>
         {item.bloqueio && <small className="fila-motivo">Bloqueada: {item.bloqueio.motivo}</small>}

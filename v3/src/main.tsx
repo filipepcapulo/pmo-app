@@ -8,6 +8,7 @@ import { ProvedorToasts } from './componentes/Toasts';
 import { ProvedorEdicao } from './estado/edicao';
 import { ProvedorEquipe } from './estado/equipe';
 import { ProvedorFavoritos } from './estado/favoritos';
+import { ProvedorResumos } from './estado/resumosCtx';
 import { ProvedorSessao, useSessao } from './estado/sessao';
 import { aplicarTema, lerTema } from './estado/tema';
 import './estilos/base.css';
@@ -23,7 +24,7 @@ function App() {
   if (!configurado) return <div className="vazio-tela"><h2>Configuração ausente</h2><p>Faltam VITE_SUPABASE_URL e VITE_SUPABASE_KEY no build.</p></div>;
   if (carregando) return <div className="carregando" aria-busy="true"><span className="giro" /> Carregando…</div>;
   if (!sessao || !eu) return <Login erroSessao={erro} />;
-  return <ProvedorFavoritos><ProvedorEquipe><ProvedorEdicao><Casca key={eu.escritorio_id ?? 'sem'} /></ProvedorEdicao></ProvedorEquipe></ProvedorFavoritos>;
+  return <ProvedorFavoritos><ProvedorEquipe><ProvedorEdicao><ProvedorResumos><Casca key={eu.escritorio_id ?? 'sem'} /></ProvedorResumos></ProvedorEdicao></ProvedorEquipe></ProvedorFavoritos>;
 }
 
 createRoot(document.getElementById('raiz')!).render(

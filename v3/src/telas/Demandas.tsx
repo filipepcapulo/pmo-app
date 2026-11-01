@@ -1,6 +1,7 @@
 // Módulo Demandas (#/demandas): todas as demandas/subdemandas visíveis, agrupadas por cliente · projeto, com a barra
 // de horas e as mesmas ações (popup único) de qualquer tela. Filtros por status e texto.
 import { useMemo, useState } from 'react';
+import { consultor } from '../api/consultor';
 import { exec, STATUS_DEMANDA, type DemandaLinha } from '../api/execucao';
 import { ArvoreDemandas } from '../componentes/ArvoreDemandas';
 import { Botao } from '../componentes/Botao';
@@ -13,7 +14,7 @@ import { Resumo } from '../componentes/Resumo';
 
 const ABERTAS = ['backlog', 'planejada', 'em_andamento', 'pausada'];
 
-export function Demandas() {
+export function Demandas({ minhas }: { minhas?: boolean }) {
   const esc = useSessao().eu!.escritorio_id!;
   const pode = usePode();
   const ed = useEdicao();
@@ -21,7 +22,8 @@ export function Demandas() {
   const [texto, setTexto] = useState('');
   const [busca, setBusca] = useState('');
   const filtro = status === 'abertas' ? ABERTAS : status === 'todas' ? null : [status];
-  const c = useCarga(() => exec.demandas(esc, { status: filtro, texto: busca || null, limite: 500 }), [esc, status, busca, ed.geracao]);
+  const c = useCarga(() => (minhas ? consultor.demandas(esc, filtro, busca || null) : exec.demandas(esc, { status: filtro, texto: busca || null, limite: 500 })),
+    [esc, minhas, status, busca, ed.geracao]);
   const grupos = useMemo(() => {
     const m = new Map<string, { cliente: string; projeto: string; projeto_id: string; itens: DemandaLinha[] }>();
     for (const d of c.dados?.itens ?? []) {
@@ -32,14 +34,14 @@ export function Demandas() {
     return [...m.values()];
   }, [c.dados]);
   return (
-    <div className="pagina">
-      <header className="pagina-topo">
+    <div className={minhas ? undefined : 'pagina'}>
+      {!minhas && <header className="pagina-topo">
         <div><h1>Demandas</h1><p className="ajuda">{c.dados ? `${c.dados.total} demanda(s)/subdemanda(s)` : ''}</p></div>
         <div className="linha">
           {pode('tarefa.criar') && <Botao onClick={() => ed.tarefa({})}>+ Tarefa</Botao>}
           {pode('demanda.criar') && <Botao variante="primario" onClick={() => ed.demanda({})}>+ Demanda</Botao>}
         </div>
-      </header>
+      </header>}
       <form className="barra-filtros" onSubmit={e => { e.preventDefault(); setBusca(texto.trim()); }}>
         <select value={status} onChange={e => setStatus(e.target.value)} aria-label="Status">
           <option value="abertas">Abertas</option><option value="todas">Todas</option>

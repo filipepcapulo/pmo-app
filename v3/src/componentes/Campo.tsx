@@ -5,7 +5,7 @@ type Opcao = { valor: string; rotulo: string };
 
 export function Campo({ rotulo, valor, aoMudar, tipo = 'text', opcoes, erro, ajuda, obrigatorio, somenteLeitura, ...resto }: {
   rotulo: string; valor: string; aoMudar: (v: string) => void;
-  tipo?: 'text' | 'email' | 'number' | 'date' | 'textarea' | 'select' | 'password';
+  tipo?: 'text' | 'email' | 'number' | 'date' | 'time' | 'textarea' | 'select' | 'password';
   opcoes?: Opcao[]; erro?: string | null; ajuda?: string; obrigatorio?: boolean; somenteLeitura?: boolean;
   placeholder?: string; autoComplete?: string; inputMode?: 'numeric' | 'email' | 'text'; maxLength?: number; name?: string;
 }) {

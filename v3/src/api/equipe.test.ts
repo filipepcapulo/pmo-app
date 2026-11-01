@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreBacklog, ausenciaEm, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, paraGravar, rotuloAgenda, segundaDe, situacaoFila, statusBacklog, sugerirReprogramacao, turnoDe, wip,
+import { arvoreBacklog, ausenciaEm, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, paraGravar, rotuloAgenda, segundaDe, situacaoFila, statusBacklog, sugerirReprogramacao, turnoDe, wip,
   type Ausencia, type DepFila, type ItemBacklog, type ItemFila, type TarefaGrade } from './equipe';
 
 const item = (o: Partial<ItemFila>): ItemFila => ({ fila_id: 'f', id: 'a', nome: 'A', pai: null, status: 'planejada', inicio: null, fim: null, horas: 8,
@@ -114,6 +114,15 @@ describe('backlog de chamados', () => {
 });
 
 describe('agenda como no 2.x', () => {
+  it('agendas do dia na ordem das horas: manhã, tarde, noite; sem horário no fim', () => {
+    const t = (id: string, periodo: string, hora_ini: string | null = null, hora_fim: string | null = null) => ({ id, periodo, hora_ini, hora_fim });
+    const l = [t('noite', 'noite'), t('sem', 'nada'), t('tarde', 'tarde'), t('dia', 'dia'), t('livre', 'livre', '09:00:00', '10:00:00'), t('manha', 'manha')];
+    expect(ordenarDia(l).map(x => x.id)).toEqual(['manha', 'dia', 'livre', 'tarde', 'noite', 'sem']);
+  });
+  it('árvore do backlog ganha o nível de projeto', () => {
+    const c = arvoreBacklog([back({ id: 'a', projeto_id: 'p1', projeto: 'P1' }), back({ id: 'b', projeto_id: 'p2', projeto: 'P2' }), back({ id: 'c', projeto_id: 'p1', projeto: 'P1' })])[0];
+    expect(porProjeto(c.demandas).map(p => [p.nome, p.demandas.map(d => d.id)])).toEqual([['P1', ['a', 'c']], ['P2', ['b']]]);
+  });
   it('turno pela janela: manhã, tarde, dia inteiro e noite (horário livre incluído)', () => {
     const t = (periodo: string, hora_ini: string | null = null, hora_fim: string | null = null) => ({ periodo, hora_ini, hora_fim });
     expect(turnoDe(t('manha'))).toBe('manha');

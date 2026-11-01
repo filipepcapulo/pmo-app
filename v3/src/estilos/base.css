@@ -581,6 +581,12 @@ body.redimensionando, body.redimensionando * { cursor: col-resize !important; us
 .selo { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--superficie-2); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .bl-selo { background: var(--laranja); color: #fff; font-size: 11px; }
 .bl-demanda { padding-left: 8px; }
+.bl-linha { display: flex; align-items: flex-start; gap: 4px; min-width: 0; }
+.bl-linha > :first-child { flex: 1 1 auto; min-width: 0; }
+.bl-projeto { padding-left: 6px; }
+.bl-projeto-nome { padding: 4px 6px; font-size: 12px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; overflow-wrap: anywhere; }
+.bl-editar { flex: none; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--texto-2); display: inline-flex; align-items: center; justify-content: center; }
+@media (hover: hover) { .bl-editar:hover { background: var(--superficie-2); color: var(--verde); } }
 .bl-mae { margin: 6px 0 2px; font-size: 13px; font-weight: 600; color: var(--texto-2); }
 .bl-item { padding: 6px; border-radius: 8px; display: flex; flex-direction: column; gap: 2px; cursor: grab; font-size: 13px; }
 .bl-item.sub { margin-left: 10px; }

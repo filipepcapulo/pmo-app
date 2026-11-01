@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 
 const P: Record<string, ReactNode> = {
+  lapis: <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   casa: <><path d="M4 11l8-7 8 7" /><path d="M6 10v10h12V10" /><path d="M10 20v-6h4v6" /></>,
   predio: <><rect x="4" y="3" width="11" height="18" rx="1.5" /><path d="M15 9h4a1 1 0 0 1 1 1v11H15" /><path d="M8 7h3M8 11h3M8 15h3" /></>,

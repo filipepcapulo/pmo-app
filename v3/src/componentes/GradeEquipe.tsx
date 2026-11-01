@@ -3,7 +3,7 @@
 // "Selecionar" + tocar na tarefa/backlog e "Mover para…"/tocar na célula. Como no 2.x: soma do dia, cor por turno e consultor
 // recolhido mostra só a ocupação em horas.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { equipe, ausenciaEm, diasEntre, faixaTarefa, fimDeSemana, horasTexto, itensMover, janelaInicial, nivelCarga, rotuloAgenda, rotuloAusencia, TURNOS, turnoDe, type Ausencia, type TarefaGrade } from '../api/equipe';
+import { equipe, ausenciaEm, diasEntre, faixaTarefa, fimDeSemana, horasTexto, itensMover, janelaInicial, nivelCarga, ordenarDia, rotuloAgenda, rotuloAusencia, TURNOS, turnoDe, type Ausencia, type TarefaGrade } from '../api/equipe';
 import { hojeIso, somarDias } from '../api/projeto';
 import { rotuloPeriodo } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
@@ -186,6 +186,7 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
   const porCelula = useMemo(() => {
     const m = new Map<string, TarefaGrade[]>();
     for (const t of tarefas) { const k = t.consultor_id + t.data; m.set(k, [...(m.get(k) ?? []), t]); }
+    for (const [k, l] of m) m.set(k, ordenarDia(l));
     return m;
   }, [tarefas]);
   const somaDia = useMemo(() => {

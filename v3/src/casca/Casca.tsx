@@ -25,6 +25,9 @@ import { Desvios } from '../telas/Desvios';
 import { EnvioAgendas } from '../telas/EnvioAgendas';
 import { EmConstrucao, NaoEncontrada } from '../telas/EmConstrucao';
 import { Produtividade } from '../telas/Produtividade';
+import { Ferias } from '../telas/Ferias';
+import { Ociosidade } from '../telas/Ociosidade';
+import { Portfolio } from '../telas/Portfolio';
 import { Equipe } from '../telas/Equipe';
 import { EquipeDev } from '../telas/EquipeDev';
 import { Inicio } from '../telas/Inicio';
@@ -152,6 +155,9 @@ export function Casca() {
     if (r.modulo.id === 'desvios') return <Desvios />;
     if (r.modulo.id === 'envio-agendas') return <EnvioAgendas />;
     if (r.modulo.id === 'produtividade') return <Produtividade />;
+    if (r.modulo.id === 'ociosidade') return <Ociosidade />;
+    if (r.modulo.id === 'portfolio') return <Portfolio />;
+    if (r.modulo.id === 'ferias') return <Ferias />;
     return <EmConstrucao titulo={r.modulo.titulo} etapa={r.modulo.etapa} />;
   };
 
@@ -220,7 +226,7 @@ export function Casca() {
           })}
         </div>
         <footer className="menu-rodape menu-texto">
-          <a href="../">App atual (2.x)</a>
+          <a href="../?ficar=2x">App atual (2.x)</a>
           <small>v{VERSAO}</small>
         </footer>
       </nav>

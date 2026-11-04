@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreBacklog, ausenciaEm, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, paraGravar, rotuloAgenda, segundaDe, situacaoFila, statusBacklog, sugerirReprogramacao, turnoDe, wip,
+import { arvoreBacklog, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, paraGravar, rotuloAgenda, segundaDe, situacaoFila, statusBacklog, sugerirReprogramacao, turnoDe, wip,
   type Ausencia, type DepFila, type ItemBacklog, type ItemFila, type TarefaGrade } from './equipe';
 
 const item = (o: Partial<ItemFila>): ItemFila => ({ fila_id: 'f', id: 'a', nome: 'A', pai: null, status: 'planejada', inicio: null, fim: null, horas: 8,
@@ -27,6 +27,19 @@ describe('semanas', () => {
     expect(ausenciaEm(a, 'u1', '2026-11-03')?.tipo).toBe('ferias');
     expect(ausenciaEm(a, 'u1', '2026-11-04')).toBeNull();
     expect(ausenciaEm(a, 'u2', '2026-11-03')).toBeNull();
+  });
+  it('ausência de algumas horas desconta só as horas; dia inteiro tira o dia', () => {
+    const tarde: Ausencia = { id: '2', versao: 1, consultor_id: 'u1', de: '2026-11-05', ate: '2026-11-05', tipo: 'ausencia', hora_ini: '14:00', hora_fim: '18:00', horas: 4 };
+    const manha: Ausencia = { ...tarde, id: '3', hora_ini: '09:00', hora_fim: '11:00', horas: 2 };
+    const ferias: Ausencia = { id: '4', versao: 1, consultor_id: 'u1', de: '2026-11-05', ate: '2026-11-05', tipo: 'ferias' };
+    expect(diaInteiro(tarde)).toBe(false);
+    expect(horasAusentes([tarde])).toBe(4);
+    expect(horasAusentes([tarde, manha])).toBe(6);
+    expect(horasAusentes([tarde, ferias])).toBe(8);
+    expect(ausenciasNoDia([tarde, ferias], 'u1', '2026-11-05')[0].id).toBe('4');
+    expect(rotuloAusenciaDia(tarde)).toBe('Ausência 14h-18h');
+    expect(rotuloAusenciaDia({ ...manha, hora_ini: '09:30' })).toBe('Ausência 09:30-11h');
+    expect(rotuloAusenciaDia(ferias)).toBe('Férias');
   });
 });
 

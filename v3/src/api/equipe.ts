@@ -15,7 +15,11 @@ export const TIPOS_AUSENCIA: { valor: TipoAusencia; rotulo: string }[] = [
   { valor: 'ferias', rotulo: 'Férias' }, { valor: 'folga', rotulo: 'Folga' }, { valor: 'licenca', rotulo: 'Licença' }, { valor: 'ausencia', rotulo: 'Ausência' },
 ];
 export const rotuloAusencia = (t: string) => TIPOS_AUSENCIA.find(x => x.valor === t)?.rotulo ?? t;
-export interface Ausencia { id: string | null; versao: number | null; consultor_id: string; de: string; ate: string; tipo: TipoAusencia; origem?: 'app' | 'clickup'; motivo?: string | null }
+export interface Ausencia {
+  id: string | null; versao: number | null; consultor_id: string; de: string; ate: string; tipo: TipoAusencia; origem?: 'app' | 'clickup'; motivo?: string | null;
+  /** Só parte do dia (0039): início, fim e as horas pela conta da agenda (2 h de almoço). Vazios = dia inteiro. */
+  hora_ini?: string | null; hora_fim?: string | null; horas?: number | null;
+}
 export interface Grade { tarefas: TarefaGrade[]; ausencias: Ausencia[] }
 export type OrigemBacklog = 'demanda' | 'backlog_base' | 'personalizacao';
 export const ORIGENS: { valor: OrigemBacklog; rotulo: string }[] = [
@@ -68,6 +72,16 @@ export function diasEntre(de: string, ate: string) {
 export const janelaInicial = (hoje = hojeIso()) => ({ de: somarDias(segundaDe(hoje), -7), ate: somarDias(segundaDe(hoje), 20) });
 export const ausenciaEm = (lista: Ausencia[], consultor: string, data: string) =>
   lista.find(a => a.consultor_id === consultor && a.de <= data && a.ate >= data) ?? null;
+/** Ausências da pessoa no dia: a de dia inteiro primeiro (bloqueia a célula); as de algumas horas só tiram horas. */
+export const ausenciasNoDia = (lista: Ausencia[], consultor: string, data: string) =>
+  lista.filter(a => a.consultor_id === consultor && a.de <= data && a.ate >= data).sort((a, b) => Number(!!a.hora_ini) - Number(!!b.hora_ini));
+export const diaInteiro = (a: Ausencia) => !a.hora_ini;
+/** Horas de ausência no dia (capacidade de 8 h): dia inteiro = 8; parciais somam as horas de cada uma, no máximo 8. */
+export const horasAusentes = (l: Ausencia[]) => (l.some(diaInteiro) ? CAPACIDADE_DIA : Math.min(CAPACIDADE_DIA, l.reduce((s, a) => s + Number(a.horas ?? 0), 0)));
+export const CAPACIDADE_DIA = 8;
+/** "Ausência" ou "Ausência 14h-18h". */
+export const rotuloAusenciaDia = (a: Ausencia) =>
+  rotuloAusencia(a.tipo) + (a.hora_ini && a.hora_fim ? ` ${a.hora_ini.slice(0, 5)}-${a.hora_fim.slice(0, 5)}`.replace(/:00/g, 'h') : '');
 
 // ---------------------------------------------------------------- backlog: Cliente → Demanda → Subdemanda
 export interface NoDemanda { id: string; nome: string; projeto_id: string; projeto: string; item: ItemBacklog | null; subs: ItemBacklog[] }

@@ -3,7 +3,7 @@
 // "Selecionar" + tocar na tarefa/backlog e "Mover para…"/tocar na célula. Como no 2.x: soma do dia, cor por turno e consultor
 // recolhido mostra só a ocupação em horas.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { equipe, ausenciaEm, diasEntre, faixaTarefa, fimDeSemana, horasTexto, itensMover, janelaInicial, nivelCarga, ordenarDia, rotuloAgenda, rotuloAusencia, TURNOS, turnoDe, type Ausencia, type TarefaGrade } from '../api/equipe';
+import { equipe, ausenciasNoDia, CAPACIDADE_DIA, diaInteiro, diasEntre, horasAusentes, rotuloAusenciaDia, faixaTarefa, fimDeSemana, horasTexto, itensMover, janelaInicial, nivelCarga, ordenarDia, rotuloAgenda, rotuloAusencia, TURNOS, turnoDe, type Ausencia, type TarefaGrade } from '../api/equipe';
 import { hojeIso, somarDias } from '../api/projeto';
 import { rotuloPeriodo } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
@@ -18,7 +18,6 @@ import { Resumo } from './Resumo';
 
 const COL = 150;       // largura do dia (igual à grade aberta do 2.x)
 const BORDA = 240;     // a esta distância da borda busca mais uma semana
-const CAPACIDADE = 8;  // horas/dia: acima disso a célula avisa
 const JANELA = 91;     // dias por chamada ao recarregar (a API aceita 93)
 const INI_DIA = 8, FIM_DIA = 18;  // mini-faixa de cada dia, como no 2.x
 const CHAVE_RECOLHIDOS = 'pmo3.grade.recolhidos';
@@ -158,7 +157,8 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
     const grupo = sel.has(base.id) ? tarefas.filter(t => sel.has(t.id)) : [base];
     const itens = itensMover(grupo, base, data, consultor);
     if (!itens.length) return;
-    const bloqueada = itens.map(i => ausenciaEm(ausencias, i.responsavel_id, i.data)).find(Boolean);
+    // ausência de algumas horas não bloqueia aqui: o banco recusa só se o horário da tarefa cruzar o dela
+    const bloqueada = itens.map(i => ausenciasNoDia(ausencias, i.responsavel_id, i.data).find(diaInteiro)).find(Boolean);
     if (bloqueada) { avisar(`${rotuloAusencia(bloqueada.tipo)} nesse dia: tarefa não movida.`, 'erro'); return; }
     try {
       await equipe.mover(esc, itens);
@@ -253,19 +253,24 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
                 </th>
                 {dias.map(d => {
                   const lista = porCelula.get(p.id + d) ?? [];
-                  const aus = ausenciaEm(ausencias, p.id, d);
+                  const doDia = ausenciasNoDia(ausencias, p.id, d);
+                  const aus = doDia.find(diaInteiro) ?? null;
+                  // ausência de algumas horas: desconta só essas horas da capacidade do dia
+                  const fora = horasAusentes(doDia), capacidade = CAPACIDADE_DIA - fora;
                   const horas = lista.reduce((s, t) => s + Number(t.horas_previstas ?? 0), 0);
                   return (
                     <td key={d} data-consultor={p.id} data-dia={d}
-                      className={`cel${fimDeSemana(d) ? ' fds' : ''}${aus ? ' ausente' : ''}${horas > CAPACIDADE ? ' sobrecarga' : ''}`}
+                      className={`cel${fimDeSemana(d) ? ' fds' : ''}${aus ? ' ausente' : doDia.length ? ' ausente-parcial' : ''}${horas > capacidade ? ' sobrecarga' : ''}`}
                       onDragOver={aus ? undefined : e => { e.preventDefault(); e.currentTarget.classList.add('alvo'); }}
                       onDragLeave={e => e.currentTarget.classList.remove('alvo')}
                       onDrop={aus ? undefined : e => soltar(e, d, p.id)}>
-                      {aus && (
-                        <button type="button" className="eq-ausencia" disabled={aus.origem === 'clickup' || !pode('equipe.editar')}
-                          title={aus.motivo ?? undefined} onClick={() => aoEditarAusencia(aus)}>{rotuloAusencia(aus.tipo)}</button>
-                      )}
-                      {horas > 0 && <small className={`eq-carga ${nivelCarga(horas)}`}>{horasTexto(horas)}</small>}
+                      {(aus ? [aus] : doDia).map(a => (
+                        <button key={a.id ?? a.de} type="button" className={`eq-ausencia${diaInteiro(a) ? '' : ' parcial'}`} disabled={a.origem === 'clickup' || !pode('equipe.editar')}
+                          title={[a.motivo, diaInteiro(a) ? null : `${horasTexto(Number(a.horas ?? 0))} fora; capacidade do dia ${horasTexto(capacidade)}`].filter(Boolean).join(' · ') || undefined}
+                          onClick={() => aoEditarAusencia(a)}>{rotuloAusenciaDia(a)}</button>
+                      ))}
+                      {horas > 0 && <small className={`eq-carga ${nivelCarga(horas + fora)}`}
+                        title={fora && !aus ? `${horasTexto(horas)} de ${horasTexto(capacidade)} disponíveis` : undefined}>{horasTexto(horas)}</small>}
                       {recolhido && lista.length > 0 && <MiniFaixa itens={lista} />}
                       {!recolhido && lista.map(t => (
                         <button key={t.id} type="button" draggable={podeMover} data-tarefa={t.id}

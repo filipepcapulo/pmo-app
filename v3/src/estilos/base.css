@@ -637,6 +637,7 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .eq-tarefa.st-nao_executada { background: var(--superficie-2); color: var(--texto-2); text-decoration: line-through; }
 .eq-tarefa.marcada { box-shadow: inset 3px 0 0 var(--t, var(--verde)), 0 0 0 2px var(--azul); }
 .eq-ausencia { width: 100%; padding: 4px; border: 0; border-radius: 8px; background: var(--superficie); color: var(--vermelho); font: inherit; font-size: 12px; font-weight: 600; }
+.eq-ausencia.parcial { margin-bottom: 3px; padding: 2px 4px; background: color-mix(in srgb, var(--vermelho) 10%, var(--superficie)); font-size: 11px; }
 .eq-mais { position: absolute; right: 3px; bottom: 3px; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: var(--superficie-2); color: var(--verde); font-weight: 700; opacity: 0; }
 .eq-mais.visivel, .eq-mais:focus-visible, td.cel:hover .eq-mais { opacity: 1; }
 .eq-massa { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; margin-bottom: 8px; border-radius: var(--raio); background: var(--verde-claro); color: var(--verde-texto); }

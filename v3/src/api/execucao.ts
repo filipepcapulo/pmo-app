@@ -88,7 +88,19 @@ export interface DemandaLinha extends Demanda { projeto: string; fase: string; c
 const salvar = <R = Record<string, unknown>>(funcao: string, esc: string, dados: Record<string, unknown>) =>
   rpc<Gravado<R> & Record<string, unknown>>(funcao, { p_escritorio: esc, p_dados: dados, p_id_operacao: novaOperacao() });
 
+/** Escolha da demanda em cascata (como o "Escolha o cliente…" do 2.x): clientes → demandas e subdemandas abertas do cliente. */
+export interface OpcaoCliente { id: string; nome: string }
+export interface OpcaoDemandaCliente { id: string; nome: string; pai_id: string | null; status: string; projeto_id: string; projeto: string }
+/** Demandas (sem pai) do cliente e as subdemandas da escolhida; subdemanda órfã (sem a demanda na lista) vira demanda. */
+export function cascataDemandas(itens: OpcaoDemandaCliente[], demanda: string) {
+  const ids = new Set(itens.map(i => i.id));
+  const raiz = (i: OpcaoDemandaCliente) => !i.pai_id || !ids.has(i.pai_id);
+  return { demandas: itens.filter(raiz), subdemandas: demanda ? itens.filter(i => !raiz(i) && i.pai_id === demanda) : [] };
+}
+
 export const exec = {
+  clientesEscolha: (esc: string) => rpc<OpcaoCliente[]>('v1_demandas_escolha', { p_escritorio: esc, p_cliente: null }),
+  demandasEscolha: (esc: string, cliente: string) => rpc<OpcaoDemandaCliente[]>('v1_demandas_escolha', { p_escritorio: esc, p_cliente: cliente }),
   demandas: (esc: string, f: { projeto?: string | null; status?: string[] | null; texto?: string | null; limite?: number; pagina?: number } = {}) =>
     rpc<{ total: number; itens: DemandaLinha[] }>('v1_demandas', { p_escritorio: esc, p_projeto: f.projeto ?? null, p_status: f.status ?? null,
       p_texto: f.texto ?? null, p_limite: f.limite ?? 200, p_pagina: f.pagina ?? 0 }),

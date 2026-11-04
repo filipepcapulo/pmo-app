@@ -11,6 +11,7 @@ import { useSessao } from '../estado/sessao';
 import { Botao } from './Botao';
 import { Campo, Formulario } from './Campo';
 import { EscolhaChips } from './Chips';
+import { EscolhaDemanda } from './EscolhaDemanda';
 import { CaixaEscolhida, dataCurta, hojeLocal, opcoesDe, proximoDiaUtil } from './FormComum';
 import { Popup } from './Popup';
 import { useToast } from './Toasts';
@@ -29,7 +30,6 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
   const avisar = useToast();
   const { lista: equipe, porId } = useEquipe();
   const [orig, setOrig] = useState<Tarefa | null>(null);
-  const [demandas, setDemandas] = useState<{ id: string; nome: string; local: string }[]>([]);
   const [caixa, setCaixa] = useState<{ local: string; nome: string } | null>(null);
   const dataInicial = alvo.data ?? hojeLocal();
   const [f, setF] = useState({ demanda: alvo.demanda_id ?? '', nome: '', modalidade: '', status: 'planejada', detalhamento: '', etapa: '',
@@ -55,8 +55,6 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
       setCaixa({ local: local(r), nome: r.demanda.nome });
     }).catch(e => setErro((e as Error).message));
     else if (alvo.demanda_id) exec.demanda(esc, alvo.demanda_id).then(r => setCaixa({ local: local(r), nome: r.demanda.nome })).catch(() => setCaixa(null));
-    else exec.demandas(esc, { status: ['backlog', 'planejada', 'em_andamento', 'pausada'], limite: 500 })
-      .then(r => setDemandas(r.itens.map(d => ({ id: d.id, nome: d.nome, local: `${d.cliente} › ${d.projeto}` })))).catch(() => setDemandas([]));
   }, [alvo, esc]);
 
   const montadorPronto = !!mont.resp && !!mont.data && !horarioInvalido(mont);
@@ -78,7 +76,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
   const enviar = async (excluir = false) => {
     setErro(null);
     if (!excluir) {
-      if (!f.demanda || !f.nome.trim()) { setErro('Demanda e título são obrigatórios.'); return; }
+      if (!f.demanda || !f.nome.trim()) { setErro('Cliente, demanda e título são obrigatórios.'); return; }
       if (novo && !lista.length) { setErro('Monte ao menos uma combinação de consultor, data e período.'); return; }
       if (!novo && horarioInvalido(f)) { setErro('No horário livre, informe início e fim (hh:mm, fim depois do início).'); return; }
     }
@@ -116,8 +114,6 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
   const pessoas = equipe.filter(m => m.ativo || m.id === f.resp || m.id === mont.resp);
   const opPessoas = [{ valor: '', rotulo: '— escolha —' }, ...pessoas.map(m => ({ valor: m.id, rotulo: m.nome }))];
   const horasDe = (p: string) => (p !== 'livre' ? opcoes?.periodos?.[p] : null);
-  const escolhida = demandas.find(d => d.id === f.demanda);
-  const caixaDemanda = caixa ?? (escolhida ? { local: escolhida.local, nome: escolhida.nome } : null);
   const nNovas = lista.length;
   return (
     <Popup aberto titulo={novo ? 'Nova tarefa' : 'Tarefa'} aoFechar={aoFechar} largura={640}
@@ -129,14 +125,10 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
           {novo && nNovas > 1 ? `Criar ${nNovas} tarefas` : 'Gravar'}</Botao>}</>}>
       {!podeGravar && <p className="ajuda">Você não tem permissão para {novo ? 'criar' : 'editar'} tarefas.</p>}
       <Formulario aoEnviar={() => enviar()} className="form-2x">
-        {caixaDemanda ? (
+        {caixa ? (
           <div className="campo"><span className="rotulo">Demanda</span>
-            <CaixaEscolhida {...caixaDemanda} rotuloTrocar="Trocar demanda"
-              aoTrocar={novo && !alvo.demanda_id ? () => setF({ ...f, demanda: '' }) : undefined} /></div>
-        ) : (
-          <Campo rotulo="Demanda" tipo="select" valor={f.demanda} aoMudar={v => setF({ ...f, demanda: v })} obrigatorio
-            opcoes={[{ valor: '', rotulo: '— escolha —' }, ...demandas.map(d => ({ valor: d.id, rotulo: `${d.local} › ${d.nome}` }))]} />
-        )}
+            <CaixaEscolhida {...caixa} rotuloTrocar="Trocar demanda" /></div>
+        ) : !alvo.id && !alvo.demanda_id && <EscolhaDemanda aoMudar={v => setF(x => ({ ...x, demanda: v }))} />}
         <Campo rotulo="Título" valor={f.nome} aoMudar={v => setF({ ...f, nome: v })} obrigatorio maxLength={300} placeholder="O que será feito" />
 
         {novo ? (

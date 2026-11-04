@@ -54,16 +54,20 @@ function AlocarLote({ itens, alvo, aoFechar, aoGravar }: { itens: ItemBacklog[];
 function FormAusencia({ alvo, aoFechar, aoGravar }: { alvo: Partial<Ausencia>; aoFechar: () => void; aoGravar: () => void }) {
   const esc = useSessao().eu!.escritorio_id!;
   const { lista } = useEquipe();
-  const [f, setF] = useState({ consultor_id: alvo.consultor_id ?? '', de: alvo.de ?? '', ate: alvo.ate ?? '', tipo: alvo.tipo ?? 'ferias', motivo: alvo.motivo ?? '' });
+  const [f, setF] = useState({ consultor_id: alvo.consultor_id ?? '', de: alvo.de ?? '', ate: alvo.ate ?? '', tipo: alvo.tipo ?? 'ferias', motivo: alvo.motivo ?? '',
+    duracao: alvo.hora_ini ? 'horas' : 'dia', hora_ini: alvo.hora_ini?.slice(0, 5) ?? '', hora_fim: alvo.hora_fim?.slice(0, 5) ?? '' });
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
+  const soHoras = f.duracao === 'horas';
   const enviar = async (excluir = false) => {
     if (!excluir && (!f.consultor_id || !f.de || !f.ate || f.ate < f.de)) { setErro('Informe a pessoa e o período.'); return; }
+    if (!excluir && soHoras && (!f.hora_ini || !f.hora_fim || f.hora_fim <= f.hora_ini)) { setErro('Informe a hora de início e a de fim (fim depois do início).'); return; }
     setGravando(true); setErro(null);
     try {
       const base = alvo.id ? { id: alvo.id, versao: alvo.versao } : {};
-      await equipe.ausenciaSalvar(esc, excluir ? { ...base, excluir: true } : alvo.id
-        ? { ...base, de: f.de, ate: f.ate, tipo: f.tipo, motivo: f.motivo || null } : { ...f, motivo: f.motivo || null });
+      // horário em branco = dia inteiro; com horário, a grade desconta só essas horas da capacidade do dia
+      const dados = { de: f.de, ate: f.ate, tipo: f.tipo, motivo: f.motivo || null, hora_ini: soHoras ? f.hora_ini : '', hora_fim: soHoras ? f.hora_fim : '' };
+      await equipe.ausenciaSalvar(esc, excluir ? { ...base, excluir: true } : alvo.id ? { ...base, ...dados } : { consultor_id: f.consultor_id, ...dados });
       aoGravar();
     } catch (e) { setErro((e as Error).message); setGravando(false); }
   };
@@ -76,6 +80,15 @@ function FormAusencia({ alvo, aoFechar, aoGravar }: { alvo: Partial<Ausencia>; a
           opcoes={[{ valor: '', rotulo: 'Escolha…' }, ...lista.filter(m => m.ativo).map(m => ({ valor: m.id, rotulo: m.nome }))]} />
         <Campo rotulo="De" tipo="date" obrigatorio valor={f.de} aoMudar={v => setF({ ...f, de: v })} />
         <Campo rotulo="Até" tipo="date" obrigatorio valor={f.ate} aoMudar={v => setF({ ...f, ate: v })} />
+        <EscolhaChips rotulo="Duração" valor={f.duracao} aoMudar={v => setF({ ...f, duracao: v })}
+          opcoes={[{ valor: 'dia', rotulo: 'Dia inteiro' }, { valor: 'horas', rotulo: 'Só algumas horas' }]}
+          ajuda={soHoras ? 'Vale para cada dia do período; desconta só essas horas da capacidade (almoço 12h-14h não conta).' : undefined} />
+        {soHoras && (
+          <div className="grade-campos dupla">
+            <Campo rotulo="Hora de início" tipo="time" obrigatorio valor={f.hora_ini} aoMudar={v => setF({ ...f, hora_ini: v })} />
+            <Campo rotulo="Hora de fim" tipo="time" obrigatorio valor={f.hora_fim} aoMudar={v => setF({ ...f, hora_fim: v })} />
+          </div>
+        )}
         <EscolhaChips rotulo="Tipo" valor={f.tipo} aoMudar={v => setF({ ...f, tipo: v as Ausencia['tipo'] })} opcoes={TIPOS_AUSENCIA} />
         <Campo rotulo="Motivo" valor={f.motivo} aoMudar={v => setF({ ...f, motivo: v })} maxLength={500} />
         {erro && <p className="msg-erro">{erro}</p>}

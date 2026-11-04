@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreDemandas, caminhoAnexo, fatiasBarra, mencoesNoTexto } from './execucao';
+import { arvoreDemandas, caminhoAnexo, cascataDemandas, fatiasBarra, mencoesNoTexto } from './execucao';
 
 describe('barra de pílula de horas', () => {
   it('real e planejado sobre o previsto, em fatias separadas', () => {
@@ -38,5 +38,20 @@ describe('árvore de demandas', () => {
 describe('caminho do anexo', () => {
   it('começa pela pasta do escritório e limpa o nome', () => {
     expect(caminhoAnexo('esc1', 'demanda', 'Ata reunião (final).pdf', 'u1')).toBe('esc1/demanda/u1-Ata_reuniao_final_.pdf');
+  });
+});
+
+describe('escolha da demanda em cascata (cliente → demanda → subdemanda)', () => {
+  const l = [
+    { id: 'd1', nome: 'Almoxarifado', pai_id: null, status: 'em_andamento', projeto_id: 'p1', projeto: 'P1' },
+    { id: 's1', nome: 'Requisições', pai_id: 'd1', status: 'planejada', projeto_id: 'p1', projeto: 'P1' },
+    { id: 'd2', nome: 'Financeiro', pai_id: null, status: 'backlog', projeto_id: 'p1', projeto: 'P1' },
+    { id: 's9', nome: 'Órfã', pai_id: 'fechada', status: 'planejada', projeto_id: 'p1', projeto: 'P1' },
+  ];
+  it('lista só as demandas; as subdemandas aparecem depois de escolher a demanda', () => {
+    expect(cascataDemandas(l, '').demandas.map(d => d.id)).toEqual(['d1', 'd2', 's9']);
+    expect(cascataDemandas(l, '').subdemandas).toEqual([]);
+    expect(cascataDemandas(l, 'd1').subdemandas.map(d => d.id)).toEqual(['s1']);
+    expect(cascataDemandas(l, 'd2').subdemandas).toEqual([]);
   });
 });

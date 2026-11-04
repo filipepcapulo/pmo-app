@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreBacklog, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, paraGravar, rotuloAgenda, segundaDe, situacaoFila, statusBacklog, sugerirReprogramacao, turnoDe, wip,
+import { arvoreBacklog, blocosDia, faixaEscala, marcasEscala, PX_HORA, rotuloAgendas, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, paraGravar, rotuloAgenda, segundaDe, situacaoFila, statusBacklog, sugerirReprogramacao, turnoDe, wip,
   type Ausencia, type DepFila, type ItemBacklog, type ItemFila, type TarefaGrade } from './equipe';
 
 const item = (o: Partial<ItemFila>): ItemFila => ({ fila_id: 'f', id: 'a', nome: 'A', pai: null, status: 'planejada', inicio: null, fim: null, horas: 8,
@@ -159,5 +159,41 @@ describe('agenda como no 2.x', () => {
     const itens = [it0, { ...it0, id: 'b', status: 'backlog' }, { ...it0, id: 'c', status: 'backlog' }];
     expect(statusBacklog(itens).map(s => [s.valor, s.total])).toEqual([['backlog', 2], ['planejada', 1]]);
     expect(arvoreBacklog(itens, '', '', new Set(['backlog']))[0].total).toBe(1);
+  });
+});
+
+describe('escala de tempo da grade aberta', () => {
+  it('07h–19h por padrão; alarga em horas cheias só com agenda fora', () => {
+    expect(faixaEscala([[8, 12], [14, 18], null])).toEqual([7, 19]);
+    expect(faixaEscala([[6.5, 9], [18, 21.25]])).toEqual([6, 22]);
+  });
+  it('card de 4 h fica do tamanho do card antigo (~56 px) e as outras durações são proporcionais', () => {
+    expect(4 * PX_HORA).toBe(56);
+    const [manha, livre] = blocosDia([tar({ id: 'm' }), tar({ id: 'l', periodo: 'livre', hora_ini: '14:00', hora_fim: '15:30' })], [7, 19]);
+    expect([manha.ini, manha.fim, livre.ini, livre.fim]).toEqual([8, 12, 14, 15.5]);
+  });
+  it('sobrepostas dividem a largura; sem sobreposição volta a uma coluna', () => {
+    const b = blocosDia([tar({ id: 'a', periodo: 'dia' }), tar({ id: 'b', periodo: 'livre', hora_ini: '09:00', hora_fim: '10:00' }),
+      tar({ id: 'c', periodo: 'livre', hora_ini: '18:00', hora_fim: '19:00' })], [7, 19]);
+    const por = Object.fromEntries(b.map(x => [x.item.id, x]));
+    expect([por.a.coluna, por.a.colunas, por.b.coluna, por.b.colunas]).toEqual([0, 2, 1, 2]);
+    expect([por.c.coluna, por.c.colunas]).toEqual([0, 1]);
+  });
+  it('sem horário vai no topo com 1 h; marcas da régua nas horas pares', () => {
+    const [x] = blocosDia([tar({ periodo: 'xyz' })], [7, 19]);
+    expect([x.semHora, x.ini, x.fim]).toEqual([true, 7, 8]);
+    expect(marcasEscala([7, 19])).toEqual([8, 10, 12, 14, 16, 18]);
+  });
+});
+
+describe('backlog com agendas em aberto', () => {
+  it('a mãe fora do backlog herda as agendas trazidas pela subdemanda; rótulo com a próxima data', () => {
+    const a = arvoreBacklog([back({ id: 's', pai_id: 'm', pai: 'Mãe', agendas: 0, agendas_pai: 2 }), back({ id: 'd', agendas: 1, agenda_prox: '2026-11-05' })]);
+    const ds = a[0].demandas;
+    expect(ds.find(d => d.id === 'm')!.agendas).toBe(2);
+    expect(ds.find(d => d.id === 'd')!.agendas).toBe(1);
+    expect(rotuloAgendas(1, '2026-11-05')).toBe('1 agenda em aberto · próx. 05/11');
+    expect(rotuloAgendas(3)).toBe('3 agendas em aberto');
+    expect(rotuloAgendas(0)).toBe('');
   });
 });

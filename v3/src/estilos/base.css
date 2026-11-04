@@ -593,6 +593,13 @@ body.redimensionando, body.redimensionando * { cursor: col-resize !important; us
 .bl-item.pedido { box-shadow: inset 3px 0 0 var(--laranja); background: var(--superficie-2); }
 .bl-item small { color: var(--texto-2); padding-left: 22px; }
 .bl-item .bl-pedido { color: var(--laranja); font-weight: 600; }
+.bl-item.com-agenda { box-shadow: inset 3px 0 0 var(--verde); }
+.bl-item.pedido.com-agenda { box-shadow: inset 3px 0 0 var(--laranja), inset 6px 0 0 var(--verde); }
+.bl-agendas { display: block; color: var(--verde-texto, var(--verde)) !important; font-weight: 600; }
+.bl-agendas::before { content: '●'; margin-right: 4px; font-size: 9px; vertical-align: 1px; }
+.bl-linha.com-agenda .bl-mae .bl-agendas { padding: 0; font-size: 11px; }
+.bl-so-sem { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--texto-2); }
+.bl-so-sem input { min-height: 0; accent-color: var(--verde); }
 .bl-marca { display: flex; gap: 6px; align-items: flex-start; }
 .bl-marca input { min-height: 0; accent-color: var(--verde); margin-top: 2px; }
 @media (hover: hover) { .bl-item:hover, .bl-titulo:hover { background: var(--superficie-2); } }
@@ -606,7 +613,32 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .eq-nome > :first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; }
 .eq-chev { flex: none; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--texto-2); display: inline-flex; align-items: center; justify-content: center; transition: transform .15s; }
 .eq-chev.aberto { transform: rotate(180deg); }
-.eq-grade tr.recolhida td.cel { height: 44px; text-align: center; }
+.eq-grade tr.recolhida td.cel { height: 46px; padding: 3px; vertical-align: middle; text-align: center; }
+/* recolhido: a carga preenche a célula, como na grade do 2.x */
+.eq-cheia { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 4px; width: 100%; height: 40px; padding: 4px 6px; border: 0; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700; }
+.eq-cheia .eq-faixa { margin: 0; background: color-mix(in srgb, var(--superficie) 70%, transparent); }
+.eq-cheia.livre { background: #e9e9e9; color: #8a8a8a; } .eq-cheia.parcial { background: #eee2b8; color: #8a6d1f; } .eq-cheia.cheio { background: #c6ecd2; color: #1f7a45; }
+.eq-cheia.acima { background: #f7d3a8; color: #c1650a; } .eq-cheia.excesso { background: #f5b6b1; color: #c62f28; }
+/* aberto: cada dia é uma escala de tempo (07h–19h ou mais, se houver agenda fora); linhas de hora sutis e o almoço sombreado.
+   14px = PX_HORA (api/equipe.ts) */
+.eq-grade tr.aberta td.cel { padding: 4px 3px; }
+.eq-grade tr.aberta th.col-nome { vertical-align: top; }
+.eq-dia-topo { display: flex; align-items: flex-start; gap: 4px; min-width: 0; overflow: hidden; }
+.eq-dia-topo .eq-ausencia { width: auto; padding: 1px 6px; font-size: 11px; }
+.eq-escala { position: relative; box-sizing: content-box; border-top: 1px solid var(--linha);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 13px, color-mix(in srgb, var(--linha) 60%, transparent) 13px 14px); }
+.eq-almoco { position: absolute; left: 0; right: 0; background: color-mix(in srgb, var(--texto-2) 7%, transparent); pointer-events: none; }
+.eq-regua { position: absolute; right: 6px; width: 30px; pointer-events: none; }
+.eq-regua span { position: absolute; right: 0; transform: translateY(-50%); font-size: 10px; font-weight: 600; color: var(--texto-2); }
+.eq-tarefa.na-escala { position: absolute; margin: 0; padding: 2px 5px 2px 8px; gap: 0; z-index: 1; }
+.eq-tarefa.na-escala.curta .eq-tarefa-pe { display: none; }
+.eq-tarefa.na-escala.mini { padding-top: 0; padding-bottom: 0; justify-content: center; }
+/* o Resumo embrulha o conteúdo num span: esconde só o título e o rodapé do card */
+.eq-tarefa.na-escala.mini b ~ span, .eq-tarefa.na-escala.mini .eq-tarefa-pe { display: none; }
+.eq-tarefa.na-escala.mini b { font-size: 10px; line-height: 11px; }
+.eq-tarefa.na-escala.sem-hora { border: 1px dashed var(--t, var(--verde)); }
+.eq-ausencia.parcial.na-escala { position: absolute; left: 0; right: 0; width: auto; margin: 0; z-index: 0; overflow: hidden;
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--vermelho) 12%, var(--superficie)) 0 6px, var(--superficie) 6px 12px); }
 .eq-faixa { position: relative; display: block; height: 5px; margin-top: 4px; border-radius: 3px; background: var(--superficie-2); overflow: hidden; }
 .eq-faixa i { position: absolute; top: 0; bottom: 0; background: var(--t, var(--texto-2)); }
 .eq-faixa .almoco { left: 40%; width: 20%; background: repeating-linear-gradient(90deg, var(--linha) 0 2px, transparent 2px 4px); }
@@ -640,6 +672,7 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .eq-ausencia.parcial { margin-bottom: 3px; padding: 2px 4px; background: color-mix(in srgb, var(--vermelho) 10%, var(--superficie)); font-size: 11px; }
 .eq-mais { position: absolute; right: 3px; bottom: 3px; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: var(--superficie-2); color: var(--verde); font-weight: 700; opacity: 0; }
 .eq-mais.visivel, .eq-mais:focus-visible, td.cel:hover .eq-mais { opacity: 1; }
+.eq-grade tr.aberta .eq-mais { top: 3px; bottom: auto; width: 20px; height: 20px; z-index: 2; line-height: 1; }
 .eq-massa { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; margin-bottom: 8px; border-radius: var(--raio); background: var(--verde-claro); color: var(--verde-texto); }
 .lista-simples { margin: 0; padding-left: 18px; font-size: 14px; }
 .cartoes-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-items: start; }

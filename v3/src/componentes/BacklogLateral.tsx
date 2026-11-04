@@ -1,9 +1,10 @@
 // Backlog lateral da grade (escopo §4): recolhido por Cliente → Demanda → Subdemanda. Arrastar para a grade (ou marcar e
 // tocar numa célula) abre a alocação; pedidos de "mais agenda" ficam destacados. Recolhe numa barra fina e filtra por status
 // (a escolha fica guardada no aparelho). Todo nível tem o lápis: cliente e projeto levam à tela própria; demanda e subdemanda
-// abrem o popup único de edição.
+// abrem o popup único de edição. O que já tem agenda em aberto fica marcado em verde ("2 agendas em aberto · próx. 05/11") e
+// pode ser escondido, para sobrar só o que ainda precisa de alocação.
 import { useEffect, useMemo, useState } from 'react';
-import { arvoreBacklog, ORIGENS, porProjeto, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
+import { arvoreBacklog, ORIGENS, porProjeto, rotuloAgendas, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
 import { rotuloPrioridade } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
@@ -26,7 +27,7 @@ function Linha({ item, marcado, sub, aoMarcar, aoArrastar }: {
   item: ItemBacklog; marcado: boolean; sub?: boolean; aoMarcar: (id: string) => void; aoArrastar: (id: string) => void;
 }) {
   return (
-    <div className={`bl-item${sub ? ' sub' : ''}${item.pedidos.length ? ' pedido' : ''}`} draggable data-backlog={item.id}
+    <div className={`bl-item${sub ? ' sub' : ''}${item.pedidos.length ? ' pedido' : ''}${item.agendas ? ' com-agenda' : ''}`} draggable data-backlog={item.id}
       onDragStart={e => { aoArrastar(item.id); e.dataTransfer.setData('text/plain', item.id); e.dataTransfer.effectAllowed = 'move'; }}>
       <div className="bl-linha">
         <label className="bl-marca">
@@ -36,6 +37,7 @@ function Linha({ item, marcado, sub, aoMarcar, aoArrastar }: {
         <EditarDemanda id={item.id} nome={item.nome} />
       </div>
       <small>{item.horas > 0 ? `${item.horas} h` : ''}{item.prioridade !== 'normal' ? ` · ${rotuloPrioridade(item.prioridade)}` : ''}</small>
+      {!!item.agendas && <small className="bl-agendas">{rotuloAgendas(item.agendas, item.agenda_prox)}</small>}
       {item.pedidos.map(p => <small key={p.id} className="bl-pedido">Pedido de agenda: {p.horas} h — {p.motivo}</small>)}
     </div>
   );
@@ -50,8 +52,9 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   const chaveStatus = `pmo3.backlog.status.${origemInicial ?? 'geral'}`;
   const [fora, setFora] = useState(() => lerFora(chaveStatus));
+  const [soSemAgenda, setSoSemAgenda] = useState(false);
   useEffect(() => { try { localStorage.setItem(chaveStatus, JSON.stringify([...fora])); } catch { /* */ } }, [fora, chaveStatus]);
-  const arvore = useMemo(() => arvoreBacklog(itens ?? [], origem, texto, fora), [itens, origem, texto, fora]);
+  const arvore = useMemo(() => arvoreBacklog((itens ?? []).filter(i => !soSemAgenda || !i.agendas), origem, texto, fora), [itens, origem, texto, fora, soSemAgenda]);
   const opcoesStatus = useMemo(() => statusBacklog(itens ?? []), [itens]);
   const escolhidos = opcoesStatus.filter(o => !fora.has(o.valor));
   const visiveis = arvore.reduce((s, c) => s + c.total, 0);
@@ -86,6 +89,7 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
             <label key={o.valor} className="check"><input type="checkbox" checked={!fora.has(o.valor)} onChange={() => trocarStatus(o.valor)} /> {o.rotulo} <small>{o.total}</small></label>
           ))}
         </details>
+        <label className="check bl-so-sem"><input type="checkbox" checked={soSemAgenda} onChange={e => setSoSemAgenda(e.target.checked)} /> Esconder o que já tem agenda</label>
       </div>
       {erro && <p className="msg-erro">{erro}</p>}
       {itens && arvore.length === 0 && <p className="ajuda">Nada no backlog com esse filtro.</p>}
@@ -106,7 +110,8 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
                 {p.demandas.map(d => (
                   <div key={d.id} className="bl-demanda">
                     {d.item ? <Linha item={d.item} marcado={marcados.has(d.item.id)} aoMarcar={aoMarcar} aoArrastar={aoArrastar} />
-                      : <div className="bl-linha"><p className="bl-mae"><Resumo tipo="demanda" id={d.id} comGp>{d.nome}</Resumo></p><EditarDemanda id={d.id} nome={d.nome} /></div>}
+                      : <div className={`bl-linha${d.agendas ? ' com-agenda' : ''}`}><p className="bl-mae"><Resumo tipo="demanda" id={d.id} comGp>{d.nome}</Resumo>
+                          {d.agendas > 0 && <small className="bl-agendas">{rotuloAgendas(d.agendas)}</small>}</p><EditarDemanda id={d.id} nome={d.nome} /></div>}
                     {d.subs.map(s => <Linha key={s.id} item={s} sub marcado={marcados.has(s.id)} aoMarcar={aoMarcar} aoArrastar={aoArrastar} />)}
                   </div>
                 ))}

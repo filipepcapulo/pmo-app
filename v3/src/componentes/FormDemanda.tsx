@@ -24,7 +24,7 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
   const [caixa, setCaixa] = useState<{ local: string; nome: string } | null>(null);
   const [gpCliente, setGpCliente] = useState<string | null>(null);
   const [f, setF] = useState({ projeto: alvo.projeto_id ?? '', pai: alvo.pai_id ?? '', nome: '', status: 'backlog', prioridade: 'normal',
-    inicio: '', fim: '', horas: '', perc: '', resp: '', etapa: '', modulo: '', descricao: '' });
+    inicio: '', fim: '', horas: '', perc: '', resp: '', etapa: '', modulo: '', descricao: '', avulso: false });
   const [erro, setErro] = useState<string | null>(null);
   const [lib, setLib] = useState<{ horas: string; justificativa: string } | null>(null);
   const [gravando, setGravando] = useState(false);
@@ -38,7 +38,7 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
       setCaixa({ local: r.cliente.nome, nome: r.projeto.nome });
       setF({ projeto: d.projeto_id, pai: d.pai_id ?? '', nome: d.nome, status: d.status, prioridade: d.prioridade, inicio: d.inicio ?? '',
         fim: d.fim ?? '', horas: d.horas_previstas != null ? String(d.horas_previstas) : '', perc: d.perc_manual != null ? String(d.perc_manual) : '',
-        resp: d.responsavel_id ?? '', etapa: d.etapa ?? '', modulo: d.modulo_id ?? '', descricao: d.descricao ?? '' });
+        resp: d.responsavel_id ?? '', etapa: d.etapa ?? '', modulo: d.modulo_id ?? '', descricao: d.descricao ?? '', avulso: !!d.avulso_base });
     }).catch(e => setErro((e as Error).message));
     else if (alvo.projeto_id) api.projeto(esc, alvo.projeto_id).then(r => setCaixa({ local: r.cliente.nome, nome: r.projeto.nome })).catch(() => setCaixa(null));
     else api.projetos(esc).then(l => setProjetos(l.filter(p => p.situacao === 'ativo'))).catch(() => setProjetos([]));
@@ -74,7 +74,9 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
     try {
       const campos = { nome: f.nome.trim(), status: f.status, prioridade: f.prioridade, inicio: f.inicio || null, fim: f.fim || null,
         horas_previstas: f.horas === '' ? null : Number(f.horas), perc_manual: f.perc === '' ? null : Number(f.perc),
-        responsavel_id: f.resp || null, etapa: f.etapa || null, modulo_id: f.modulo || null, descricao: f.descricao.trim() || null };
+        responsavel_id: f.resp || null, etapa: f.etapa || null, modulo_id: f.modulo || null, descricao: f.descricao.trim() || null,
+        // só vai quando marca ou desmarca: o resto das demandas grava como antes
+        ...(f.avulso || orig?.avulso_base ? { avulso_base: !f.pai && f.avulso } : {}) };
       const r = novo
         ? await exec.demandaSalvar(esc, { projeto_id: f.projeto, pai_id: f.pai || null, ...campos })
         : await exec.demandaSalvar(esc, { id: alvo.id, versao: orig!.versao, ...(excluir ? { excluir: true } : { ...campos, pai_id: f.pai || null }) });
@@ -116,6 +118,12 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
         <Campo rotulo="Subdemanda de" tipo="select" valor={f.pai} aoMudar={v => setF({ ...f, pai: v })}
           opcoes={[{ valor: '', rotulo: '— é uma demanda (entregável) —' }, ...maes.map(m => ({ valor: m.id, rotulo: m.nome }))]}
           ajuda="Subdemanda tem só 1 nível; horas e datas sobem para a demanda." />
+        {!f.pai && (
+          <div className="campo campo-marca">
+            <label className="check"><input type="checkbox" checked={f.avulso} onChange={e => setF({ ...f, avulso: e.target.checked })} /> Atendimento Avulso da Base</label>
+            <small className="ajuda">Recebe os chamados do cliente como subdemandas (fica fora da trava de horas, como os chamados).</small>
+          </div>
+        )}
         <Campo rotulo="Nome" valor={f.nome} aoMudar={v => setF({ ...f, nome: v })} obrigatorio maxLength={300} placeholder="O que será entregue" />
         <EscolhaChips rotulo="Status" valor={f.status} aoMudar={v => setF({ ...f, status: v })} opcoes={STATUS_DEMANDA} />
         <EscolhaChips rotulo="Prioridade" valor={f.prioridade} aoMudar={v => setF({ ...f, prioridade: v })} opcoes={PRIORIDADES} />

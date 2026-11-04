@@ -40,6 +40,7 @@ export interface TotaisDemanda {
 }
 export interface Demanda {
   id: string; projeto_id: string; pai_id: string | null; tipo: 'entregavel' | 'plano_acao' | 'chamado'; nome: string; descricao: string | null;
+  avulso_base?: boolean;
   status: StatusDemanda; prioridade: string; inicio: string | null; fim: string | null; horas_previstas: number | null; perc_manual: number | null;
   responsavel_id: string | null; etapa: string | null; modulo_id: string | null; versao: number; clickup_id: string | null;
   totais?: TotaisDemanda | null;

@@ -1,4 +1,5 @@
-// Novo chamado (V9): o formulário do 2.x, em 4 seções. Grava a demanda no projeto Avulso do cliente e depois sobe os anexos
+// Novo chamado (V9): o formulário do 2.x, em 4 seções. Grava o chamado como subdemanda da demanda "Atendimento Avulso da Base"
+// do cliente (o banco cria o projeto Avulso e essa demanda se faltarem) e depois sobe os anexos
 // nela (assim vão para o ClickUp). Rascunho salvo neste navegador; o mesmo id de operação protege contra clique repetido.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ABRANGENCIAS, AMBIENTES, cham, etapaSugerida, ETAPAS, faltasChamado, FORMAS, IMPACTOS, prioridadeMatriz, TIPOS, URGENCIAS, type FormChamado as Dados, type OpcoesChamado } from '../api/chamados';
@@ -71,7 +72,7 @@ export function FormChamado({ opcoes, aoFechar, aoGravar }: { opcoes: OpcoesCham
         <h3 className="secao">1 · Cliente e solicitante</h3>
         <Campo rotulo="Cliente" tipo="select" obrigatorio valor={f.cliente_id} erro={falta('cliente_id')} aoMudar={v => mudar({ cliente_id: v, projeto_id: '' })}
           opcoes={[{ valor: '', rotulo: 'Escolha o cliente…' }, ...opcoes.clientes.map(c => ({ valor: c.id, rotulo: c.nome }))]}
-          ajuda={cliente && !avulsos.length ? 'Este cliente ainda não tem projeto Avulso: será criado.' : undefined} />
+          ajuda={cliente ? `${avulsos.length ? '' : 'Este cliente ainda não tem projeto Avulso: será criado. '}O chamado entra como subdemanda de “Atendimento Avulso da Base” (criada se o cliente ainda não tiver).` : undefined} />
         {avulsos.length > 1 && <Campo rotulo="Projeto Avulso" tipo="select" obrigatorio valor={f.projeto_id} erro={falta('projeto_id')} aoMudar={v => mudar({ projeto_id: v })}
           opcoes={[{ valor: '', rotulo: 'Escolha o projeto…' }, ...avulsos.map(p => ({ valor: p.id, rotulo: p.nome }))]} />}
         <div className="duas-col">

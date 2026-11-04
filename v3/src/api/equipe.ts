@@ -29,6 +29,8 @@ export interface PedidoBacklog { id: string; versao: number; horas: number; moti
 export interface ItemBacklog {
   id: string; pai_id: string | null; pai: string | null; nome: string; prioridade: string; status: string; cliente_id: string; cliente: string;
   projeto_id: string; projeto: string; origem: OrigemBacklog; horas: number; pedidos: PedidoBacklog[]; criado_em?: string;
+  /** Agendas em aberto (planejada/em andamento, qualquer data) do item (com as das subdemandas) e da demanda-mãe; próxima data futura. */
+  agendas?: number; agendas_pai?: number | null; agenda_prox?: string | null;
 }
 export interface ItemFila {
   fila_id: string; id: string; nome: string; pai: string | null; status: string; inicio: string | null; fim: string | null; horas: number | null;
@@ -84,7 +86,7 @@ export const rotuloAusenciaDia = (a: Ausencia) =>
   rotuloAusencia(a.tipo) + (a.hora_ini && a.hora_fim ? ` ${a.hora_ini.slice(0, 5)}-${a.hora_fim.slice(0, 5)}`.replace(/:00/g, 'h') : '');
 
 // ---------------------------------------------------------------- backlog: Cliente → Demanda → Subdemanda
-export interface NoDemanda { id: string; nome: string; projeto_id: string; projeto: string; item: ItemBacklog | null; subs: ItemBacklog[] }
+export interface NoDemanda { id: string; nome: string; projeto_id: string; projeto: string; item: ItemBacklog | null; subs: ItemBacklog[]; agendas: number }
 export interface NoProjeto { id: string; nome: string; demandas: NoDemanda[] }
 export interface NoCliente { id: string; nome: string; demandas: NoDemanda[]; total: number; pedidos: number }
 const RANK_PRIORIDADE = ['urgente', 'alta', 'normal', 'baixa'];
@@ -100,8 +102,10 @@ export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' =
     c.pedidos += i.pedidos.length;
     const raiz = i.pai_id ?? i.id;
     let n = c.demandas.find(d => d.id === raiz);
-    if (!n) { n = { id: raiz, nome: i.pai ?? i.nome, projeto_id: i.projeto_id, projeto: i.projeto, item: null, subs: [] }; c.demandas.push(n); }
+    if (!n) { n = { id: raiz, nome: i.pai ?? i.nome, projeto_id: i.projeto_id, projeto: i.projeto, item: null, subs: [], agendas: 0 }; c.demandas.push(n); }
     if (i.pai_id) n.subs.push(i); else n.item = i;
+    // agendas em aberto da demanda-mãe: as do próprio item ou, se ela não está no backlog, as que a subdemanda trouxe
+    n.agendas = Math.max(n.agendas, (i.pai_id ? i.agendas_pai : i.agendas) ?? 0);
   }
   const lista = [...clientes.values()];
   // chamados (Backlog Base): prioridade × antiguidade, inclusive entre clientes
@@ -115,6 +119,12 @@ export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' =
     return lista.sort((a, b) => compara(a.demandas[0], b.demandas[0]));
   }
   return lista.sort((a, b) => b.pedidos - a.pedidos || a.nome.localeCompare(b.nome));
+}
+
+/** "Já tem agenda": quantas em aberto e a próxima data, para destacar no backlog o que ainda precisa de alocação. */
+export function rotuloAgendas(n: number, prox?: string | null): string {
+  if (!n) return '';
+  return `${n === 1 ? '1 agenda' : `${n} agendas`} em aberto${prox ? ` · próx. ${prox.slice(8, 10)}/${prox.slice(5, 7)}` : ''}`;
 }
 
 /** Nível de projeto da árvore: agrupa as demandas do cliente, mantendo a ordem em que vieram. */
@@ -161,6 +171,44 @@ export function ordenarDia<T extends Pick<TarefaGrade, 'periodo' | 'hora_ini' | 
   const chave = (t: T) => faixaTarefa(t) ?? [99, 99];
   return [...lista].sort((a, b) => chave(a)[0] - chave(b)[0] || chave(a)[1] - chave(b)[1]);
 }
+// ---------------------------------------------------------------- escala de tempo da grade aberta (como o Google Agenda)
+export const ESCALA_PADRAO: [number, number] = [7, 19];
+/** Pixels por hora na grade aberta: o card de 4 h fica do tamanho do card antigo (cliente, título e horário). */
+export const PX_HORA = 14;
+/** Faixa de horas da grade aberta: 07h–19h, alargada (em horas cheias) só quando alguma agenda cai fora dela. */
+export function faixaEscala(faixas: ([number, number] | null)[]): [number, number] {
+  let [ini, fim] = ESCALA_PADRAO;
+  for (const f of faixas) if (f) { ini = Math.min(ini, Math.floor(f[0])); fim = Math.max(fim, Math.ceil(f[1])); }
+  return [Math.max(0, ini), Math.min(24, fim)];
+}
+export interface Bloco<T> { item: T; ini: number; fim: number; coluna: number; colunas: number; semHora: boolean }
+/** Posição das agendas do dia na escala. Sobrepostas dividem a largura em colunas, como no Google Agenda; sem horário vai no
+ *  topo com 1 h; o card tem no mínimo 15 min para continuar clicável. */
+export function blocosDia<T extends Pick<TarefaGrade, 'periodo' | 'hora_ini' | 'hora_fim'>>(lista: T[], escala: [number, number]): Bloco<T>[] {
+  const bl: Bloco<T>[] = lista.map(item => {
+    const f = faixaTarefa(item);
+    if (!f) return { item, ini: escala[0], fim: escala[0] + 1, coluna: 0, colunas: 1, semHora: true };
+    const ini = Math.min(Math.max(escala[0], f[0]), escala[1] - 0.25);
+    return { item, ini, fim: Math.max(ini + 0.25, Math.min(escala[1], f[1])), coluna: 0, colunas: 1, semHora: false };
+  }).sort((a, b) => a.ini - b.ini || b.fim - a.fim);
+  let grupo: Bloco<T>[] = [], fimGrupo = -1;
+  const fechar = () => { const n = Math.max(...grupo.map(b => b.coluna)) + 1; grupo.forEach(b => { b.colunas = n; }); grupo = []; fimGrupo = -1; };
+  for (const b of bl) {
+    if (grupo.length && b.ini >= fimGrupo) fechar();
+    const ocupadas = new Set(grupo.filter(g => g.fim > b.ini).map(g => g.coluna));
+    let c = 0;
+    while (ocupadas.has(c)) c++;
+    b.coluna = c;
+    grupo.push(b);
+    fimGrupo = Math.max(fimGrupo, b.fim);
+  }
+  if (grupo.length) fechar();
+  return bl;
+}
+/** Marcas da régua: horas pares dentro da escala ("8h", "10h"…). */
+export const marcasEscala = (e: [number, number]) =>
+  Array.from({ length: e[1] - e[0] + 1 }, (_, i) => e[0] + i).filter(h => h % 2 === 0 && h > e[0] && h < e[1]);
+
 /** Faixa de cor da carga do dia (mesmos degraus do 2.x). */
 export const nivelCarga = (h: number) => (h === 0 ? 'livre' : h <= 7 ? 'parcial' : h === 8 ? 'cheio' : h <= 12 ? 'acima' : 'excesso');
 export const horasTexto = (h: number) => `${String(Math.round(h * 100) / 100).replace('.', ',')} h`;

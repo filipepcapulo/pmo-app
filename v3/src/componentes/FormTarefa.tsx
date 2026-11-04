@@ -2,6 +2,8 @@
 // consultor + data + período + tipo de agenda (ex.: Airton 30/10 08h-12h Presencial e Jeferson 03/11 08h-18h Remoto); cada
 // pílula vira uma tarefa com o
 // restante dos dados. Cada combinação é gravada numa chamada própria (grupo próprio = tarefa própria no ClickUp).
+// Tarefa já lançada: "+ Mais agenda" duplica a agenda (mesmos cliente/demanda/subdemanda, título, tipo e detalhes) pedindo só a
+// nova data e o horário, como o "Alocar mais" do 2.x.
 import { useEffect, useState } from 'react';
 import { horas } from '../api/cadastros';
 import { exec, MODALIDADES, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, type OpcoesExecucao, type Tarefa } from '../api/execucao';
@@ -40,6 +42,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
     (alvo.responsaveis?.length ?? 0) > 1 ? alvo.responsaveis!.map(r => ({ resp: r, data: dataInicial, periodo: 'manha', ini: '', fim: '', modalidade: 'remoto' })) : []);
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
+  const [mais, setMais] = useState<{ data: string; periodo: string; ini: string; fim: string } | null>(null);
   const novo = !alvo.id;
   const podeGravar = pode(novo ? 'tarefa.criar' : 'tarefa.editar');
 
@@ -111,6 +114,24 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
     setGravando(false);
   };
 
+  const maisAgenda = async () => {
+    if (!orig || !mais) return;
+    setErro(null);
+    if (!mais.data) { setErro('Informe a data da nova agenda.'); return; }
+    if (horarioInvalido(mais)) { setErro('No horário livre, informe início e fim (hh:mm, fim depois do início).'); return; }
+    setGravando(true);
+    try {
+      // a nova nasce planejada e sem Experience lançado; o resto vem da agenda já lançada (não do que foi editado e não gravado)
+      await exec.tarefasSalvar(esc, { demanda_id: orig.demanda_id, nome: orig.nome, modalidade: orig.modalidade, detalhamento: orig.detalhamento,
+        etapa: orig.etapa, agendamento: orig.agendamento, apontamento: orig.apontamento, status: 'planejada',
+        periodo: mais.periodo, hora_ini: mais.periodo === 'livre' ? mais.ini : null, hora_fim: mais.periodo === 'livre' ? mais.fim : null,
+        responsaveis: [orig.responsavel_id], datas: [mais.data] });
+      avisar(`Agenda adicionada em ${dataCurta(mais.data)}`, 'ok');
+      aoGravar();
+    } catch (e) { setErro((e as Error).message); }
+    setGravando(false);
+  };
+
   const pessoas = equipe.filter(m => m.ativo || m.id === f.resp || m.id === mont.resp);
   const opPessoas = [{ valor: '', rotulo: '— escolha —' }, ...pessoas.map(m => ({ valor: m.id, rotulo: m.nome }))];
   const horasDe = (p: string) => (p !== 'livre' ? opcoes?.periodos?.[p] : null);
@@ -120,6 +141,8 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
       rodape={<>
         {!novo && podeGravar && <Botao variante="perigo" className="a-esquerda" carregando={gravando}
           onClick={() => { if (confirm('Excluir esta tarefa?')) enviar(true); }}>Excluir</Botao>}
+        {!novo && orig && pode('tarefa.criar') && !mais && <Botao onClick={() => setMais({ data: proximoDiaUtil(orig.data), periodo: orig.periodo,
+          ini: orig.hora_ini?.slice(0, 5) ?? '', fim: orig.hora_fim?.slice(0, 5) ?? '' })}>+ Mais agenda</Botao>}
         <Botao onClick={aoFechar}>{podeGravar ? 'Cancelar' : 'Fechar'}</Botao>
         {podeGravar && <Botao variante="primario" carregando={gravando} onClick={() => enviar()}>
           {novo && nNovas > 1 ? `Criar ${nNovas} tarefas` : 'Gravar'}</Botao>}</>}>
@@ -192,6 +215,23 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
         </div>
         <Campo rotulo="Detalhamento" tipo="textarea" valor={f.detalhamento} aoMudar={v => setF({ ...f, detalhamento: v })} maxLength={20000}
           placeholder="Observações da tarefa (vão no campo Detalhamento)" />
+        {mais && (
+          <fieldset className="campo chips-campo montador mais-agenda" aria-label="Mais agenda">
+            <legend>Mais agenda <small>— mesma demanda, título, tipo e detalhes; escolha a nova data e o horário</small></legend>
+            <Campo rotulo="Nova data" tipo="date" valor={mais.data} aoMudar={v => setMais({ ...mais, data: v })} />
+            <EscolhaChips rotulo="Período" valor={mais.periodo} aoMudar={v => setMais({ ...mais, periodo: v })} opcoes={PERIODOS} />
+            {mais.periodo === 'livre' && (
+              <div className="grade-campos dupla">
+                <Campo rotulo="Início" tipo="text" valor={mais.ini} aoMudar={v => setMais({ ...mais, ini: v })} placeholder="08:00" maxLength={5} />
+                <Campo rotulo="Fim" tipo="text" valor={mais.fim} aoMudar={v => setMais({ ...mais, fim: v })} placeholder="12:00" maxLength={5} />
+              </div>
+            )}
+            <div className="linha">
+              <Botao variante="primario" carregando={gravando} onClick={maisAgenda}>Criar agenda</Botao>
+              <Botao variante="fantasma" onClick={() => setMais(null)}>Desistir</Botao>
+            </div>
+          </fieldset>
+        )}
         {erro && <p className="msg-erro" role="alert">{erro}</p>}
       </Formulario>
     </Popup>

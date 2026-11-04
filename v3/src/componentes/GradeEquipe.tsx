@@ -1,9 +1,10 @@
 // Grade da equipe (escopo §4): consultores × dias, rolagem infinita (busca uma semana ao chegar perto da borda), abre em
 // hoje, ausências bloqueiam a célula. Arrastar a tarefa move; arrastar do backlog pede a alocação. Sem mouse (celular):
 // "Selecionar" + tocar na tarefa/backlog e "Mover para…"/tocar na célula. Como no 2.x: soma do dia, cor por turno e consultor
-// recolhido mostra só a ocupação em horas.
+// recolhido mostra só a ocupação em horas, preenchendo a célula. Aberto, cada dia é uma escala de tempo (como o Google Agenda):
+// 07h–19h, alargada só se alguma agenda cair fora; o card fica no horário dele com altura proporcional (4 h = card antigo).
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { equipe, ausenciasNoDia, CAPACIDADE_DIA, diaInteiro, diasEntre, horasAusentes, rotuloAusenciaDia, faixaTarefa, fimDeSemana, horasTexto, itensMover, janelaInicial, nivelCarga, ordenarDia, rotuloAgenda, rotuloAusencia, TURNOS, turnoDe, type Ausencia, type TarefaGrade } from '../api/equipe';
+import { equipe, ausenciasNoDia, blocosDia, CAPACIDADE_DIA, diaInteiro, faixaEscala, marcasEscala, PX_HORA, diasEntre, horasAusentes, rotuloAusenciaDia, faixaTarefa, fimDeSemana, horasTexto, itensMover, janelaInicial, nivelCarga, ordenarDia, rotuloAgenda, rotuloAusencia, TURNOS, turnoDe, type Ausencia, type TarefaGrade } from '../api/equipe';
 import { hojeIso, somarDias } from '../api/projeto';
 import { rotuloPeriodo } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
@@ -20,6 +21,7 @@ const COL = 150;       // largura do dia (igual à grade aberta do 2.x)
 const BORDA = 240;     // a esta distância da borda busca mais uma semana
 const JANELA = 91;     // dias por chamada ao recarregar (a API aceita 93)
 const INI_DIA = 8, FIM_DIA = 18;  // mini-faixa de cada dia, como no 2.x
+const TOPO = 22;       // faixa acima da escala: carga do dia e ausência
 const CHAVE_RECOLHIDOS = 'pmo3.grade.recolhidos';
 const lerRecolhidos = () => { try { return new Set<string>(JSON.parse(localStorage.getItem(CHAVE_RECOLHIDOS) || '[]')); } catch { return new Set<string>(); } };
 
@@ -190,6 +192,10 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
     for (const [k, l] of m) m.set(k, ordenarDia(l));
     return m;
   }, [tarefas]);
+  // a mesma escala em todas as linhas abertas: as linhas ficam com a mesma altura
+  const escala = useMemo(() => faixaEscala(tarefas.map(faixaTarefa)), [tarefas]);
+  const alturaEscala = (escala[1] - escala[0]) * PX_HORA;
+  const yHora = (h: number) => (h - escala[0]) * PX_HORA;
   const somaDia = useMemo(() => {
     const m = new Map<string, number>(), vis = new Set(pessoas.map(p => p.id));
     for (const t of tarefas) if (vis.has(t.consultor_id)) m.set(t.data, (m.get(t.data) ?? 0) + Number(t.horas_previstas ?? 0));
@@ -243,13 +249,18 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
             {pessoas.map(p => {
               const recolhido = recolhidos.has(p.id);
               return (
-              <tr key={p.id} className={recolhido ? 'recolhida' : undefined}>
+              <tr key={p.id} className={recolhido ? 'recolhida' : 'aberta'}>
                 <th scope="row" className="col-nome">
                   <div className="eq-nome">
                     <NomePessoa id={p.id} comAvatar />
                     <button type="button" className={`eq-chev${recolhido ? '' : ' aberto'}`} aria-expanded={!recolhido} aria-label={`${recolhido ? 'Expandir' : 'Recolher'} ${p.nome}`}
                       onClick={() => alternarConsultor(p.id)}><Icone nome="baixo" tam={16} /></button>
                   </div>
+                  {!recolhido && (
+                    <div className="eq-regua" style={{ top: TOPO + 4, height: alturaEscala }} aria-hidden>
+                      {marcasEscala(escala).map(h => <span key={h} style={{ top: yHora(h) }}>{h}h</span>)}
+                    </div>
+                  )}
                 </th>
                 {dias.map(d => {
                   const lista = porCelula.get(p.id + d) ?? [];
@@ -264,24 +275,57 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
                       onDragOver={aus ? undefined : e => { e.preventDefault(); e.currentTarget.classList.add('alvo'); }}
                       onDragLeave={e => e.currentTarget.classList.remove('alvo')}
                       onDrop={aus ? undefined : e => soltar(e, d, p.id)}>
-                      {(aus ? [aus] : doDia).map(a => (
-                        <button key={a.id ?? a.de} type="button" className={`eq-ausencia${diaInteiro(a) ? '' : ' parcial'}`} disabled={a.origem === 'clickup' || !pode('equipe.editar')}
-                          title={[a.motivo, diaInteiro(a) ? null : `${horasTexto(Number(a.horas ?? 0))} fora; capacidade do dia ${horasTexto(capacidade)}`].filter(Boolean).join(' · ') || undefined}
-                          onClick={() => aoEditarAusencia(a)}>{rotuloAusenciaDia(a)}</button>
-                      ))}
-                      {horas > 0 && <small className={`eq-carga ${nivelCarga(horas + fora)}`}
-                        title={fora && !aus ? `${horasTexto(horas)} de ${horasTexto(capacidade)} disponíveis` : undefined}>{horasTexto(horas)}</small>}
-                      {recolhido && lista.length > 0 && <MiniFaixa itens={lista} />}
-                      {!recolhido && lista.map(t => (
-                        <button key={t.id} type="button" draggable={podeMover} data-tarefa={t.id}
-                          className={`eq-tarefa tu-${turnoDe(t)} st-${t.status}${sel.has(t.id) ? ' marcada' : ''}`} aria-pressed={sel.has(t.id)}
-                          onDragStart={e => { arrastada.current = t.id; e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; }}
-                          onDragEnd={() => { arrastada.current = null; }}
-                          onClick={e => { if (selecionando || e.ctrlKey || e.metaKey) alternar(t.id); else ed.tarefa({ id: t.id }); }}>
-                          <Resumo tipo="demanda" id={t.demanda_id} local={`${t.cliente} · ${t.projeto}`}><b>{t.cliente}</b><span>{t.nome}</span><small className="eq-tarefa-pe"><span>{rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim).replace(/ \(.*/, '').replace(/:00/g, 'h').replace('–', '-')}</span>
-                            {rotuloAgenda(t.modalidade) && <i className={`eq-agenda ag-${t.modalidade}`}>{rotuloAgenda(t.modalidade)}</i>}</small></Resumo>
-                        </button>
-                      ))}
+                      {recolhido ? <>
+                        {(aus ? [aus] : doDia).map(a => (
+                          <button key={a.id ?? a.de} type="button" className={`eq-ausencia${diaInteiro(a) ? '' : ' parcial'}`} disabled={a.origem === 'clickup' || !pode('equipe.editar')}
+                            title={[a.motivo, diaInteiro(a) ? null : `${horasTexto(Number(a.horas ?? 0))} fora; capacidade do dia ${horasTexto(capacidade)}`].filter(Boolean).join(' · ') || undefined}
+                            onClick={() => aoEditarAusencia(a)}>{rotuloAusenciaDia(a)}</button>
+                        ))}
+                        {/* recolhido: a carga preenche a célula (como na grade do 2.x), com a mini-faixa dos turnos */}
+                        {horas > 0 && !aus && (
+                          <button type="button" className={`eq-cheia ${nivelCarga(horas + fora)}`} onClick={() => alternarConsultor(p.id)}
+                            aria-label={`${p.nome}, ${dataCurta(d)}: ${horasTexto(horas)}. Abrir as agendas`}
+                            title={fora ? `${horasTexto(horas)} de ${horasTexto(capacidade)} disponíveis` : `${lista.length} agenda(s)`}>
+                            <b>{horasTexto(horas)}</b><MiniFaixa itens={lista} />
+                          </button>
+                        )}
+                      </> : <>
+                        <div className="eq-dia-topo" style={{ height: TOPO }}>
+                          {horas > 0 && <small className={`eq-carga ${nivelCarga(horas + fora)}`}
+                            title={fora && !aus ? `${horasTexto(horas)} de ${horasTexto(capacidade)} disponíveis` : undefined}>{horasTexto(horas)}</small>}
+                          {aus && <button type="button" className="eq-ausencia" disabled={aus.origem === 'clickup' || !pode('equipe.editar')} title={aus.motivo || undefined}
+                            onClick={() => aoEditarAusencia(aus)}>{rotuloAusenciaDia(aus)}</button>}
+                        </div>
+                        <div className="eq-escala" style={{ height: alturaEscala }}>
+                          {escala[0] < 14 && escala[1] > 12 && <i className="eq-almoco" style={{ top: yHora(Math.max(12, escala[0])), height: (Math.min(14, escala[1]) - Math.max(12, escala[0])) * PX_HORA }} />}
+                          {!aus && doDia.map(a => {
+                            const f = faixaTarefa({ periodo: 'livre', hora_ini: a.hora_ini ?? null, hora_fim: a.hora_fim ?? null });
+                            if (!f) return null;
+                            const ini = Math.max(escala[0], f[0]), fim = Math.min(escala[1], f[1]);
+                            return (
+                              <button key={a.id ?? a.de} type="button" className="eq-ausencia parcial na-escala" disabled={a.origem === 'clickup' || !pode('equipe.editar')}
+                                style={{ top: yHora(ini), height: Math.max(PX_HORA, (fim - ini) * PX_HORA) }}
+                                title={[a.motivo, `${horasTexto(Number(a.horas ?? 0))} fora; capacidade do dia ${horasTexto(capacidade)}`].filter(Boolean).join(' · ')}
+                                onClick={() => aoEditarAusencia(a)}>{rotuloAusenciaDia(a)}</button>
+                            );
+                          })}
+                          {blocosDia(lista, escala).map(({ item: t, ini, fim, coluna, colunas, semHora }) => {
+                            const dur = fim - ini;
+                            return (
+                              <button key={t.id} type="button" draggable={podeMover} data-tarefa={t.id}
+                                className={`eq-tarefa na-escala tu-${turnoDe(t)} st-${t.status}${dur < 2 ? ' mini' : dur < 3.5 ? ' curta' : ''}${semHora ? ' sem-hora' : ''}${sel.has(t.id) ? ' marcada' : ''}`}
+                                aria-pressed={sel.has(t.id)}
+                                style={{ top: yHora(ini) + 1, height: dur * PX_HORA - 2, left: `calc(${coluna / colunas * 100}% + 1px)`, width: `calc(${100 / colunas}% - 2px)` }}
+                                onDragStart={e => { arrastada.current = t.id; e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; }}
+                                onDragEnd={() => { arrastada.current = null; }}
+                                onClick={e => { if (selecionando || e.ctrlKey || e.metaKey) alternar(t.id); else ed.tarefa({ id: t.id }); }}>
+                                <Resumo tipo="demanda" id={t.demanda_id} local={`${t.cliente} · ${t.projeto}`}><b>{t.cliente}</b><span>{t.nome}</span><small className="eq-tarefa-pe"><span>{semHora ? 'sem horário' : rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim).replace(/ \(.*/, '').replace(/:00/g, 'h').replace('–', '-')}</span>
+                                  {rotuloAgenda(t.modalidade) && <i className={`eq-agenda ag-${t.modalidade}`}>{rotuloAgenda(t.modalidade)}</i>}</small></Resumo>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>}
                       {!aus && podeCriar && (
                         <button type="button" className={`eq-mais${backlogMarcado ? ' visivel' : ''}`} aria-label={`Agendar ${p.nome} em ${dataCurta(d)}`}
                           onClick={() => (backlogMarcado ? aoSoltarBacklog({ data: d, consultor: p.id }) : ed.tarefa({ data: d, responsaveis: [p.id] }))}>+</button>

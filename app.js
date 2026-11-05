@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const VERSAO_WEB = '2.14.0';
+const VERSAO_WEB = '2.14.1';
 // URL da implantação do servidor (Apps Script > Implantar > App da Web). Não é segredo:
 // sem um e-mail autorizado e o código enviado por e-mail, ela não devolve nada.
 const SERVIDOR = 'https://script.google.com/macros/s/AKfycbzTcboB69tml5f_quYwfbVA1n0MDUTrZ8y3gA3EQsydEHA-5EWWHh-BHLy9dbMJnMUw/exec';
@@ -613,7 +613,7 @@ function horasPeriodo(p) {
   const m = /^(\d{1,2})h-(\d{1,2})h$/.exec(p || '');
   if (!m) return 0;
   let h = +m[2] - +m[1];
-  if (+m[1] <= 12 && +m[2] >= 13) h -= 1;
+  if (+m[1] <= 12 && +m[2] >= 14) h -= 2; // almoço 12h-14h atravessado inteiro (regra da 0033 do v3)
   return Math.max(0, Math.min(8, h));
 }
 

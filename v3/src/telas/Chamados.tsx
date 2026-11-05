@@ -39,7 +39,7 @@ function Lista({ itens, alocar }: { itens: ChamadoLinha[]; alocar?: (c: ChamadoL
               <tr key={c.id}>
                 <td><a href={hashDe(caminhoEntidade('chamado', c.id))}>#{c.numero}</a></td>
                 <td><Resumo tipo="cliente" id={c.cliente_id}>{c.cliente}</Resumo></td>
-                <td><a href={hashDe(caminhoEntidade('chamado', c.id))}>{c.titulo}</a><br /><small className="ajuda">{[c.tipo, rotuloFila(c.fila)].filter(Boolean).join(' · ')}</small></td>
+                <td><a href={hashDe(caminhoEntidade('chamado', c.id))}>{c.titulo}</a><br /><small className="ajuda">{[c.tipo, rotuloFila(c.fila), c.tem_agenda ? 'com agenda' : ''].filter(Boolean).join(' · ')}</small></td>
                 <td><PilulaPrioridade p={c.prioridade} /></td>
                 <td><PilulaSituacao s={c.situacao} /></td>
                 <td><span className={`sla sla-${sla.classe}`}>{sla.texto}</span></td>
@@ -100,7 +100,7 @@ function Backlog({ geracao }: { geracao: number }) {
   const esc = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
   const pode = usePode();
-  const c = useCarga(() => cham.buscar(esc, { abertos: true, sem_agenda: true, ordem: 'backlog' }, 50, 0), [esc, geracao, ed.geracao]);
+  const c = useCarga(() => cham.buscar(esc, { abertos: true, ordem: 'backlog' }, 50, 0), [esc, geracao, ed.geracao]);
   return <>
     <section className="cartao">
       <h2 className="secao">Fila por prioridade e antiguidade{c.dados ? ` (${c.dados.total})` : ''}</h2>

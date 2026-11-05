@@ -104,6 +104,8 @@ export function cascataDemandas(itens: OpcaoDemandaCliente[], demanda: string) {
 export const exec = {
   clientesEscolha: (esc: string) => rpc<OpcaoCliente[]>('v1_demandas_escolha', { p_escritorio: esc, p_cliente: null }),
   demandasEscolha: (esc: string, cliente: string) => rpc<OpcaoDemandaCliente[]>('v1_demandas_escolha', { p_escritorio: esc, p_cliente: cliente }),
+  /** Os dois níveis numa chamada só: sem cliente, os clientes; com cliente, as demandas e subdemandas dele. */
+  demandasEscolhaCli: (esc: string, cliente: string | null) => rpc<OpcaoCliente[] | OpcaoDemandaCliente[]>('v1_demandas_escolha', { p_escritorio: esc, p_cliente: cliente }),
   demandas: (esc: string, f: { projeto?: string | null; status?: string[] | null; texto?: string | null; limite?: number; pagina?: number } = {}) =>
     rpc<{ total: number; itens: DemandaLinha[] }>('v1_demandas', { p_escritorio: esc, p_projeto: f.projeto ?? null, p_status: f.status ?? null,
       p_texto: f.texto ?? null, p_limite: f.limite ?? 200, p_pagina: f.pagina ?? 0 }),

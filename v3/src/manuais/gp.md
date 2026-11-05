@@ -55,12 +55,12 @@ Nos dois casos o consultor recebe o aviso "Seu pedido de agenda foi atendido/rec
 
 ## 4. Desvios de agenda
 
-Desvio é quando o consultor estava agendado num projeto e atendeu outro no mesmo horário. Ele informa pelo botão **Informar desvio** na tarefa do dia (projeto atendido, demanda se souber, quem orientou e motivo). **Quem decide é o GP do projeto atendido.**
+Desvio é quando o consultor estava agendado num projeto e atendeu outro no mesmo horário. Ele informa pelo botão **Informar desvio** na tarefa do dia (cliente, demanda e subdemanda atendidos — só entre as existentes, sem criar —, quem orientou e motivo). **Quem decide é o GP do projeto atendido.**
 
 1. Abra **Desvios de agenda** (pelo sino ou pelo menu). Na Agenda da equipe aparece a pílula "N desvio(s) pendente(s)".
 2. Filtre por **Situação** (Pendentes) e pelo período **De / Até**.
 3. Na linha do desvio, toque em **Aprovar** ou **Recusar**.
-4. **Aprovar**: confira previsto × atendido e o motivo. Se o consultor não soube a demanda, escolha a **Demanda atendida**. Ao aprovar, o app troca a agenda numa operação só: cria a tarefa no projeto atendido (onde o consultor vai apontar) e marca a tarefa prevista como "não executada". A demanda prevista volta ao backlog.
+4. **Aprovar**: confira previsto × atendido e o motivo. Desvios informados antes da 3.14 podem vir sem demanda: nesse caso escolha a **Demanda atendida**. Ao aprovar, o app troca a agenda numa operação só: cria a tarefa no projeto atendido (onde o consultor vai apontar) e marca a tarefa prevista como "não executada". A demanda prevista volta ao backlog.
 5. **Recusar**: informe o **Motivo da recusa** (obrigatório). A agenda prevista continua valendo.
 
 ![Aprovar desvio com a escolha da demanda atendida](g05-aprovar-desvio.png)
@@ -122,7 +122,7 @@ Conferido, o consultor não edita nem exclui mais. As OS do Sankhya OM não pass
 ## 9. Dúvidas frequentes
 
 - **Não aparece Aprovar no desvio**: só o GP do projeto atendido (ou o admin) decide, e só enquanto está pendente.
-- **Aprovar pede a demanda**: o consultor marcou "Não sei"; escolha uma demanda aberta do projeto atendido.
+- **Aprovar pede a demanda**: desvio antigo informado sem demanda; escolha uma demanda aberta do projeto atendido.
 - **O pedido de agenda continua aberto depois que agendei**: ele só fecha sozinho quando a agenda é criada arrastando a demanda com o pedido no backlog. Feche pela Tela do Projeto com **Atendido**.
 - **Conferi errado**: use **Reabrir**.
 - **Um consultor diz que não vê a produtividade dos colegas**: é a regra; só quem tem produtividade.ver_todos vê todos.

@@ -87,7 +87,7 @@ Na aba **Meus apontamentos** você vê tudo o que conta como hora sua:
 ## 7. Quando a agenda não bate com o que aconteceu
 
 - **Precisa de mais horas na demanda**: no cartão, toque em **Preciso de mais agenda**, informe as horas e o motivo. O pedido vai para o GP e aparece em "Meus pedidos de agenda", embaixo da agenda.
-- **Atendeu outro cliente ou projeto no horário da agenda**: no cartão da tarefa do dia, toque em **Informar desvio** e diga o projeto atendido e o motivo. O GP do projeto atendido aprova ou recusa (acompanhe na aba **Meus desvios**). Aprovado, o app cria a tarefa certa na sua agenda: aponte nela.
+- **Atendeu outro cliente ou projeto no horário da agenda**: no cartão da tarefa do dia, toque em **Informar desvio**, escolha o **cliente**, a **demanda** e, se houver, a **subdemanda** que você atendeu e diga o motivo. Só dá para escolher entre as demandas que já existem: se a certa não estiver na lista, peça ao GP para criá-la. O GP do projeto atendido aprova ou recusa (acompanhe na aba **Meus desvios**). Aprovado, o app cria a tarefa certa na sua agenda: aponte nela.
 
 ![Formulário Preciso de mais agenda](09-mais-agenda.png)
 
@@ -95,7 +95,7 @@ Na aba **Meus apontamentos** você vê tudo o que conta como hora sua:
 
 ![Formulário Informar desvio](10-desvio.png)
 
-*Informar desvio: escolha o projeto atendido (a demanda pode ficar "Não sei") e diga o motivo.*
+*Informar desvio: escolha cliente, demanda e subdemanda atendidos e diga o motivo.*
 
 ## 8. Fechamento do mês
 

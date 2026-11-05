@@ -23,7 +23,7 @@ export function ConfigChamados({ opcoes, aoFechar, aoMudar }: { opcoes: OpcoesCh
   return (
     <Popup aberto titulo="Configurar chamados" aoFechar={aoFechar} largura={620} rodape={<Botao onClick={aoFechar}>Fechar</Botao>}>
       <h3 className="secao">SLA em horas úteis</h3>
-      <p className="ajuda">Seg–sex, 08h–12h e 13h–17h, sem feriados. Vale para chamados abertos ou reclassificados daqui em diante.</p>
+      <p className="ajuda">Seg–sex, 08h–12h e 14h–18h (almoço 12h–14h), sem feriados. Vale para chamados abertos ou reclassificados daqui em diante.</p>
       {PRIORIDADES.slice().reverse().map(p => (
         <div className="duas-col" key={p.valor}>
           <Campo rotulo={`${p.rotulo}: 1ª resposta`} tipo="number" valor={String(sla[p.valor]?.resposta ?? '')} aoMudar={v => horas(p.valor, 'resposta', v)} />

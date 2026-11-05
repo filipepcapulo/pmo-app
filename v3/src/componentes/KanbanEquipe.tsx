@@ -1,8 +1,13 @@
 // Kanban da Agenda da equipe (3.13.0): só as agendas em aberto (não iniciada / em andamento, de qualquer data), em colunas
 // por consultor, cliente ou demanda/subdemanda. Por consultor, arrastar o cartão para outra coluna troca o consultor (mesma
 // data) e soltar um item do backlog numa coluna abre a alocação para aquele consultor. Tocar no cartão abre o popup único.
-import { useMemo, useRef, useState } from 'react';
-import { AGRUPAMENTOS, colunasKanban, equipe, horasTexto, rotuloAgenda, type AgrupaKanban } from '../api/equipe';
+// 3.13.2: filtros de seleção múltipla (consultores, clientes, projetos, demandas, subdemandas), na ordem da visualização e
+// guardados por visualização. A escolha fica no banco por usuário (filtro salvo padrão "Última escolha" da tela
+// agenda.kanban, vale em qualquer aparelho) e no aparelho, para abrir já filtrado.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { novaOperacao, rpc, type FiltroSalvo } from '../api/cliente';
+import { AGRUPAMENTOS, colunasKanban, DIMENSOES, equipe, filtrarKanban, horasTexto, lerPrefKanban, opcoesKanban, ORDEM_FILTROS, PREF_KANBAN_PADRAO, rotuloAgenda,
+  type AgrupaKanban, type DimKanban, type PrefKanban } from '../api/equipe';
 import { rotuloPeriodo, rotuloStatusTarefa } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { useCarga } from '../estado/carga';
@@ -11,32 +16,76 @@ import { useEquipe, usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
 import { dataCurta } from './FormComum';
 import { Resumo } from './Resumo';
+import { SelecaoMultipla } from './SelecaoMultipla';
 import { useToast } from './Toasts';
 import type { Soltar } from './GradeEquipe';
 
-const CHAVE_AGRUPA = 'pmo3.kanban.agrupa';
-const lerAgrupa = (): AgrupaKanban => { try { const v = localStorage.getItem(CHAVE_AGRUPA); return v === 'cliente' || v === 'demanda' ? v : 'consultor'; } catch { return 'consultor'; } };
+const TELA = 'agenda.kanban', NOME_PREF = 'Última escolha';
+const chaveLocal = (u: string) => `pmo3.kanban.pref.${u}`;
+function lerLocal(u: string): PrefKanban {
+  try {
+    const v = localStorage.getItem(chaveLocal(u));
+    if (v) return lerPrefKanban(JSON.parse(v));
+    const antigo = localStorage.getItem('pmo3.kanban.agrupa');  // 3.13.0 guardava só o agrupamento
+    return lerPrefKanban({ por: antigo });
+  } catch { return PREF_KANBAN_PADRAO; }
+}
+
+/** Preferência do Kanban por usuário: abre com a do aparelho, troca pela do banco e grava (com espera) a cada mudança. */
+function usePrefKanban(esc: string, usuario: string): [PrefKanban, (p: PrefKanban) => void] {
+  const [pref, setPref] = useState(() => lerLocal(usuario));
+  const doBanco = useRef(false);   // só grava depois de ler o banco (não sobrescreve a escolha feita em outro aparelho)
+  const mudou = useRef(false);
+  useEffect(() => {
+    let vivo = true;
+    rpc<FiltroSalvo[]>('v1_filtros', { p_escritorio: esc, p_tela: TELA })
+      .then(l => { const p = l.find(x => x.nome === NOME_PREF); if (vivo && p && !mudou.current) setPref(lerPrefKanban(p.filtros)); })
+      .catch(() => { /* sem banco, fica a do aparelho */ })
+      // mudou antes de o banco responder: regrava a escolha feita aqui
+      .finally(() => { doBanco.current = true; if (vivo && mudou.current) setPref(p => ({ ...p })); });
+    return () => { vivo = false; };
+  }, [esc]);
+  useEffect(() => {
+    try { localStorage.setItem(chaveLocal(usuario), JSON.stringify(pref)); } catch { /* */ }
+    if (!doBanco.current || !mudou.current) return;
+    const t = setTimeout(() => {
+      rpc('v1_filtro_salvar', { p_escritorio: esc, p_dados: { tela: TELA, nome: NOME_PREF, filtros: pref, padrao: true }, p_id_operacao: novaOperacao() })
+        .catch(() => { /* grande demais ou sem rede: fica no aparelho */ });
+    }, 700);
+    return () => clearTimeout(t);
+  }, [pref, esc, usuario]);
+  return [pref, p => { mudou.current = true; setPref(p); }];
+}
 const semAcento = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
 export function KanbanEquipe({ backlogMarcado, aoSoltarBacklog }: { backlogMarcado: boolean; aoSoltarBacklog: (s: Soltar) => void }) {
-  const esc = useSessao().eu!.escritorio_id!;
+  const { eu } = useSessao();
+  const esc = eu!.escritorio_id!;
   const ed = useEdicao();
   const avisar = useToast();
   const pode = usePode();
   const { lista, porId } = useEquipe();
   const c = useCarga(() => equipe.abertas(esc), [esc, ed.geracao]);
-  const [por, setPor] = useState<AgrupaKanban>(lerAgrupa);
+  const [pref, setPref] = usePrefKanban(esc, eu!.usuario.id);
+  const por = pref.por, filtro = pref.filtros[por];
   const [texto, setTexto] = useState('');
   const arrastada = useRef<string | null>(null);
   const hoje = hojeIso();
-  const trocar = (v: AgrupaKanban) => { setPor(v); try { localStorage.setItem(CHAVE_AGRUPA, v); } catch { /* */ } };
+  const trocar = (v: AgrupaKanban) => setPref({ ...pref, por: v });
+  const mudarFiltro = (dim: DimKanban, sel: string[]) => setPref({ ...pref, filtros: { ...pref.filtros, [por]: { ...filtro, [dim]: sel } } });
+  const opcoes = useMemo(() => opcoesKanban(c.dados ?? [], filtro, id => porId.get(id)?.nome), [c.dados, filtro, porId]);
+  const filtrado = DIMENSOES.some(({ dim }) => filtro[dim].length > 0);
   const colunas = useMemo(() => {
     const t = semAcento(texto.trim());
-    const itens = (c.dados ?? []).filter(x => !t || [x.nome, x.cliente, x.projeto, x.demanda, x.pai ?? '', porId.get(x.consultor_id)?.nome ?? ''].some(v => semAcento(v).includes(t)));
-    // por consultor, quem atende e está sem agenda em aberto também tem coluna (alvo do backlog)
-    const vazias = por === 'consultor' && !t ? lista.filter(m => m.ativo && m.papeis.some(p => p === 'consultor' || p === 'desenvolvedor')).map(m => m.id) : [];
+    const itens = filtrarKanban(c.dados ?? [], filtro)
+      .filter(x => !t || [x.nome, x.cliente, x.projeto, x.demanda, x.pai ?? '', porId.get(x.consultor_id)?.nome ?? ''].some(v => semAcento(v).includes(t)));
+    // por consultor, quem atende e está sem agenda em aberto também tem coluna (alvo do backlog); com consultores escolhidos, só eles
+    const escolhidos = new Set(filtro.consultores);
+    const outros = DIMENSOES.some(({ dim }) => dim !== 'consultores' && filtro[dim].length > 0);
+    const vazias = por === 'consultor' && !t && !outros
+      ? lista.filter(m => m.ativo && m.papeis.some(p => p === 'consultor' || p === 'desenvolvedor') && (!escolhidos.size || escolhidos.has(m.id))).map(m => m.id) : [];
     return colunasKanban(itens, por, id => porId.get(id)?.nome, vazias);
-  }, [c.dados, por, texto, lista, porId]);
+  }, [c.dados, por, texto, lista, porId, filtro]);
   const total = c.dados?.length ?? 0;
   const podeMover = pode('tarefa.editar') && por === 'consultor';
 
@@ -64,7 +113,14 @@ export function KanbanEquipe({ backlogMarcado, aoSoltarBacklog }: { backlogMarca
           </select>
         </label>
         <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Buscar consultor, cliente ou demanda…" aria-label="Buscar no Kanban" />
-        <small className="ajuda">{total} agenda(s) em aberto{backlogMarcado && por === 'consultor' ? ' · toque em "Alocar aqui" para agendar o marcado' : ''}</small>
+      </div>
+      <div className="barra-filtros kb-filtros" aria-label="Filtros do Kanban" role="group">
+        {ORDEM_FILTROS[por].map(dim => (
+          <SelecaoMultipla key={dim} rotulo={DIMENSOES.find(d => d.dim === dim)!.rotulo} opcoes={opcoes[dim]}
+            sel={filtro[dim]} aoMudar={s => mudarFiltro(dim, s)} />
+        ))}
+        {filtrado && <button type="button" className="link" onClick={() => setPref({ ...pref, filtros: { ...pref.filtros, [por]: PREF_KANBAN_PADRAO.filtros[por] } })}>Limpar filtros</button>}
+        <small className="ajuda" data-testid="kb-total">{filtrado ? `${colunas.reduce((n, x) => n + x.itens.length, 0)} de ` : ''}{total} agenda(s) em aberto{backlogMarcado && por === 'consultor' ? ' · toque em "Alocar aqui" para agendar o marcado' : ''}</small>
       </div>
       {c.erro && <p className="msg-erro">{c.erro}</p>}
       {c.carregando && !c.dados && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}

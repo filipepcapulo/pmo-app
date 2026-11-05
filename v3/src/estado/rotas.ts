@@ -9,6 +9,7 @@ export interface Modulo {
   icone: string;           // nome do ícone SVG (componentes/Icone.tsx)
   etapa?: string;          // etapa do plano v3 que entrega a tela (enquanto não chega: "em construção")
   permissao?: string;      // funcionalidade exigida (app.funcionalidades); sem ela o item some do menu
+  parametro?: boolean;     // aceita um item no caminho (#/manuais/<id>): cada um abre a própria aba
 }
 
 export const AREAS: { id: Area; titulo: string }[] = [
@@ -21,6 +22,7 @@ export const AREAS: { id: Area; titulo: string }[] = [
 
 export const MODULOS: Modulo[] = [
   { id: 'inicio', titulo: 'Início', area: 'geral', icone: 'casa' },
+  { id: 'manuais', titulo: 'Manuais', area: 'geral', icone: 'livro', parametro: true },
   { id: 'clientes', titulo: 'Clientes', area: 'cadastros', icone: 'predio' },
   { id: 'projetos', titulo: 'Projetos', area: 'cadastros', icone: 'pasta' },
   { id: 'modelos', titulo: 'Modelos de projeto', area: 'cadastros', icone: 'copia', permissao: 'projeto.criar' },
@@ -35,7 +37,8 @@ export const MODULOS: Modulo[] = [
   { id: 'ociosidade', titulo: 'Ociosidade', area: 'execucao', icone: 'pessoas', permissao: 'ociosidade.ver' },
   { id: 'ferias', titulo: 'Controle de Férias', area: 'execucao', icone: 'calendario', permissao: 'ferias.ver' },
   { id: 'portfolio', titulo: 'Portfólio', area: 'relatorios', icone: 'grade', permissao: 'portfolio.ver' },
-  { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: 'grafico', permissao: 'relatorio.produtividade' },
+  // todos entram; sem produtividade.ver_todos o banco devolve só o próprio (0045)
+  { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: 'grafico' },
   { id: 'componentes', titulo: 'Componentes', area: 'sistema', icone: 'grade' },
 ];
 
@@ -49,7 +52,7 @@ export const ENTIDADES = {
 export type Entidade = keyof typeof ENTIDADES;
 
 export type Rota =
-  | { tipo: 'modulo'; modulo: Modulo }
+  | { tipo: 'modulo'; modulo: Modulo; parametro?: string }
   | { tipo: 'entidade'; entidade: Entidade; id: string }
   | { tipo: 'desconhecida'; caminho: string };
 
@@ -68,6 +71,8 @@ export function lerRota(caminho: string): Rota {
   if (b === undefined) {
     const m = MODULOS.find(x => x.id === a);
     if (m) return { tipo: 'modulo', modulo: m };
+  } else if (resto.length === 0 && b && MODULOS.some(x => x.id === a && x.parametro)) {
+    return { tipo: 'modulo', modulo: MODULOS.find(x => x.id === a)!, parametro: b };
   } else if (resto.length === 0 && a in ENTIDADES && UUID.test(b)) {
     return { tipo: 'entidade', entidade: a as Entidade, id: b };
   }

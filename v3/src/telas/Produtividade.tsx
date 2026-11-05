@@ -1,5 +1,6 @@
 // Produtividade (#/produtividade): fechamento por consultor e apontamentos da equipe, OS do Sankhya OM + app (D10: substitui
 // as planilhas do Drive e a planilha mestre). O relatório por consultor abre pronto para imprimir ou salvar em PDF.
+// Sem produtividade.ver_todos (o consultor), o banco devolve só o próprio (0045) e a tela vira "Minha produtividade".
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { consultor } from '../api/consultor';
@@ -10,6 +11,7 @@ import { RelatorioApontamentos } from '../componentes/RelatorioApontamentos';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
+import { usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
@@ -42,7 +44,7 @@ ${itens.map(a => `<tr><td>${data(a.data)}</td><td>${a.origem === 'app' ? 'APP' :
   w.document.close();
 }
 
-function Fechamento() {
+function Fechamento({ todos }: { todos: boolean }) {
   const escritorio = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
   const p0 = useMemo(() => periodoFechamento(hojeIso()), []);
@@ -72,7 +74,7 @@ function Fechamento() {
       </div>
       <p className="ajuda">Normais = até {horas(c.dados?.horas_dia ?? 8)} por dia útil; extras = o que passa disso e todo sábado/domingo. Capacidade = dias úteis × horas do dia − ausências (sem feriados).</p>
       {(c.erro || erro) && <p className="msg-erro">{c.erro || erro}</p>}
-      {t && <section className="indicadores" aria-label="Totais da equipe">
+      {t && <section className="indicadores" aria-label={todos ? 'Totais da equipe' : 'Seus totais'}>
         <div className="indicador"><small>Total (OS + app)</small><strong data-testid="fech-total">{horas(t.total)}</strong></div>
         <div className="indicador"><small>Capacidade</small><strong>{horas(t.capacidade)}</strong></div>
         <div className="indicador"><small>Extras</small><strong>{horas(t.extras)}</strong></div>
@@ -87,15 +89,20 @@ function Fechamento() {
 }
 
 export function Produtividade() {
+  const todos = usePode()('produtividade.ver_todos');
   const [aba, setAba] = useState<'fechamento' | 'apontamentos'>('fechamento');
   return (
     <div className="pagina">
-      <header className="pagina-topo"><div><h1>Produtividade</h1><p className="ajuda">Fechamento por consultor e apontamentos da equipe (Sankhya OM + app).</p></div></header>
+      <header className="pagina-topo"><div>
+        <h1>{todos ? 'Produtividade' : 'Minha produtividade'}</h1>
+        <p className="ajuda">{todos ? 'Fechamento por consultor e apontamentos da equipe (Sankhya OM + app).'
+          : 'O seu fechamento e os seus apontamentos (Sankhya OM + app). A dos colegas só aparece para a gerência.'}</p>
+      </div></header>
       <div className="segmentos" role="tablist" aria-label="Seções de produtividade">
         <button type="button" role="tab" aria-selected={aba === 'fechamento'} onClick={() => setAba('fechamento')}>Fechamento</button>
-        <button type="button" role="tab" aria-selected={aba === 'apontamentos'} onClick={() => setAba('apontamentos')}>Apontamentos</button>
+        <button type="button" role="tab" aria-selected={aba === 'apontamentos'} onClick={() => setAba('apontamentos')}>{todos ? 'Apontamentos' : 'Meus apontamentos'}</button>
       </div>
-      {aba === 'fechamento' ? <Fechamento /> : <RelatorioApontamentos equipe />}
+      {aba === 'fechamento' ? <Fechamento todos={todos} /> : <RelatorioApontamentos equipe={todos} />}
     </div>
   );
 }

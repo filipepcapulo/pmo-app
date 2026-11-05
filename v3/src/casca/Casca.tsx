@@ -31,6 +31,8 @@ import { Portfolio } from '../telas/Portfolio';
 import { Equipe } from '../telas/Equipe';
 import { EquipeDev } from '../telas/EquipeDev';
 import { Inicio } from '../telas/Inicio';
+import { Manuais } from '../telas/Manuais';
+import { MANUAIS } from '../manuais';
 import { Modelos } from '../telas/Modelos';
 import { ProjetoTela } from '../telas/ProjetoTela';
 import { Projetos } from '../telas/Projetos';
@@ -45,7 +47,7 @@ const titulosConhecidos = new Map<string, string>();
 
 function tituloDe(caminho: string): string {
   const r = lerRota(caminho);
-  if (r.tipo === 'modulo') return r.modulo.titulo;
+  if (r.tipo === 'modulo') return r.parametro ? MANUAIS.find(m => m.id === r.parametro)?.titulo ?? r.modulo.titulo : r.modulo.titulo;
   if (r.tipo === 'entidade') return titulosConhecidos.get(caminho) ?? ENTIDADES[r.entidade].titulo;
   return 'Não encontrado';
 }
@@ -142,6 +144,7 @@ export function Casca() {
     }
     if (!mods.includes(r.modulo)) return <div className="vazio-tela"><h2>Sem acesso</h2><p>Você não tem permissão para {r.modulo.titulo}.</p></div>;
     if (r.modulo.id === 'inicio') return <Inicio />;
+    if (r.modulo.id === 'manuais') return <Manuais id={r.parametro} />;
     if (r.modulo.id === 'componentes') return <Componentes />;
     if (r.modulo.id === 'clientes') return <Clientes ir={ir} />;
     if (r.modulo.id === 'projetos') return <Projetos ir={ir} />;

@@ -1,4 +1,4 @@
-// Início: saudação, card de favoritos agrupado por cliente (V6, com a barra de horas) e atalhos por área.
+// Início: saudação, card de favoritos agrupado por cliente (V6, com a barra de horas), atalhos por área e os manuais da função.
 import { data } from '../api/cadastros';
 import { exec } from '../api/execucao';
 import { StatusPilula } from '../componentes/ArvoreDemandas';
@@ -11,6 +11,7 @@ import { useSessao } from '../estado/sessao';
 import { useFavoritos } from '../estado/favoritos';
 import { AREAS, caminhoEntidade, hashDe, modulosVisiveis } from '../estado/rotas';
 import { Resumo } from '../componentes/Resumo';
+import { manuaisVisiveis } from '../manuais';
 
 const PERFIS: Record<string, string> = { admin: 'Admin', gp: 'GP', lider_tech: 'Líder Tech', consultor: 'Consultor', triagem: 'Triagem' };
 
@@ -90,6 +91,17 @@ export function Inicio() {
           </section>
         );
       })}
+      <section>
+        <h2 className="secao">Manuais</h2>
+        <div className="grade-atalhos">
+          {manuaisVisiveis(eu.perfil).map(m => (
+            <a key={m.id} className="atalho" href={hashDe(`manuais/${m.id}`)}>
+              <span className="atalho-icone"><Icone nome="livro" tam={24} /></span><span className="atalho-nome">{m.titulo}</span>
+              <Icone nome="seta" tam={18} className="atalho-seta" />
+            </a>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

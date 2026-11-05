@@ -20,8 +20,18 @@ describe('rotas', () => {
     expect(lerRota('nada').tipo).toBe('desconhecida');
   });
   it('item com permissão só aparece para quem tem', () => {
-    expect(modulosVisiveis([]).some(m => m.id === 'produtividade')).toBe(false);
-    expect(modulosVisiveis(['relatorio.produtividade']).some(m => m.id === 'produtividade')).toBe(true);
+    expect(modulosVisiveis([]).some(m => m.id === 'portfolio')).toBe(false);
+    expect(modulosVisiveis(['portfolio.ver']).some(m => m.id === 'portfolio')).toBe(true);
+  });
+  it('produtividade e manuais para todos (o banco limita a produtividade ao próprio, 0045)', () => {
+    const ids = modulosVisiveis([]).map(m => m.id);
+    expect(ids).toEqual(expect.arrayContaining(['produtividade', 'manuais']));
+  });
+  it('manual por link profundo (#/manuais/<id>); parâmetro só em módulo que aceita', () => {
+    expect(lerRota('manuais')).toMatchObject({ tipo: 'modulo', modulo: { id: 'manuais' } });
+    expect(lerRota('manuais/gp')).toMatchObject({ tipo: 'modulo', modulo: { id: 'manuais' }, parametro: 'gp' });
+    expect(lerRota('demandas/gp').tipo).toBe('desconhecida');
+    expect(lerRota('manuais/gp/x').tipo).toBe('desconhecida');
   });
   it('cadastros da V5: clientes, projetos e equipe para todos; modelos com projeto.criar', () => {
     const ids = modulosVisiveis([]).map(m => m.id);

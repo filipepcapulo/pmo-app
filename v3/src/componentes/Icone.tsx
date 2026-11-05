@@ -26,6 +26,8 @@ const P: Record<string, ReactNode> = {
   baixo: <path d="M6 9l6 6 6-6" />,
   x: <path d="M6 6l12 12M18 6L6 18" />,
   funil: <path d="M3 5h18l-7 8v6l-4 2v-8z" />,
+  livro: <><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z" /><path d="M4 21V5M8 7h7M8 11h5" /></>,
+  imprimir: <><path d="M7 9V3h10v6" /><rect x="3" y="9" width="18" height="8" rx="2" /><path d="M7 14h10v7H7z" /></>,
   baixar: <path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v3h16v-3" />,
 };
 export function Icone({ nome, tam = 20, cheio = false, className }: { nome: string; tam?: number; cheio?: boolean; className?: string }) {

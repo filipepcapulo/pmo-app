@@ -773,3 +773,45 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .envio-marca { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
 .envio-tabela { overflow-x: auto; }
 .envio-resultado { margin: 0; padding-left: 18px; }
+
+/* ---------------------------------------------------------------- V11a: Ociosidade, Férias e Portfólio (conceito das telas do 2.x) */
+.ocioso-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; align-items: start; }
+.ocioso-grupo { margin-top: 14px; }
+.ocioso { padding: 12px 14px; }
+.ocioso-topo { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.ocioso-nome { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ocioso-nome strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ocioso-nome small { font-size: 12px; font-weight: 600; }
+.ocioso-barra { height: 6px; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.ocioso-barra i { display: block; height: 100%; border-radius: 3px; }
+.ocioso-resumo { margin: 8px 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ocioso-corpo { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.ocioso-corpo h4 { margin: 6px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--texto-2); }
+.ocioso-corpo .linha-s { display: flex; gap: 8px; justify-content: space-between; font-size: 13px; color: inherit; }
+.sug { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 8px; border-radius: 8px; background: var(--superficie-2); }
+.sug > div { display: flex; flex-direction: column; min-width: 0; }
+.pf-card { border: 1px solid transparent; font: inherit; color: inherit; cursor: pointer; }
+.pf-card.sel { border-color: var(--verde); box-shadow: 0 0 0 1px var(--verde); }
+.pf-dupla { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 10px; margin: 10px 0; }
+@media (max-width: 900px) { .pf-dupla { grid-template-columns: minmax(0, 1fr); } }
+.pf-gp { display: flex; flex-direction: column; gap: 4px; }
+.pf-gp-l { display: grid; grid-template-columns: minmax(80px, 140px) 1fr auto 80px; gap: 8px; align-items: center; border: 0; background: none; padding: 4px; border-radius: 6px; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.pf-gp-l.sel { background: var(--verde-claro); }
+.pf-gp-l.apagado { opacity: .45; }
+.pf-gp-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.pf-gp-trilha { height: 10px; border-radius: 5px; background: var(--superficie-2); overflow: hidden; }
+.pf-gp-trilha i { display: block; height: 100%; background: var(--verde); border-radius: 5px; }
+.pf-gantt { overflow-x: auto; }
+.pf-g-linha { display: grid; grid-template-columns: minmax(140px, 240px) minmax(480px, 1fr); align-items: center; min-height: 30px; border-bottom: 1px solid var(--linha); }
+.pf-g-cab { min-height: 22px; font-size: 11px; color: var(--texto-2); }
+.pf-g-rot { display: flex; flex-direction: column; min-width: 0; padding-right: 8px; font-size: 13px; }
+.pf-g-rot small { color: var(--texto-2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-g-rot a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-g-trilha { position: relative; height: 100%; min-height: 22px; }
+.pf-g-mes { position: absolute; top: 4px; transform: translateX(2px); white-space: nowrap; }
+.pf-g-hoje { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--azul); opacity: .6; }
+.pf-g-barra { position: absolute; top: 50%; height: 10px; margin-top: -5px; border-radius: 5px; background: var(--verde); opacity: .85; }
+.pf-g-barra.atraso { background: repeating-linear-gradient(45deg, var(--laranja), var(--laranja) 4px, color-mix(in srgb, var(--laranja) 55%, transparent) 4px, color-mix(in srgb, var(--laranja) 55%, transparent) 8px); }
+.pf-g-gl { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; transform: rotate(45deg); background: var(--azul); border: 2px solid var(--superficie); }
+.pf-g-gl.ok { background: var(--verde); }
+.pf-g-gl.vencido { background: var(--vermelho); }

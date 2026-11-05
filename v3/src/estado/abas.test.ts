@@ -54,6 +54,8 @@ describe('abas', () => {
     const e = renomear(abrir(vazio, { caminho: 'projeto/x', titulo: 'Projeto' }), 'projeto/x', 'Cliente · P1');
     expect(e.abas[0].titulo).toBe('Cliente · P1');
     expect(lerAbasSalvas('{lixo')).toEqual(vazio);
+    expect(lerAbasSalvas(JSON.stringify({ abas: [{ caminho: 'equipe-dev', titulo: 'Equipe dev' }, { caminho: 'a', titulo: 'A' }], ativa: 'equipe-dev' })))
+      .toEqual({ abas: [{ caminho: 'a', titulo: 'A' }], ativa: 'a' });
     expect(lerAbasSalvas(JSON.stringify({ abas: [{ caminho: 'a', titulo: 'A' }], ativa: 'zz' })).ativa).toBe('a');
   });
 });

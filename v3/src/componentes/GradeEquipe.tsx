@@ -42,8 +42,8 @@ function MiniFaixa({ itens }: { itens: TarefaGrade[] }) {
 }
 
 export interface Soltar { data: string; consultor: string }
-export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAusencia, geracaoExtra = 0 }: {
-  soDev?: boolean; backlogMarcado: boolean; aoSoltarBacklog: (s: Soltar) => void; aoEditarAusencia: (a: Partial<Ausencia>) => void; geracaoExtra?: number;
+export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia, geracaoExtra = 0 }: {
+  backlogMarcado: boolean; aoSoltarBacklog: (s: Soltar) => void; aoEditarAusencia: (a: Partial<Ausencia>) => void; geracaoExtra?: number;
 }) {
   const esc = useSessao().eu!.escritorio_id!;
   const pode = usePode();
@@ -75,9 +75,9 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
     const t = texto.trim().toLowerCase();
     const comTarefa = new Set(tarefas.map(x => x.consultor_id));
     return lista.filter(m => (m.ativo || comTarefa.has(m.id))
-      && (soDev ? m.papeis.includes('desenvolvedor') : m.papeis.some(p => p === 'consultor' || p === 'desenvolvedor') || comTarefa.has(m.id))
+      && (m.papeis.some(p => p === 'consultor' || p === 'desenvolvedor') || comTarefa.has(m.id))
       && (!t || m.nome.toLowerCase().includes(t))).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [lista, tarefas, texto, soDev]);
+  }, [lista, tarefas, texto]);
 
   const juntar = useCallback((g: { tarefas: TarefaGrade[]; ausencias: Ausencia[] }, deData: string, ateData: string) => {
     setTarefas(l => [...l.filter(t => t.data < deData || t.data > ateData), ...g.tarefas]);
@@ -343,7 +343,7 @@ export function GradeEquipe({ soDev, backlogMarcado, aoSoltarBacklog, aoEditarAu
         {[['livre', 'livre'], ['parcial', 'até 7 h'], ['cheio', '8 h'], ['acima', 'até 12 h'], ['excesso', 'mais de 12 h']].map(([c, r]) => <span key={c} className={`eq-carga ${c}`}>{r}</span>)}
         {TURNOS.map(t => <span key={t.valor} className="eq-leg-turno"><i className={`tu-${t.valor}`} />{t.rotulo}</span>)}
       </div>
-      {pessoas.length === 0 && !carregando && <p className="ajuda">{soDev ? 'Marque o papel Desenvolvedor em Equipe para aparecer aqui.' : 'Ninguém com esse filtro.'}</p>}
+      {pessoas.length === 0 && !carregando && <p className="ajuda">Ninguém com esse filtro.</p>}
     </section>
   );
 }

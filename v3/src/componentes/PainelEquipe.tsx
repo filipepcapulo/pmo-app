@@ -1,5 +1,6 @@
-// Grade + backlog lateral, usados pela Agenda da equipe e pela equipe dev. Um item solto na grade abre o popup único de
-// tarefa; vários abrem a alocação em lote (uma tarefa por demanda). Pedido de agenda do item alocado fica atendido.
+// Grade (ou Kanban) + backlog lateral, usados pela Agenda da equipe e pelos Chamados. Um item solto na grade abre o popup
+// único de tarefa; vários abrem a alocação em lote (uma tarefa por demanda). Pedido de agenda do item alocado fica atendido.
+// No Kanban não há dia: a alocação sugere hoje (no popup único dá para trocar a data).
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { equipe, TIPOS_AUSENCIA, type Ausencia, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
 import { exec, MODALIDADES, PERIODOS } from '../api/execucao';
@@ -13,6 +14,7 @@ import { Campo, Formulario } from './Campo';
 import { EscolhaChips } from './Chips';
 import { dataCurta } from './FormComum';
 import { GradeEquipe, type Soltar } from './GradeEquipe';
+import { KanbanEquipe } from './KanbanEquipe';
 import { Popup } from './Popup';
 import { useToast } from './Toasts';
 import { Resumo } from './Resumo';
@@ -97,7 +99,7 @@ function FormAusencia({ alvo, aoFechar, aoGravar }: { alvo: Partial<Ausencia>; a
   );
 }
 
-export function PainelEquipe({ soDev, origemInicial }: { soDev?: boolean; origemInicial?: OrigemBacklog }) {
+export function PainelEquipe({ origemInicial, vista = 'grade' }: { origemInicial?: OrigemBacklog; vista?: 'grade' | 'kanban' }) {
   const esc = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
   const avisar = useToast();
@@ -133,7 +135,9 @@ export function PainelEquipe({ soDev, origemInicial }: { soDev?: boolean; origem
     <div className={`painel-equipe${semBacklog ? ' sem-backlog' : ''}`}>
       <BacklogLateral itens={b.dados} erro={b.erro} marcados={marcados} origemInicial={origemInicial} recolhido={semBacklog} aoRecolher={recolher} aoArrastar={id => { arrastado.current = id; }}
         aoMarcar={id => setMarcados(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
-      <GradeEquipe soDev={soDev} backlogMarcado={marcados.size > 0} aoSoltarBacklog={soltar} aoEditarAusencia={setAusencia} geracaoExtra={gerAus} />
+      {vista === 'kanban'
+        ? <KanbanEquipe backlogMarcado={marcados.size > 0} aoSoltarBacklog={soltar} />
+        : <GradeEquipe backlogMarcado={marcados.size > 0} aoSoltarBacklog={soltar} aoEditarAusencia={setAusencia} geracaoExtra={gerAus} />}
       {lote && <AlocarLote {...lote} aoFechar={() => setLote(null)} aoGravar={ok => { setLote(null); atender(ok); }} />}
       {ausencia && <FormAusencia alvo={ausencia} aoFechar={() => setAusencia(null)} aoGravar={() => { setAusencia(null); setGerAus(g => g + 1); }} />}
     </div>

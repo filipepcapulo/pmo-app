@@ -2,12 +2,13 @@
 // tocar numa célula) abre a alocação; pedidos de "mais agenda" ficam destacados. Recolhe numa barra fina e filtra por status
 // (a escolha fica guardada no aparelho). Todo nível tem o lápis: cliente e projeto levam à tela própria; demanda e subdemanda
 // abrem o popup único de edição. O que já tem agenda em aberto fica marcado em verde ("2 agendas em aberto · próx. 05/11") e
-// pode ser escondido, para sobrar só o que ainda precisa de alocação.
+// pode ser escondido, para sobrar só o que ainda precisa de alocação. O filtro "GP responsável" (3.13.0) usa a regra da pílula:
+// responsável da demanda, senão o da mãe, o do projeto, o do cliente (gp_id vem do banco).
 import { useEffect, useMemo, useState } from 'react';
-import { arvoreBacklog, ORIGENS, porProjeto, rotuloAgendas, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
+import { arvoreBacklog, doGp, ORIGENS, porProjeto, rotuloAgendas, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
 import { rotuloPrioridade } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
-import { usePode } from '../estado/equipe';
+import { gps, useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe, type Entidade } from '../estado/rotas';
 import { Icone } from './Icone';
 import { Resumo } from './Resumo';
@@ -53,8 +54,15 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
   const chaveStatus = `pmo3.backlog.status.${origemInicial ?? 'geral'}`;
   const [fora, setFora] = useState(() => lerFora(chaveStatus));
   const [soSemAgenda, setSoSemAgenda] = useState(false);
+  const { lista } = useEquipe();
+  const [gp, setGp] = useState('');
   useEffect(() => { try { localStorage.setItem(chaveStatus, JSON.stringify([...fora])); } catch { /* */ } }, [fora, chaveStatus]);
-  const arvore = useMemo(() => arvoreBacklog((itens ?? []).filter(i => !soSemAgenda || !i.agendas), origem, texto, fora), [itens, origem, texto, fora, soSemAgenda]);
+  const arvore = useMemo(() => arvoreBacklog(doGp(itens ?? [], gp).filter(i => !soSemAgenda || !i.agendas), origem, texto, fora), [itens, origem, texto, fora, soSemAgenda, gp]);
+  // GPs possíveis + quem aparece como GP de algum item (responsável que não é GP também filtra)
+  const opcoesGp = useMemo(() => {
+    const ids = new Set([...gps(lista).map(m => m.id), ...(itens ?? []).map(i => i.gp_id).filter((x): x is string => !!x)]);
+    return lista.filter(m => ids.has(m.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }, [lista, itens]);
   const opcoesStatus = useMemo(() => statusBacklog(itens ?? []), [itens]);
   const escolhidos = opcoesStatus.filter(o => !fora.has(o.valor));
   const visiveis = arvore.reduce((s, c) => s + c.total, 0);
@@ -81,6 +89,10 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
         <select value={origem} onChange={e => setOrigem(e.target.value as OrigemBacklog | '')} aria-label="Origem do backlog">
           <option value="">Tudo</option>
           {ORIGENS.map(o => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
+        </select>
+        <select value={gp} onChange={e => setGp(e.target.value)} aria-label="GP responsável">
+          <option value="">GP responsável: todos</option>
+          {opcoesGp.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
         </select>
         <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Cliente ou demanda…" aria-label="Buscar no backlog" />
         <details className="bl-status">

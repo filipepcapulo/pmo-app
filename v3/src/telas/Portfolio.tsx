@@ -1,12 +1,17 @@
 // Portfólio de projetos (#/portfolio, V11a): como o módulo do 2.x — cartões por fase e gráfico por GP (tocar filtra),
 // Gantt dos projetos com o Go Live (losango; vermelho = vencido em aberto, barra laranja = etapa vencida), grade e riscos.
+// 3.13.0: fases e GPs em seleção múltipla; Avulso só no Gantt com cronograma; a tabela sinaliza o cliente com plano de
+// ação aberto e o "+ Plano" abre o mesmo 5W2H da Tela de Projeto.
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { diaNum } from '../api/projeto';
-import { fasesDe, filtrar, janelaGantt, porGp, portfolio, SEM_GP, type ProjetoPortfolio, type RiscoPortfolio } from '../api/portfolio';
+import { alternar, fasesDe, filtrar, gpsDe, janelaGantt, paraGantt, planosPorCliente, porGp, portfolio, SEM_GP, type ProjetoPortfolio, type RiscoPortfolio } from '../api/portfolio';
+import type { DemandaProjeto } from '../api/projeto';
+import { Popup5W2H } from '../componentes/Popup5W2H';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
+import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 
@@ -14,6 +19,19 @@ const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'o
 const COR_NIVEL = { critico: 'var(--vermelho)', alto: 'var(--laranja)', moderado: 'var(--texto-2)' };
 const ROT_NIVEL = { critico: 'Crítico', alto: 'Alto', moderado: 'Moderado' };
 const linkProjeto = (id: string, nome: string) => <a href={hashDe(caminhoEntidade('projeto', id))}>{nome}</a>;
+
+// Seleção múltipla em lista suspensa (o resumo diz quantos): fases e GPs.
+function Multipla({ rotulo, opcoes, sel, aoMudar }: { rotulo: string; opcoes: string[]; sel: string[]; aoMudar: (s: string[]) => void }) {
+  return (
+    <details className="pf-multi">
+      <summary aria-label={`${rotulo}: ${sel.length ? sel.join(', ') : 'todos'}`}>{rotulo}: {sel.length === 0 ? 'todos' : sel.length === 1 ? sel[0] : `${sel.length} selecionados`}</summary>
+      <div className="pf-multi-lista">
+        {opcoes.map(o => <label key={o} className="check"><input type="checkbox" checked={sel.includes(o)} onChange={() => aoMudar(alternar(sel, o))} /> {o}</label>)}
+        {sel.length > 0 && <button type="button" className="link" onClick={() => aoMudar([])}>Limpar</button>}
+      </div>
+    </details>
+  );
+}
 
 function GanttPortfolio({ ps, hoje }: { ps: ProjetoPortfolio[]; hoje: string }) {
   if (!ps.length) return <p className="ajuda">Nenhum projeto.</p>;
@@ -56,16 +74,22 @@ export function Portfolio() {
   const esc = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
   const c = useCarga(() => portfolio.ler(esc), [esc, ed.geracao]);
-  const [fase, setFase] = useState('');
-  const [gp, setGp] = useState('');
+  const pode = usePode();
+  const [fases, setFases] = useState<string[]>([]);
+  const [gpsSel, setGps] = useState<string[]>([]);
   const [texto, setTexto] = useState('');
+  const [plano, setPlano] = useState<Partial<DemandaProjeto> | null>(null);
   const ps = c.dados?.projetos ?? [];
-  const doGp = useMemo(() => filtrar(ps, { gp }), [ps, gp]);
-  const daFase = useMemo(() => filtrar(ps, { fase }), [ps, fase]);
-  const lista = useMemo(() => filtrar(ps, { fase, gp, texto }), [ps, fase, gp, texto]);
+  const doGp = useMemo(() => filtrar(ps, { gps: gpsSel }), [ps, gpsSel]);
+  const daFase = useMemo(() => filtrar(ps, { fases }), [ps, fases]);
+  const lista = useMemo(() => filtrar(ps, { fases, gps: gpsSel, texto }), [ps, fases, gpsSel, texto]);
+  const planos = useMemo(() => planosPorCliente(c.dados?.riscos ?? [], ps), [c.dados, ps]);
+  const podePlano = pode('demanda.criar');
   const barras = porGp(daFase), max = Math.max(1, ...barras.map(b => b.n));
   const colunas = useMemo<Coluna<ProjetoPortfolio>[]>(() => [
-    { chave: 'cliente', titulo: 'Cliente' },
+    { chave: 'cliente', titulo: 'Cliente', render: p => (planos.get(p.cliente_id)
+      ? <span className="pf-cli">{p.cliente} <span className="pilula pf-plano" title="Cliente com plano de ação aberto (5W2H)">{planos.get(p.cliente_id)} plano{planos.get(p.cliente_id)! > 1 ? 's' : ''} de ação</span></span>
+      : p.cliente) },
     { chave: 'nome', titulo: 'Projeto', render: p => linkProjeto(p.id, p.nome), texto: p => p.nome },
     { chave: 'fase', titulo: 'Fase' },
     { chave: 'gp', titulo: 'GP', texto: p => p.gp ?? SEM_GP },
@@ -78,7 +102,9 @@ export function Portfolio() {
     { chave: 'horas_agendadas', titulo: 'Agendadas', alinhar: 'dir', texto: p => horas(p.horas_agendadas), valor: p => p.horas_agendadas },
     { chave: 'horas_executadas', titulo: 'Executadas', alinhar: 'dir', texto: p => horas(p.horas_executadas), valor: p => p.horas_executadas },
     { chave: 'demandas_abertas', titulo: 'Demandas abertas', alinhar: 'dir' },
-  ], []);
+    { chave: 'plano', titulo: 'Plano de ação', texto: p => (planos.get(p.cliente_id) ? 'Sim' : ''), valor: p => planos.get(p.cliente_id) ?? 0,
+      render: p => (podePlano ? <button type="button" className="link" aria-label={`Novo plano de ação em ${p.nome}`} onClick={() => setPlano({ projeto_id: p.id })}>+ Plano</button> : null) },
+  ], [planos, podePlano]);
   const colRiscos = useMemo<Coluna<RiscoPortfolio>[]>(() => [
     { chave: 'nivel', titulo: 'Nível', texto: r => ROT_NIVEL[r.nivel], render: r => <span className="pilula" style={{ background: COR_NIVEL[r.nivel], color: '#fff' }}>{ROT_NIVEL[r.nivel]}</span> },
     { chave: 'nome', titulo: 'Plano de ação', render: r => <a href={hashDe(caminhoEntidade('demanda', r.demanda_id))}>{r.nome}</a>, texto: r => r.nome },
@@ -90,13 +116,13 @@ export function Portfolio() {
   ], []);
   return (
     <div className="pagina pagina-larga">
-      <header className="pagina-topo"><div><h1>Portfólio de projetos</h1><p className="ajuda">Projetos ativos por fase e GP, Go Live, atraso, horas e riscos ativos. Toque num cartão ou numa barra para filtrar.</p></div></header>
+      <header className="pagina-topo"><div><h1>Portfólio de projetos</h1><p className="ajuda">Projetos ativos por fase e GP, Go Live, atraso, horas e riscos ativos. Toque nos cartões e nas barras para filtrar (vários de uma vez). No Gantt, projeto Avulso só aparece com cronograma.</p></div></header>
       {c.erro && <p className="msg-erro">{c.erro}</p>}
       {c.dados && <>
         <section className="indicadores" aria-label="Projetos por fase">
-          <button type="button" className={`indicador pf-card${fase === '' ? ' sel' : ''}`} onClick={() => setFase('')}><small>Projetos</small><strong style={{ color: 'var(--verde)' }} data-testid="pf-total">{doGp.length}</strong></button>
+          <button type="button" className={`indicador pf-card${fases.length === 0 ? ' sel' : ''}`} onClick={() => setFases([])}><small>Projetos</small><strong style={{ color: 'var(--verde)' }} data-testid="pf-total">{doGp.length}</strong></button>
           {fasesDe(ps).map(f => (
-            <button key={f} type="button" className={`indicador pf-card${fase === f ? ' sel' : ''}`} aria-pressed={fase === f} onClick={() => setFase(fase === f ? '' : f)}>
+            <button key={f} type="button" className={`indicador pf-card${fases.includes(f) ? ' sel' : ''}`} aria-pressed={fases.includes(f)} onClick={() => setFases(alternar(fases, f))}>
               <small>{f}</small><strong>{doGp.filter(p => p.fase === f).length}</strong>
             </button>
           ))}
@@ -106,7 +132,7 @@ export function Portfolio() {
             <h2 className="secao">Projetos por GP</h2>
             <div className="pf-gp">
               {barras.map(b => (
-                <button key={b.gp} type="button" className={`pf-gp-l${gp === b.gp ? ' sel' : ''}${gp && gp !== b.gp ? ' apagado' : ''}`} onClick={() => setGp(gp === b.gp ? '' : b.gp)}>
+                <button key={b.gp} type="button" aria-pressed={gpsSel.includes(b.gp)} className={`pf-gp-l${gpsSel.includes(b.gp) ? ' sel' : ''}${gpsSel.length && !gpsSel.includes(b.gp) ? ' apagado' : ''}`} onClick={() => setGps(alternar(gpsSel, b.gp))}>
                   <span className="pf-gp-nome">{b.gp}</span>
                   <span className="pf-gp-trilha"><i style={{ width: `${(b.n / max) * 100}%` }} /></span>
                   <b>{b.n}</b><small className="excecao">{b.atrasados ? `${b.atrasados} atrasado${b.atrasados > 1 ? 's' : ''}` : ''}</small>
@@ -122,15 +148,18 @@ export function Portfolio() {
           </section>
         </div>
         <div className="barra-filtros">
+          <Multipla rotulo="Fases" opcoes={fasesDe(ps)} sel={fases} aoMudar={setFases} />
+          <Multipla rotulo="GPs" opcoes={gpsDe(ps)} sel={gpsSel} aoMudar={setGps} />
           <input type="search" placeholder="Buscar projeto, cliente, GP ou fase" value={texto} onChange={e => setTexto(e.target.value)} aria-label="Buscar projeto" />
-          {(fase || gp || texto) && <button type="button" className="link" onClick={() => { setFase(''); setGp(''); setTexto(''); }}>Limpar filtros</button>}
+          {(fases.length > 0 || gpsSel.length > 0 || texto) && <button type="button" className="link" onClick={() => { setFases([]); setGps([]); setTexto(''); }}>Limpar filtros</button>}
         </div>
-        <section className="cartao"><h2 className="secao">Cronograma</h2><GanttPortfolio ps={lista} hoje={c.dados.hoje} /></section>
+        <section className="cartao"><h2 className="secao">Cronograma</h2><GanttPortfolio ps={paraGantt(lista)} hoje={c.dados.hoje} /></section>
         <section className="cartao">
           <Tabela id="portfolio" nome="Portfólio de projetos" colunas={colunas} linhas={lista} chave={p => p.id} tamanhoInicial={15} vazio="Nenhum projeto encontrado." />
         </section>
       </>}
       {c.carregando && !c.dados && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}
+      <Popup5W2H plano={plano} aoFechar={() => setPlano(null)} aoGravar={() => { setPlano(null); ed.mudou(); }} />
     </div>
   );
 }

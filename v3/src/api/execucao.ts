@@ -91,6 +91,8 @@ const salvar = <R = Record<string, unknown>>(funcao: string, esc: string, dados:
 
 /** Escolha da demanda em cascata (como o "Escolha o cliente…" do 2.x): clientes → demandas e subdemandas abertas do cliente. */
 export interface OpcaoCliente { id: string; nome: string }
+export interface ItemConflito { responsavel_id: string; data: string; periodo: string; hora_ini: string | null; hora_fim: string | null; tarefa_id?: string }
+export interface Conflito { item: number; tipo: 'agenda' | 'ausencia' | 'lote'; consultor_id: string; consultor: string | null; data: string; horario: string; existente: string; descricao: string }
 export interface OpcaoDemandaCliente { id: string; nome: string; pai_id: string | null; status: string; projeto_id: string; projeto: string }
 /** Demandas (sem pai) do cliente e as subdemandas da escolhida; subdemanda órfã (sem a demanda na lista) vira demanda. */
 export function cascataDemandas(itens: OpcaoDemandaCliente[], demanda: string) {
@@ -110,6 +112,8 @@ export const exec = {
   opcoes: (esc: string) => rpc<OpcoesExecucao>('v1_opcoes_execucao', { p_escritorio: esc }),
   demandaSalvar: (esc: string, d: Record<string, unknown>) => salvar<Demanda>('v1_demanda_salvar', esc, d),
   tarefasSalvar: (esc: string, d: Record<string, unknown>) => salvar<Tarefa>('v1_tarefas_salvar', esc, d),
+  /** Choques de horário (agenda, ausência e o próprio lote) das tarefas a gravar — 0044. */
+  conflitos: (esc: string, itens: ItemConflito[]) => rpc<Conflito[]>('v1_conflitos_agenda', { p_escritorio: esc, p_itens: itens }),
   liberarHoras: (esc: string, d: { projeto_id: string; horas: number; justificativa: string }) => salvar('v1_liberacao_horas_salvar', esc, d),
   comentarios: (esc: string, entidade: EntidadeComentavel, id: string) =>
     rpc<Comentario[]>('v1_comentarios', { p_escritorio: esc, p_entidade: entidade, p_entidade_id: id }),

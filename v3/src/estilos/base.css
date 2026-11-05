@@ -315,10 +315,9 @@ body.redimensionando, body.redimensionando * { cursor: col-resize !important; us
 .pessoa-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pessoa-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--verde-escuro); color: #fff; font-size: .68rem; font-weight: 700;
   display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.pessoa-dica { position: fixed; z-index: 70; width: 280px; max-width: calc(100vw - 16px); background: var(--superficie); color: var(--texto);
+.pessoa-dica { position: fixed; z-index: 90; width: 280px; max-width: calc(100vw - 16px); background: var(--superficie); color: var(--texto);
   border: 1px solid var(--linha); border-radius: 10px; box-shadow: var(--sombra-alta); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
   font-size: .85rem; font-weight: 400; text-align: left; pointer-events: none; white-space: normal; }
-.pessoa-dica.acima { transform: translateY(-100%); }
 .pessoa-dica small { color: var(--texto-2); }
 .pilulas { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; margin: 0; padding: 0; }
 .pilula-cert { background: var(--verde); color: #fff; }
@@ -735,10 +734,9 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .bl-item:has(.res-fora), .bl-linha:has(.res-fora), .linha-exec:has(> .linha-exec-topo .res-fora), .tabela tr:has(.res-fora) > td { background: var(--fora); }
 .pilula-gp { margin-right: 4px; background: var(--verde-claro); color: var(--verde-texto); text-transform: none; letter-spacing: 0; vertical-align: 1px; }
 .res-plano { margin-left: 4px; color: var(--laranja); font-weight: 700; }
-.res-dica { position: fixed; z-index: 70; width: 300px; max-width: calc(100vw - 16px); background: var(--superficie); color: var(--texto);
+.res-dica { position: fixed; z-index: 90; width: 300px; max-width: calc(100vw - 16px); background: var(--superficie); color: var(--texto);
   border: 1px solid var(--linha); border-radius: var(--raio); box-shadow: var(--sombra-alta); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
   font-size: 13px; font-weight: 400; line-height: 1.35; text-transform: none; text-align: left; white-space: normal; letter-spacing: 0; pointer-events: none; cursor: default; }
-.res-dica.acima { transform: translateY(-100%); }
 .res-dica small { color: var(--texto-2); }
 .res-dica strong { font-size: 14px; overflow-wrap: anywhere; }
 .res-dica em { font-style: normal; font-weight: 600; color: var(--vermelho); }
@@ -747,9 +745,15 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .res-campos b { text-align: right; font-weight: 600; }
 .eq-tarefa > .res { display: flex; flex-direction: column; gap: inherit; width: 100%; min-width: 0; }
 .eq-tarefa > .res > .res-plano { position: absolute; top: 2px; right: 4px; margin: 0; }
+/* o resumo responde no cartão inteiro da grade (não só nas linhas de texto: cartão de "Dia" é alto e vazio embaixo) */
+.eq-tarefa.na-escala > .res { flex: 1 1 auto; min-height: 0; }
+.eq-tarefa.na-escala.mini > .res { justify-content: center; }
+.conflitos { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+.conflito { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: var(--superficie-2); border-left: 3px solid var(--laranja); }
+.conflito-ausencia { border-left-color: var(--vermelho); }
+.conflito small { color: var(--texto-2); overflow-wrap: anywhere; }
 .eq-tarefa { position: relative; }
-.eq-tarefa .res-dica, .eq-tarefa .res-dica span { white-space: normal; overflow: visible; text-overflow: clip; }
-.res-dica small, .bl-item .res-dica small { padding: 0; color: var(--texto-2); }
+.res-dica small { padding: 0; color: var(--texto-2); }
 
 /* Visão do consultor (V10a): dia em seções, tarefa em cartão com ação à mão no celular */
 .cons-nav { justify-content: space-between; }

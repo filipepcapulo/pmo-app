@@ -7,13 +7,14 @@ import { useEquipe } from '../estado/equipe';
 import type { Resumo as DadosResumo, TipoResumo } from '../estado/resumos';
 import { useResumo } from '../estado/resumosCtx';
 import { BarraHoras } from './BarraHoras';
+import { DicaFlutuante } from './DicaFlutuante';
 
 const ROTULO = { cliente: 'Cliente', projeto: 'Projeto', demanda: 'Demanda' };
 const planos = (n: number) => `${n} plano${n > 1 ? 's' : ''} de ação em aberto`;
 
-function Dica({ tipo, r, gp, local, id, acima, x, y }: { tipo: TipoResumo; r: DadosResumo; gp: string | null; local?: string; id: string; acima: boolean; x: number; y: number }) {
+function Dica({ tipo, r, gp, local, id, ancora }: { tipo: TipoResumo; r: DadosResumo; gp: string | null; local?: string; id: string; ancora: DOMRect }) {
   return (
-    <span id={id} role="tooltip" className={`res-dica${acima ? ' acima' : ''}`} style={{ left: x, top: y }}>
+    <DicaFlutuante id={id} className="res-dica" ancora={ancora}>
       <small>{local ?? (r.sub ? 'Subdemanda' : ROTULO[tipo])}</small>
       <strong>{r.nome}</strong>
       <BarraHoras previsto={r.horas_previstas} real={r.horas_reais} planejado={r.horas_planejadas} compacta />
@@ -29,14 +30,14 @@ function Dica({ tipo, r, gp, local, id, acima, x, y }: { tipo: TipoResumo; r: Da
       {r.fora_prazo && <em>Fora do prazo</em>}
       {r.fora_horas && <em>Fora das horas</em>}
       {r.planos_abertos > 0 && <em>⚠ {planos(r.planos_abertos)}</em>}
-    </span>
+    </DicaFlutuante>
   );
 }
 
 export function Resumo({ tipo, id, comGp, local, children }: { tipo: TipoResumo; id: string | null | undefined; comGp?: boolean; local?: string; children: ReactNode }) {
   const r = useResumo(tipo, id);
   const { porId } = useEquipe();
-  const [pos, setPos] = useState<{ x: number; y: number; acima: boolean } | null>(null);
+  const [pos, setPos] = useState<DOMRect | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
   const dica = useId();
   // a dica é fixa na janela: rolar ou arrastar deixaria ela solta longe do nome
@@ -50,9 +51,7 @@ export function Resumo({ tipo, id, comGp, local, children }: { tipo: TipoResumo;
   if (!r) return <>{children}</>;
   const abrir = () => {
     const c = ref.current?.getBoundingClientRect();
-    if (!c) return;
-    const acima = c.bottom + 260 > window.innerHeight;
-    setPos({ x: Math.max(8, Math.min(c.left, window.innerWidth - 308)), y: acima ? c.top - 6 : c.bottom + 6, acima });
+    if (c) setPos(c);
   };
   const gp = r.gp_id ? porId.get(r.gp_id)?.nome ?? null : null;
   return (
@@ -61,7 +60,7 @@ export function Resumo({ tipo, id, comGp, local, children }: { tipo: TipoResumo;
       {comGp && gp && <span className="pilula pilula-gp">{gp.split(' ')[0]}</span>}
       {children}
       {r.planos_abertos > 0 && <span className="res-plano" role="img" aria-label={planos(r.planos_abertos)}>⚠</span>}
-      {pos && <Dica tipo={tipo} r={r} gp={gp} local={local} id={dica} {...pos} />}
+      {pos && <Dica tipo={tipo} r={r} gp={gp} local={local} id={dica} ancora={pos} />}
     </span>
   );
 }

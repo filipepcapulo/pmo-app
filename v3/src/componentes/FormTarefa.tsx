@@ -4,15 +4,17 @@
 // restante dos dados. Cada combinação é gravada numa chamada própria (grupo próprio = tarefa própria no ClickUp).
 // Tarefa já lançada: "+ Mais agenda" duplica a agenda (mesmos cliente/demanda/subdemanda, título, tipo e detalhes) pedindo só a
 // nova data e o horário, como o "Alocar mais" do 2.x.
+// Antes de gravar, os choques de horário (agenda, ausência, o próprio lote) aparecem para confirmar ou voltar ao lançamento.
 import { useEffect, useState } from 'react';
 import { horas } from '../api/cadastros';
-import { exec, MODALIDADES, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, type OpcoesExecucao, type Tarefa } from '../api/execucao';
+import { exec, MODALIDADES, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
 import type { AlvoTarefa } from '../estado/edicao';
 import { usePode, useEquipe } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
 import { Botao } from './Botao';
 import { Campo, Formulario } from './Campo';
 import { EscolhaChips } from './Chips';
+import { ConflitosAgenda } from './ConflitosAgenda';
 import { EscolhaDemanda } from './EscolhaDemanda';
 import { CaixaEscolhida, dataCurta, hojeLocal, opcoesDe, proximoDiaUtil } from './FormComum';
 import { Popup } from './Popup';
@@ -43,6 +45,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
   const [mais, setMais] = useState<{ data: string; periodo: string; ini: string; fim: string } | null>(null);
+  const [conf, setConf] = useState<{ lista: Conflito[]; seguir: () => void } | null>(null);
   const novo = !alvo.id;
   const podeGravar = pode(novo ? 'tarefa.criar' : 'tarefa.editar');
 
@@ -75,6 +78,18 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
   };
   // ao gravar sem ter adicionado nada, o que está no montador vale como a única combinação
   const lista = combos.length ? combos : montadorPronto ? [mont] : [];
+  const item = (resp: string, data: string, c: { periodo: string; ini: string; fim: string }, tarefa_id?: string): ItemConflito =>
+    ({ responsavel_id: resp, data, periodo: c.periodo, hora_ini: c.periodo === 'livre' ? c.ini : null, hora_fim: c.periodo === 'livre' ? c.fim : null, tarefa_id });
+  // Choques de horário antes de gravar: sem nenhum grava direto; com algum, pergunta (Lançar mesmo assim → grava, também sobre
+  // ausência; Voltar → fica no lançamento). Banco sem a função (anterior à 0044) não impede gravar.
+  const conferir = async (itens: ItemConflito[], gravar: (ignorarAusencia: boolean) => Promise<void>) => {
+    let achados: Conflito[] = [];
+    setGravando(true);
+    try { achados = await exec.conflitos(esc, itens); } catch { achados = []; }
+    setGravando(false);
+    if (!achados.length) return gravar(false);
+    setConf({ lista: achados, seguir: () => { setConf(null); gravar(achados.some(c => c.tipo === 'ausencia')); } });
+  };
 
   const enviar = async (excluir = false) => {
     setErro(null);
@@ -83,6 +98,14 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
       if (novo && !lista.length) { setErro('Monte ao menos uma combinação de consultor, data e período.'); return; }
       if (!novo && horarioInvalido(f)) { setErro('No horário livre, informe início e fim (hh:mm, fim depois do início).'); return; }
     }
+    // editar sem mexer em consultor, data ou horário não pergunta de novo por um choque que já existia
+    const mesmoHorario = !novo && orig && orig.responsavel_id === f.resp && orig.data === f.data && orig.periodo === f.periodo
+      && (orig.hora_ini?.slice(0, 5) ?? '') === (f.periodo === 'livre' ? f.ini : '') && (orig.hora_fim?.slice(0, 5) ?? '') === (f.periodo === 'livre' ? f.fim : '');
+    if (excluir || mesmoHorario || (!novo && ['cancelada', 'nao_executada'].includes(f.status))) return gravar(excluir, false);
+    return conferir(novo ? lista.map(c => item(c.resp, c.data, c)) : [item(f.resp, f.data, f, alvo.id)], ign => gravar(false, ign));
+  };
+  const gravar = async (excluir: boolean, ignorarAusencia: boolean) => {
+    const forcar = ignorarAusencia ? { ignorar_ausencia: true } : {};
     setGravando(true);
     const comuns = { nome: f.nome.trim(), modalidade: f.modalidade || null, status: f.status, detalhamento: f.detalhamento.trim() || null,
       etapa: f.etapa || null, agendamento: f.agendamento || null, experience: f.experience || null, apontamento: f.apontamento || null };
@@ -92,7 +115,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
       let feitas = 0;
       try {
         for (const c of lista) {
-          await exec.tarefasSalvar(esc, { demanda_id: f.demanda, ...comuns, ...horario(c), modalidade: c.modalidade || null, responsaveis: [c.resp], datas: [c.data] });
+          await exec.tarefasSalvar(esc, { demanda_id: f.demanda, ...comuns, ...horario(c), modalidade: c.modalidade || null, responsaveis: [c.resp], datas: [c.data], ...forcar });
           feitas++;
         }
         avisar(`${feitas} tarefa(s) criada(s)`, 'ok');
@@ -107,7 +130,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
     }
     try {
       await exec.tarefasSalvar(esc, { id: alvo.id, versao: orig!.versao,
-        ...(excluir ? { excluir: true } : { ...comuns, ...horario(f), responsavel_id: f.resp, data: f.data }) });
+        ...(excluir ? { excluir: true } : { ...comuns, ...horario(f), responsavel_id: f.resp, data: f.data, ...forcar }) });
       avisar(excluir ? 'Tarefa excluída' : 'Tarefa gravada', 'ok');
       aoGravar();
     } catch (e) { setErro((e as Error).message); }
@@ -119,13 +142,17 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
     setErro(null);
     if (!mais.data) { setErro('Informe a data da nova agenda.'); return; }
     if (horarioInvalido(mais)) { setErro('No horário livre, informe início e fim (hh:mm, fim depois do início).'); return; }
+    return conferir([item(orig.responsavel_id, mais.data, mais)], ign => gravarMais(ign));
+  };
+  const gravarMais = async (ignorarAusencia: boolean) => {
+    if (!orig || !mais) return;
     setGravando(true);
     try {
       // a nova nasce planejada e sem Experience lançado; o resto vem da agenda já lançada (não do que foi editado e não gravado)
       await exec.tarefasSalvar(esc, { demanda_id: orig.demanda_id, nome: orig.nome, modalidade: orig.modalidade, detalhamento: orig.detalhamento,
         etapa: orig.etapa, agendamento: orig.agendamento, apontamento: orig.apontamento, status: 'planejada',
         periodo: mais.periodo, hora_ini: mais.periodo === 'livre' ? mais.ini : null, hora_fim: mais.periodo === 'livre' ? mais.fim : null,
-        responsaveis: [orig.responsavel_id], datas: [mais.data] });
+        responsaveis: [orig.responsavel_id], datas: [mais.data], ...(ignorarAusencia ? { ignorar_ausencia: true } : {}) });
       avisar(`Agenda adicionada em ${dataCurta(mais.data)}`, 'ok');
       aoGravar();
     } catch (e) { setErro((e as Error).message); }
@@ -234,6 +261,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
         )}
         {erro && <p className="msg-erro" role="alert">{erro}</p>}
       </Formulario>
+      {conf && <ConflitosAgenda conflitos={conf.lista} gravando={gravando} aoVoltar={() => setConf(null)} aoSeguir={conf.seguir} />}
     </Popup>
   );
 }

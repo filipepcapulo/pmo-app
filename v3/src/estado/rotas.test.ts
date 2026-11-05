@@ -6,6 +6,10 @@ describe('rotas', () => {
     expect(caminhoDoHash('')).toBe('inicio');
     expect(caminhoDoHash('#/')).toBe('inicio');
   });
+  it('Equipe dev saiu (3.13.0): o link antigo cai na Agenda da equipe e ela some do menu', () => {
+    expect(caminhoDoHash('#/equipe-dev')).toBe('agenda');
+    expect(lerRota('equipe-dev').tipo).toBe('desconhecida');
+  });
   it('hash do login por link (#access_token=…) não é rota', () => {
     expect(caminhoDoHash('#access_token=abc&type=magiclink')).toBeNull();
   });

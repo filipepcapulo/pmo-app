@@ -12,7 +12,7 @@ Entre em **https://filipepcapulo.github.io/pmo-app/v3/** com o seu e-mail da San
 - **Execução › Desvios de agenda**: aprovar ou recusar os desvios dos seus projetos.
 - **Execução › Ociosidade**: quem está sem agenda ou com horas livres no dia, com sugestões.
 - **Relatórios › Produtividade**: conferir os apontamentos e fazer o fechamento.
-- **Relatórios › Portfólio** e **Execução › Controle de Férias**: visão geral dos projetos e prazos de férias.
+- **Relatórios › Portfólio** e **Execução › Controle de Férias**: visão geral dos projetos e prazos de férias. No Portfólio, fases e GPs aceitam vários de uma vez, o cliente com plano de ação aberto fica marcado e **+ Plano** cria um 5W2H ali mesmo.
 - **O sino (🔔) no topo**: os avisos que pedem a sua ação. Tocar no aviso abre a tela certa.
 - **Geral › Manuais**: este manual e o do consultor, para consultar ou imprimir.
 
@@ -82,6 +82,8 @@ Depois de decidido, o desvio não pode ser decidido de novo. Avisos: o consultor
 - **Repetir uma agenda**: abra a agenda e use **+ Mais agenda** para criar outra igual com nova data e horário.
 - **Ausências**: **+ Ausência** (férias, folga, licença ou algumas horas). O dia de ausência inteira bloqueia a célula; ausência de algumas horas só desconta as horas.
 - No backlog, "agendas em aberto" mostra o que já tem agenda futura; use o filtro para esconder.
+- **GP responsável** (filtro do backlog): mostra só o que é seu — o responsável da demanda; sem responsável, o da demanda-mãe, o GP do projeto ou o do cliente.
+- **Kanban** (aba ao lado de Grade): só as agendas em aberto, em colunas por **consultor**, **cliente** ou **demanda/subdemanda** (escolha em "Agrupar por"). Por consultor, arraste o cartão para outra coluna para trocar o consultor (a data fica) ou solte uma demanda do backlog na coluna para agendar. O backlog fica do lado também aqui.
 
 ## 6. Ociosidade
 

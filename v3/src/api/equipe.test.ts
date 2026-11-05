@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreBacklog, blocosDia, faixaEscala, marcasEscala, PX_HORA, rotuloAgendas, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, paraGravar, rotuloAgenda, segundaDe, situacaoFila, statusBacklog, sugerirReprogramacao, turnoDe, wip,
-  type Ausencia, type DepFila, type ItemBacklog, type ItemFila, type TarefaGrade } from './equipe';
+import { arvoreBacklog, blocosDia, colunasKanban, doGp, faixaEscala, marcasEscala, PX_HORA, rotuloAgendas, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, rotuloAgenda, segundaDe, statusBacklog, turnoDe,
+  type AgendaAberta, type Ausencia, type ItemBacklog, type TarefaGrade } from './equipe';
 
-const item = (o: Partial<ItemFila>): ItemFila => ({ fila_id: 'f', id: 'a', nome: 'A', pai: null, status: 'planejada', inicio: null, fim: null, horas: 8,
-  versao: 1, prioridade: 'normal', projeto: 'P', cliente: 'C', bloqueio: null, tarefas: [], ...o });
-const dep = (o: Partial<DepFila>): DepFila => ({ id: 'd', origem: 'a', destino: 'b', tipo: 'TI', folga_dias: 0, versao: 1, origem_nome: 'A',
-  origem_status: 'em_andamento', origem_fim: null, ...o });
 const back = (o: Partial<ItemBacklog>): ItemBacklog => ({ id: 'd1', pai_id: null, pai: null, nome: 'D1', prioridade: 'normal', status: 'backlog', cliente_id: 'c1',
   cliente: 'Almont', projeto_id: 'p', projeto: 'P1', origem: 'demanda', horas: 8, pedidos: [], ...o });
 const tar = (o: Partial<TarefaGrade>): TarefaGrade => ({ id: 't', versao: 1, data: '2026-11-04', periodo: 'manha', hora_ini: null, hora_fim: null, horas_previstas: 4,
@@ -71,46 +67,26 @@ describe('mover', () => {
   it('soltar no mesmo lugar não grava', () => expect(itensMover([tar({})], tar({}), '2026-11-04', 'u1')).toEqual([]));
 });
 
-describe('fila', () => {
-  it('situação: bloqueio manda; depois em andamento; TI pendente bloqueia; concluída libera', () => {
-    const b = item({ id: 'b' });
-    expect(situacaoFila(item({ bloqueio: { id: 'x', versao: 1, motivo: 'm', inicio: '' }, status: 'em_andamento' }), [])).toBe('bloqueada');
-    expect(situacaoFila(item({ status: 'em_andamento' }), [])).toBe('agora');
-    expect(situacaoFila(b, [dep({})])).toBe('bloqueada');
-    expect(situacaoFila(b, [dep({ origem_status: 'concluida' })])).toBe('proxima');
+describe('Kanban', () => {
+  const ab = (o: Partial<AgendaAberta>): AgendaAberta => ({ ...tar({}), pai_id: null, pai: null, cliente_id: 'c1', ...o });
+  const nomes = new Map([['u1', 'Bruno'], ['u2', 'Ana']]);
+  const lista = [
+    ab({ id: 'a', data: '2026-11-10', consultor_id: 'u1', cliente_id: 'c2', cliente: 'Zeta', demanda_id: 's', demanda: 'Sub', pai_id: 'm', pai: 'Mãe', horas_previstas: 4 }),
+    ab({ id: 'b', data: '2026-11-03', consultor_id: 'u1', cliente_id: 'c1', cliente: 'Almont', demanda_id: 'd', demanda: 'Dem', horas_previstas: 8 }),
+    ab({ id: 'c', data: '2026-11-05', consultor_id: 'u2', cliente_id: 'c1', cliente: 'Almont', demanda_id: 'd', demanda: 'Dem', horas_previstas: 2 }),
+  ];
+  it('por consultor: colunas por nome, cartões por data, total de horas; extra entra vazia', () => {
+    const c = colunasKanban(lista, 'consultor', id => nomes.get(id), ['u3']);
+    expect(c.map(x => [x.titulo, x.itens.map(i => i.id), x.horas])).toEqual([['Ana', ['c'], 2], ['Bruno', ['b', 'a'], 12], ['', [], 0]]);
   });
-  it('WIP não conta bloqueada', () => {
-    expect(wip([item({ status: 'em_andamento' }), item({ status: 'em_andamento', bloqueio: { id: 'x', versao: 1, motivo: 'm', inicio: '' } }), item({})])).toBe(1);
+  it('por cliente e por demanda (subdemanda com a mãe)', () => {
+    expect(colunasKanban(lista, 'cliente', id => nomes.get(id)).map(x => [x.titulo, x.itens.length])).toEqual([['Almont', 2], ['Zeta', 1]]);
+    expect(colunasKanban(lista, 'demanda', id => nomes.get(id)).map(x => x.titulo)).toEqual(['Dem', 'Mãe › Sub']);
   });
-  it('atrasada empurra as seguintes, pulando fim de semana e mantendo a duração', () => {
-    const a = item({ id: 'a', status: 'em_andamento', inicio: '2026-11-02', fim: '2026-11-03' });
-    const b = item({ id: 'b', inicio: '2026-11-04', fim: '2026-11-05', tarefas: [{ id: 't', versao: 3, data: '2026-11-05' }] });
-    const s = sugerirReprogramacao('u', [a, b], [], [], '2026-11-06'); // sexta
-    expect(s.map(x => [x.item.id, x.inicio, x.fim])).toEqual([['a', '2026-11-02', '2026-11-06'], ['b', '2026-11-09', '2026-11-10']]);
-    expect(s[1].tarefas).toEqual([{ id: 't', versao: 3, de: '2026-11-05', data: '2026-11-10' }]);
-  });
-  it('concluiu antes: a próxima encosta em hoje', () => {
-    const b = item({ id: 'b', inicio: '2026-11-16', fim: '2026-11-17' });
-    expect(sugerirReprogramacao('u', [b], [], [], '2026-11-09').map(x => [x.inicio, x.fim])).toEqual([['2026-11-09', '2026-11-10']]);
-  });
-  it('fila em dia não sugere nada', () => {
-    expect(sugerirReprogramacao('u', [item({ inicio: '2026-11-09', fim: '2026-11-10' })], [], [], '2026-11-09')).toEqual([]);
-  });
-  it('ausência empurra; bloqueada fica parada e não ocupa a fila', () => {
-    const bl = item({ id: 'x', inicio: '2026-11-09', fim: '2026-11-09', bloqueio: { id: 'b', versao: 1, motivo: 'm', inicio: '' } });
-    const c = item({ id: 'c', inicio: '2026-11-20', fim: '2026-11-20' });
-    const aus: Ausencia[] = [{ id: '1', versao: 1, consultor_id: 'u', de: '2026-11-09', ate: '2026-11-11', tipo: 'ferias' }];
-    expect(sugerirReprogramacao('u', [bl, c], [], aus, '2026-11-09').map(x => [x.item.id, x.inicio])).toEqual([['c', '2026-11-12']]);
-  });
-  it('dependência de outro consultor segura o início, com folga', () => {
-    const b = item({ id: 'b', inicio: '2026-11-09', fim: '2026-11-09' });
-    const s = sugerirReprogramacao('u', [b], [dep({ origem: 'fora', origem_fim: '2026-11-11', folga_dias: 1 })], [], '2026-11-09');
-    expect(s[0].inicio).toBe('2026-11-13');
-  });
-  it('paraGravar separa demandas e tarefas com a versão lida', () => {
-    const b = item({ id: 'b', versao: 7, inicio: '2026-11-16', fim: '2026-11-16', tarefas: [{ id: 't', versao: 2, data: '2026-11-16' }] });
-    expect(paraGravar(sugerirReprogramacao('u', [b], [], [], '2026-11-09'))).toEqual({
-      demandas: [{ id: 'b', versao: 7, inicio: '2026-11-09', fim: '2026-11-09' }], tarefas: [{ id: 't', versao: 2, data: '2026-11-09' }] });
+  it('filtro GP do backlog', () => {
+    const its = [back({ id: 'x', gp_id: 'g1' }), back({ id: 'y', gp_id: 'g2' }), back({ id: 'z', gp_id: null })];
+    expect(doGp(its, 'g1').map(i => i.id)).toEqual(['x']);
+    expect(doGp(its, '')).toHaveLength(3);
   });
 });
 

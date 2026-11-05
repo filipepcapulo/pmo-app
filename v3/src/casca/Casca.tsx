@@ -29,7 +29,6 @@ import { Ferias } from '../telas/Ferias';
 import { Ociosidade } from '../telas/Ociosidade';
 import { Portfolio } from '../telas/Portfolio';
 import { Equipe } from '../telas/Equipe';
-import { EquipeDev } from '../telas/EquipeDev';
 import { Inicio } from '../telas/Inicio';
 import { Manuais } from '../telas/Manuais';
 import { MANUAIS } from '../manuais';
@@ -152,7 +151,6 @@ export function Casca() {
     if (r.modulo.id === 'equipe') return <Equipe />;
     if (r.modulo.id === 'demandas') return <Demandas />;
     if (r.modulo.id === 'agenda') return <AgendaEquipe />;
-    if (r.modulo.id === 'equipe-dev') return <EquipeDev />;
     if (r.modulo.id === 'chamados') return <Chamados ir={ir} />;
     if (r.modulo.id === 'consultor') return <Consultor />;
     if (r.modulo.id === 'desvios') return <Desvios />;

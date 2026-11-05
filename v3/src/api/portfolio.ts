@@ -6,9 +6,11 @@ export interface ProjetoPortfolio extends Record<string, unknown> {
   id: string; nome: string; fase: string; cliente_id: string; cliente: string; gp_id: string | null; gp: string | null;
   inicio: string | null; fim: string | null; golive: string | null; golive_ok: boolean; atraso: 'golive' | 'etapa' | null;
   etapas_atrasadas: string[]; horas_agendadas: number; horas_executadas: number; horas_pedidas: number; demandas_abertas: number;
+  /** Tem etapa (demanda de 1º nível, fora plano de ação) com data (0047). */
+  cronograma?: boolean;
 }
 export interface RiscoPortfolio extends Record<string, unknown> {
-  demanda_id: string; nome: string; projeto_id: string; projeto: string; cliente: string; responsavel: string | null;
+  demanda_id: string; nome: string; projeto_id: string; projeto: string; cliente_id?: string; cliente: string; responsavel: string | null;
   vencimento: string | null; dias: number | null; prioridade: string; nivel: NivelRisco;
 }
 export interface Portfolio { hoje: string; projetos: ProjetoPortfolio[]; riscos: RiscoPortfolio[] }
@@ -32,11 +34,29 @@ export function gpsDe(ps: ProjetoPortfolio[]): string[] {
   return [...new Set(ps.map(p => p.gp ?? SEM_GP))].sort((a, b) => Number(a === SEM_GP) - Number(b === SEM_GP) || a.localeCompare(b, 'pt-BR'));
 }
 
-export function filtrar(ps: ProjetoPortfolio[], f: { fase?: string; gp?: string; texto?: string }) {
+/** Filtro do Portfólio: fases e GPs de seleção múltipla (vazio = todos) + texto. */
+export function filtrar(ps: ProjetoPortfolio[], f: { fases?: readonly string[]; gps?: readonly string[]; texto?: string }) {
   const t = (f.texto ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-  return ps.filter(p => (!f.fase || p.fase === f.fase) && (!f.gp || (p.gp ?? SEM_GP) === f.gp)
+  return ps.filter(p => (!f.fases?.length || f.fases.includes(p.fase)) && (!f.gps?.length || f.gps.includes(p.gp ?? SEM_GP))
     && (!t || [p.nome, p.cliente, p.gp ?? '', p.fase].some(v => v.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().includes(t))));
 }
+
+/** Gantt do Portfólio: projeto Avulso só entra se tiver cronograma (etapa com data). */
+export const paraGantt = (ps: ProjetoPortfolio[]) => ps.filter(p => p.fase.toLowerCase() !== 'avulso' || !!p.cronograma);
+
+/** Planos de ação abertos por cliente (riscos do Portfólio), para sinalizar o cliente na tabela. */
+export function planosPorCliente(riscos: RiscoPortfolio[], ps: ProjetoPortfolio[]): Map<string, number> {
+  const cliDoProjeto = new Map(ps.map(p => [p.id, p.cliente_id]));
+  const m = new Map<string, number>();
+  for (const r of riscos) {
+    const c = r.cliente_id ?? cliDoProjeto.get(r.projeto_id);
+    if (c) m.set(c, (m.get(c) ?? 0) + 1);
+  }
+  return m;
+}
+
+/** Liga/desliga um valor da seleção múltipla. */
+export const alternar = (sel: readonly string[], v: string) => (sel.includes(v) ? sel.filter(x => x !== v) : [...sel, v]);
 
 /** Projetos por GP (com quantos atrasados), para o gráfico de barras. */
 export function porGp(ps: ProjetoPortfolio[]) {

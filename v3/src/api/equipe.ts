@@ -243,5 +243,81 @@ export function colunasKanban(lista: AgendaAberta[], por: AgrupaKanban, nomeCons
   return lista2.sort((a, b) => Number(!a.titulo) - Number(!b.titulo) || a.titulo.localeCompare(b.titulo, 'pt-BR') || a.sub.localeCompare(b.sub, 'pt-BR'));
 }
 
+// Filtro do Kanban (3.13.2): seleção múltipla por dimensão (vazio = todas). Demanda = a de 1º nível (a mãe, se a agenda é
+// de subdemanda); subdemanda = a própria, quando tem mãe. Id guardado que não existe mais é ignorado.
+export type DimKanban = 'consultores' | 'clientes' | 'projetos' | 'demandas' | 'subdemandas';
+export type FiltroKanban = Record<DimKanban, string[]>;
+export const FILTRO_KANBAN_VAZIO: FiltroKanban = { consultores: [], clientes: [], projetos: [], demandas: [], subdemandas: [] };
+export const DIMENSOES: { dim: DimKanban; rotulo: string }[] = [
+  { dim: 'consultores', rotulo: 'Consultores' }, { dim: 'clientes', rotulo: 'Clientes' }, { dim: 'projetos', rotulo: 'Projetos' },
+  { dim: 'demandas', rotulo: 'Demandas' }, { dim: 'subdemandas', rotulo: 'Subdemandas' },
+];
+/** Ordem dos filtros conforme a visualização: a dimensão das colunas vem primeiro. */
+export const ORDEM_FILTROS: Record<AgrupaKanban, DimKanban[]> = {
+  consultor: ['consultores', 'clientes', 'projetos', 'demandas', 'subdemandas'],
+  cliente: ['clientes', 'projetos', 'demandas', 'subdemandas', 'consultores'],
+  demanda: ['demandas', 'subdemandas', 'clientes', 'projetos', 'consultores'],
+};
+const valorDim = (t: AgendaAberta, d: DimKanban): string | null => ({
+  consultores: t.consultor_id, clientes: t.cliente_id, projetos: t.projeto_id, demandas: t.pai_id ?? t.demanda_id, subdemandas: t.pai_id ? t.demanda_id : null,
+})[d];
+const casa = (t: AgendaAberta, d: DimKanban, sel: ReadonlySet<string>) => !sel.size || sel.has(valorDim(t, d) ?? '');
+
+/** Seleção válida por dimensão: só os ids que existem nas agendas (os demais não filtram). */
+function selecaoValida(lista: AgendaAberta[], f: Partial<FiltroKanban>): Record<DimKanban, Set<string>> {
+  const out = {} as Record<DimKanban, Set<string>>;
+  for (const { dim } of DIMENSOES) {
+    const existe = new Set(lista.map(t => valorDim(t, dim)).filter((x): x is string => !!x));
+    out[dim] = new Set((f[dim] ?? []).filter(id => existe.has(id)));
+  }
+  return out;
+}
+
+export function filtrarKanban(lista: AgendaAberta[], f: Partial<FiltroKanban>): AgendaAberta[] {
+  const sel = selecaoValida(lista, f);
+  return lista.filter(t => DIMENSOES.every(({ dim }) => casa(t, dim, sel[dim])));
+}
+
+/**
+ * Opções de cada filtro em cascata: a lista de uma dimensão considera as escolhas das outras (escolher o cliente limita
+ * projetos, demandas, subdemandas e consultores ao que ele tem). Ordem alfabética.
+ */
+export function opcoesKanban(lista: AgendaAberta[], f: Partial<FiltroKanban>, nomeConsultor: (id: string) => string | undefined): Record<DimKanban, { valor: string; rotulo: string }[]> {
+  const sel = selecaoValida(lista, f);
+  const rotulo = (t: AgendaAberta, dim: DimKanban) => ({
+    consultores: nomeConsultor(t.consultor_id) ?? '(sem nome)', clientes: t.cliente, projetos: `${t.cliente} · ${t.projeto}`,
+    demandas: t.pai ?? t.demanda, subdemandas: `${t.pai} › ${t.demanda}`,
+  })[dim];
+  const out = {} as Record<DimKanban, { valor: string; rotulo: string }[]>;
+  for (const { dim } of DIMENSOES) {
+    const m = new Map<string, string>();
+    for (const t of lista) {
+      if (!DIMENSOES.every(o => o.dim === dim || casa(t, o.dim, sel[o.dim]))) continue;
+      const v = valorDim(t, dim);
+      if (!v || m.has(v)) continue;
+      m.set(v, rotulo(t, dim));
+    }
+    // o que está marcado continua na lista, mesmo que a cascata o esconda (para poder desmarcar)
+    for (const id of sel[dim]) if (!m.has(id)) { const t = lista.find(x => valorDim(x, dim) === id); if (t) m.set(id, rotulo(t, dim)); }
+    out[dim] = [...m].map(([valor, rotulo]) => ({ valor, rotulo: rotulo ?? '' })).sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
+  }
+  return out;
+}
+
+/** Preferência do Kanban (por usuário): agrupamento e o filtro de cada visualização. */
+export interface PrefKanban { por: AgrupaKanban; filtros: Record<AgrupaKanban, FiltroKanban> }
+export const PREF_KANBAN_PADRAO: PrefKanban = { por: 'consultor', filtros: { consultor: FILTRO_KANBAN_VAZIO, cliente: FILTRO_KANBAN_VAZIO, demanda: FILTRO_KANBAN_VAZIO } };
+/** Lê a preferência guardada (banco ou aparelho) tolerando formato velho ou estragado. */
+export function lerPrefKanban(v: unknown): PrefKanban {
+  const o = (v && typeof v === 'object' ? v : {}) as Partial<PrefKanban>;
+  const por: AgrupaKanban = o.por === 'cliente' || o.por === 'demanda' ? o.por : 'consultor';
+  const filtro = (x: unknown): FiltroKanban => {
+    const y = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+    return Object.fromEntries(DIMENSOES.map(({ dim }) => [dim, Array.isArray(y[dim]) ? (y[dim] as unknown[]).filter((i): i is string => typeof i === 'string') : []])) as FiltroKanban;
+  };
+  const fs = (o.filtros ?? {}) as Partial<Record<AgrupaKanban, unknown>>;
+  return { por, filtros: { consultor: filtro(fs.consultor), cliente: filtro(fs.cliente), demanda: filtro(fs.demanda) } };
+}
+
 /** Filtro "GP responsável" do backlog: só o que é do GP; a mãe fica se alguma subdemanda for dele (a árvore a mostra como título). */
 export const doGp = (itens: ItemBacklog[], gp: string) => (gp ? itens.filter(i => i.gp_id === gp) : itens);

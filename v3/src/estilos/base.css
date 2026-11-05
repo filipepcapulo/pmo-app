@@ -809,7 +809,8 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .pf-multi[open] summary { border-color: var(--verde); }
 .pf-multi-lista { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 220px; max-height: 320px; overflow-y: auto; padding: 6px; border-radius: 10px; background: var(--superficie); box-shadow: var(--sombra); display: flex; flex-direction: column; }
 .pf-multi-lista .check { display: flex; align-items: center; gap: 6px; padding: 4px 6px; }
-.pf-multi-lista input { min-height: 0; accent-color: var(--verde); }
+.pf-multi-lista .check input { min-height: 0; accent-color: var(--verde); }
+.pf-multi-lista input[type=search] { margin-bottom: 4px; }
 .pf-cli { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
 .pf-plano { background: var(--laranja); color: #fff; font-size: 11px; }
 .pf-gp-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }

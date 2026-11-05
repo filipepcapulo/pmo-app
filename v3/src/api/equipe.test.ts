@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreBacklog, blocosDia, colunasKanban, doGp, faixaEscala, marcasEscala, PX_HORA, rotuloAgendas, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, rotuloAgenda, segundaDe, statusBacklog, turnoDe,
+import { arvoreBacklog, blocosDia, colunasKanban, doGp, filtrarKanban, lerPrefKanban, opcoesKanban, faixaEscala, marcasEscala, PX_HORA, rotuloAgendas, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, rotuloAgenda, segundaDe, statusBacklog, turnoDe,
   type AgendaAberta, type Ausencia, type ItemBacklog, type TarefaGrade } from './equipe';
 
 const back = (o: Partial<ItemBacklog>): ItemBacklog => ({ id: 'd1', pai_id: null, pai: null, nome: 'D1', prioridade: 'normal', status: 'backlog', cliente_id: 'c1',
@@ -82,6 +82,34 @@ describe('Kanban', () => {
   it('por cliente e por demanda (subdemanda com a mãe)', () => {
     expect(colunasKanban(lista, 'cliente', id => nomes.get(id)).map(x => [x.titulo, x.itens.length])).toEqual([['Almont', 2], ['Zeta', 1]]);
     expect(colunasKanban(lista, 'demanda', id => nomes.get(id)).map(x => x.titulo)).toEqual(['Dem', 'Mãe › Sub']);
+  });
+  it('filtro múltiplo: cada dimensão, demanda pela mãe, subdemanda só com mãe; id velho não filtra', () => {
+    const ids = (f: Parameters<typeof filtrarKanban>[1]) => filtrarKanban(lista, f).map(t => t.id);
+    expect(ids({ consultores: ['u2'] })).toEqual(['c']);
+    expect(ids({ clientes: ['c1'], consultores: ['u1'] })).toEqual(['b']);
+    expect(ids({ demandas: ['m'] })).toEqual(['a']);
+    expect(ids({ subdemandas: ['s'] })).toEqual(['a']);
+    expect(ids({ demandas: ['d', 'm'] })).toEqual(['a', 'b', 'c']);
+    expect(ids({ consultores: ['saiu'] })).toEqual(['a', 'b', 'c']);
+    expect(ids({ consultores: ['saiu', 'u2'] })).toEqual(['c']);
+  });
+  it('opções em cascata e o marcado continua na lista', () => {
+    const o = opcoesKanban(lista, { clientes: ['c1'] }, id => nomes.get(id));
+    expect(o.consultores.map(x => x.rotulo)).toEqual(['Ana', 'Bruno']);
+    expect(o.demandas.map(x => x.rotulo)).toEqual(['Dem']);
+    expect(o.subdemandas).toEqual([]);
+    expect(o.clientes.map(x => x.rotulo)).toEqual(['Almont', 'Zeta']);
+    const p = opcoesKanban(lista, { consultores: ['u2'], subdemandas: ['s'] }, id => nomes.get(id));
+    expect(p.subdemandas).toEqual([{ valor: 's', rotulo: 'Mãe › Sub' }]);
+    expect(p.projetos.map(x => x.rotulo)).toEqual([]);
+  });
+  it('preferência guardada: formato velho ou estragado vira o padrão', () => {
+    expect(lerPrefKanban(null).por).toBe('consultor');
+    expect(lerPrefKanban({ por: 'cliente' }).filtros.cliente.consultores).toEqual([]);
+    const p = lerPrefKanban({ por: 'demanda', filtros: { demanda: { demandas: ['d', 3], clientes: 'x' } } });
+    expect(p.por).toBe('demanda');
+    expect(p.filtros.demanda.demandas).toEqual(['d']);
+    expect(p.filtros.demanda.clientes).toEqual([]);
   });
   it('filtro GP do backlog', () => {
     const its = [back({ id: 'x', gp_id: 'g1' }), back({ id: 'y', gp_id: 'g2' }), back({ id: 'z', gp_id: null })];

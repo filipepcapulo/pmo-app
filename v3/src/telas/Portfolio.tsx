@@ -8,6 +8,7 @@ import { diaNum } from '../api/projeto';
 import { alternar, fasesDe, filtrar, gpsDe, janelaGantt, paraGantt, planosPorCliente, porGp, portfolio, SEM_GP, type ProjetoPortfolio, type RiscoPortfolio } from '../api/portfolio';
 import type { DemandaProjeto } from '../api/projeto';
 import { Popup5W2H } from '../componentes/Popup5W2H';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
@@ -19,19 +20,6 @@ const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'o
 const COR_NIVEL = { critico: 'var(--vermelho)', alto: 'var(--laranja)', moderado: 'var(--texto-2)' };
 const ROT_NIVEL = { critico: 'Crítico', alto: 'Alto', moderado: 'Moderado' };
 const linkProjeto = (id: string, nome: string) => <a href={hashDe(caminhoEntidade('projeto', id))}>{nome}</a>;
-
-// Seleção múltipla em lista suspensa (o resumo diz quantos): fases e GPs.
-function Multipla({ rotulo, opcoes, sel, aoMudar }: { rotulo: string; opcoes: string[]; sel: string[]; aoMudar: (s: string[]) => void }) {
-  return (
-    <details className="pf-multi">
-      <summary aria-label={`${rotulo}: ${sel.length ? sel.join(', ') : 'todos'}`}>{rotulo}: {sel.length === 0 ? 'todos' : sel.length === 1 ? sel[0] : `${sel.length} selecionados`}</summary>
-      <div className="pf-multi-lista">
-        {opcoes.map(o => <label key={o} className="check"><input type="checkbox" checked={sel.includes(o)} onChange={() => aoMudar(alternar(sel, o))} /> {o}</label>)}
-        {sel.length > 0 && <button type="button" className="link" onClick={() => aoMudar([])}>Limpar</button>}
-      </div>
-    </details>
-  );
-}
 
 function GanttPortfolio({ ps, hoje }: { ps: ProjetoPortfolio[]; hoje: string }) {
   if (!ps.length) return <p className="ajuda">Nenhum projeto.</p>;
@@ -148,8 +136,8 @@ export function Portfolio() {
           </section>
         </div>
         <div className="barra-filtros">
-          <Multipla rotulo="Fases" opcoes={fasesDe(ps)} sel={fases} aoMudar={setFases} />
-          <Multipla rotulo="GPs" opcoes={gpsDe(ps)} sel={gpsSel} aoMudar={setGps} />
+          <SelecaoMultipla rotulo="Fases" opcoes={fasesDe(ps)} sel={fases} aoMudar={setFases} />
+          <SelecaoMultipla rotulo="GPs" opcoes={gpsDe(ps)} sel={gpsSel} aoMudar={setGps} />
           <input type="search" placeholder="Buscar projeto, cliente, GP ou fase" value={texto} onChange={e => setTexto(e.target.value)} aria-label="Buscar projeto" />
           {(fases.length > 0 || gpsSel.length > 0 || texto) && <button type="button" className="link" onClick={() => { setFases([]); setGps([]); setTexto(''); }}>Limpar filtros</button>}
         </div>

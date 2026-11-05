@@ -1,8 +1,8 @@
-// Visão da equipe (V8): grade semana a semana, backlog lateral, mover tarefas, fila dev, bloqueio, ausências e as regras
-// puras da tela (semanas, árvore do backlog, mover em massa, situação na fila e reprogramação sugerida).
+// Visão da equipe (V8): grade semana a semana, Kanban das agendas em aberto (3.13.0), backlog lateral, mover tarefas,
+// ausências e as regras puras da tela (semanas, árvore do backlog, mover em massa, colunas do Kanban).
 import { novaOperacao, rpc } from './cliente';
 import { STATUS_DEMANDA } from './execucao';
-import { diaNum, hojeIso, somarDias, type Dependencia } from './projeto';
+import { diaNum, hojeIso, somarDias } from './projeto';
 
 // ---------------------------------------------------------------- tipos
 export interface TarefaGrade {
@@ -31,31 +31,20 @@ export interface ItemBacklog {
   projeto_id: string; projeto: string; origem: OrigemBacklog; horas: number; pedidos: PedidoBacklog[]; criado_em?: string;
   /** Agendas em aberto (planejada/em andamento, qualquer data) do item (com as das subdemandas) e da demanda-mãe; próxima data futura. */
   agendas?: number; agendas_pai?: number | null; agenda_prox?: string | null;
+  /** GP pela regra da pílula (0047): responsável, senão o da mãe, o do projeto, o do cliente. */
+  gp_id?: string | null;
 }
-export interface ItemFila {
-  fila_id: string; id: string; nome: string; pai: string | null; status: string; inicio: string | null; fim: string | null; horas: number | null;
-  versao: number; prioridade: string; projeto: string; cliente: string;
-  bloqueio: { id: string; versao: number; motivo: string; inicio: string } | null;
-  tarefas: { id: string; versao: number; data: string }[];
-}
-export interface Metricas { concluidas: number; vazao_30d: number; lead_dias: number | null; ciclo_dias: number | null; bloqueado_horas: number }
-export interface ConsultorDev { id: string; itens: ItemFila[]; metricas: Metricas | null }
-export type DepFila = Dependencia & { origem_nome: string; origem_status: string; origem_fim: string | null };
-export interface EquipeDev { wip_limite: number; consultores: ConsultorDev[]; dependencias: DepFila[]; ausencias: Ausencia[] }
+/** Agenda em aberto (não iniciada / em andamento) de qualquer data, para o Kanban (0047). */
+export interface AgendaAberta extends TarefaGrade { pai_id: string | null; pai: string | null; cliente_id: string }
 export interface ItemMover { id: string; versao: number; data: string; responsavel_id: string }
-export interface Reprogramacao { demandas: { id: string; versao: number; inicio: string; fim: string }[]; tarefas: { id: string; versao: number; data: string }[] }
 
 // ---------------------------------------------------------------- chamadas
 const gravar = <T = { ok: true }>(fn: string, esc: string, d: unknown) => rpc<T>(fn, { p_escritorio: esc, p_dados: d, p_id_operacao: novaOperacao() });
 export const equipe = {
   grade: (esc: string, de: string, ate: string) => rpc<Grade>('v1_grade', { p_escritorio: esc, p_de: de, p_ate: ate, p_consultores: null }),
   backlog: (esc: string) => rpc<ItemBacklog[]>('v1_backlog_lateral', { p_escritorio: esc }),
-  dev: (esc: string) => rpc<EquipeDev>('v1_equipe_dev', { p_escritorio: esc }),
+  abertas: (esc: string) => rpc<AgendaAberta[]>('v1_agendas_abertas', { p_escritorio: esc }),
   mover: (esc: string, itens: ItemMover[]) => gravar('v1_tarefas_mover', esc, { itens }),
-  filaSalvar: (esc: string, consultor_id: string, demandas: string[]) => gravar('v1_fila_salvar', esc, { consultor_id, demandas }),
-  reprogramar: (esc: string, r: Reprogramacao) => gravar('v1_fila_reprogramar', esc, r),
-  bloquear: (esc: string, demanda_id: string, motivo: string) => gravar('v1_bloqueio_salvar', esc, { demanda_id, motivo }),
-  desbloquear: (esc: string, id: string, versao: number) => gravar('v1_bloqueio_salvar', esc, { id, versao }),
   ausenciaSalvar: (esc: string, d: Record<string, unknown>) => gravar('v1_ausencia_salvar', esc, d),
   pedidoAtendido: (esc: string, id: string, versao: number) => gravar('v1_pedido_agenda_salvar', esc, { id, versao, situacao: 'atendido' }),
 };
@@ -224,67 +213,35 @@ export function itensMover(selecionadas: TarefaGrade[], arrastada: TarefaGrade, 
   }));
 }
 
-// ---------------------------------------------------------------- fila dev
-export type SituacaoFila = 'agora' | 'proxima' | 'bloqueada';
-const FEITA = ['concluida', 'cancelada'];
-export const depsPendentes = (item: ItemFila, deps: DepFila[]) => deps.filter(d => d.destino === item.id && !FEITA.includes(d.origem_status));
-export function situacaoFila(item: ItemFila, deps: DepFila[]): SituacaoFila {
-  if (item.bloqueio) return 'bloqueada';
-  if (item.status === 'em_andamento') return 'agora';
-  return depsPendentes(item, deps).some(d => d.tipo === 'TI') ? 'bloqueada' : 'proxima';
-}
-export const wip = (itens: ItemFila[]) => itens.filter(i => i.status === 'em_andamento' && !i.bloqueio).length;
-
-/** Próximo dia útil livre a partir do dia (inclusive). */
-function diaLivre(iso: string, consultor: string, ausencias: Ausencia[]) {
-  let d = iso;
-  for (let i = 0; i < 400 && (fimDeSemana(d) || ausenciaEm(ausencias, consultor, d)); i++) d = somarDias(d, 1);
-  return d;
-}
-const proximoUtil = (iso: string, consultor: string, a: Ausencia[]) => diaLivre(somarDias(iso, 1), consultor, a);
-function diasUteis(ini: string, fim: string) {
-  const n = diasEntre(ini, fim).filter(d => !fimDeSemana(d)).length;
-  return Math.max(1, n);
-}
-/** Duração em dias úteis: pelas datas; sem datas, pelas horas (8 h/dia). */
-const duracao = (i: ItemFila) => (i.inicio && i.fim ? diasUteis(i.inicio, i.fim) : Math.max(1, Math.ceil(Number(i.horas ?? 8) / 8)));
-
-export interface LinhaSugestao { item: ItemFila; inicio: string; fim: string; tarefas: { id: string; versao: number; de: string; data: string }[] }
+// ---------------------------------------------------------------- Kanban
+export type AgrupaKanban = 'consultor' | 'cliente' | 'demanda';
+export const AGRUPAMENTOS: { valor: AgrupaKanban; rotulo: string }[] = [
+  { valor: 'consultor', rotulo: 'Consultor' }, { valor: 'cliente', rotulo: 'Cliente' }, { valor: 'demanda', rotulo: 'Demanda/subdemanda' },
+];
+export interface ColunaKanban { id: string; titulo: string; sub: string; itens: AgendaAberta[]; horas: number }
 /**
- * Encosta a fila a partir de hoje: em andamento fica onde começou e, atrasada, termina hoje; as seguintes vêm em sequência,
- * respeitando dependências, fim de semana e ausências, na mesma duração. Bloqueada não anda nem ocupa a fila.
- * Só devolve o que muda; quem decide é o líder.
+ * Colunas do Kanban: uma por consultor, cliente ou demanda/subdemanda (a subdemanda vira "Mãe › Sub"). Cartões em ordem de
+ * data; colunas por nome (consultor sem nome cadastrado vai para o fim). Consultores extras entram vazios (alvo de arrasto).
  */
-export function sugerirReprogramacao(consultor: string, itens: ItemFila[], deps: DepFila[], ausencias: Ausencia[], hoje = hojeIso()): LinhaSugestao[] {
-  let cursor = diaLivre(hoje, consultor, ausencias);
-  const novosFins = new Map<string, string>();
-  const saida: LinhaSugestao[] = [];
-  for (const i of itens) {
-    if (i.bloqueio) continue;
-    let ini: string, fim: string;
-    if (i.status === 'em_andamento') {
-      ini = i.inicio ?? hoje;
-      fim = i.fim && i.fim >= hoje ? i.fim : diaLivre(hoje, consultor, ausencias);
-    } else {
-      ini = cursor;
-      for (const d of deps.filter(x => x.destino === i.id && x.tipo === 'TI' && !FEITA.includes(x.origem_status))) {
-        const fimOrigem = novosFins.get(d.origem) ?? d.origem_fim;
-        if (fimOrigem) { const minimo = diaLivre(somarDias(fimOrigem, 1 + d.folga_dias), consultor, ausencias); if (minimo > ini) ini = minimo; }
-      }
-      fim = ini;
-      for (let n = duracao(i); n > 1; n--) fim = proximoUtil(fim, consultor, ausencias);
-    }
-    novosFins.set(i.id, fim);
-    cursor = proximoUtil(fim, consultor, ausencias);
-    if (i.inicio === ini && i.fim === fim) continue;
-    // tarefas planejadas andam junto, mantendo a distância em dias do início da demanda
-    const delta = i.inicio ? diaNum(ini) - diaNum(i.inicio) : 0;
-    const tarefas = delta === 0 ? [] : i.tarefas.map(t => ({ id: t.id, versao: t.versao, de: t.data, data: diaLivre(somarDias(t.data, delta), consultor, ausencias) }));
-    saida.push({ item: i, inicio: ini, fim, tarefas });
+export function colunasKanban(lista: AgendaAberta[], por: AgrupaKanban, nomeConsultor: (id: string) => string | undefined, vazias: string[] = []): ColunaKanban[] {
+  const m = new Map<string, ColunaKanban>();
+  const col = (id: string, titulo: string, sub: string) => {
+    let c = m.get(id);
+    if (!c) { c = { id, titulo: titulo ?? '', sub: sub ?? '', itens: [], horas: 0 }; m.set(id, c); }
+    return c;
+  };
+  if (por === 'consultor') for (const id of vazias) col(id, nomeConsultor(id) ?? '', '');
+  for (const t of lista) {
+    const c = por === 'consultor' ? col(t.consultor_id, nomeConsultor(t.consultor_id) ?? '', '')
+      : por === 'cliente' ? col(t.cliente_id, t.cliente, '')
+      : col(t.demanda_id, t.pai ? `${t.pai} › ${t.demanda}` : t.demanda, `${t.cliente} · ${t.projeto}`);
+    c.itens.push(t);
+    c.horas += Number(t.horas_previstas ?? 0);
   }
-  return saida;
+  const lista2 = [...m.values()];
+  for (const c of lista2) c.itens.sort((a, b) => a.data.localeCompare(b.data) || (a.hora_ini ?? '').localeCompare(b.hora_ini ?? ''));
+  return lista2.sort((a, b) => Number(!a.titulo) - Number(!b.titulo) || a.titulo.localeCompare(b.titulo, 'pt-BR') || a.sub.localeCompare(b.sub, 'pt-BR'));
 }
-export const paraGravar = (linhas: LinhaSugestao[]): Reprogramacao => ({
-  demandas: linhas.map(l => ({ id: l.item.id, versao: l.item.versao, inicio: l.inicio, fim: l.fim })),
-  tarefas: linhas.flatMap(l => l.tarefas.map(t => ({ id: t.id, versao: t.versao, data: t.data }))),
-});
+
+/** Filtro "GP responsável" do backlog: só o que é do GP; a mãe fica se alguma subdemanda for dele (a árvore a mostra como título). */
+export const doGp = (itens: ItemBacklog[], gp: string) => (gp ? itens.filter(i => i.gp_id === gp) : itens);

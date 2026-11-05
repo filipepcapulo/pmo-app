@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { periodoFechamento, totais, type LinhaFechamento } from './fechamento';
 import { agendadosDe, cobre, quadroFerias, statusPorDias, tokens, validarProgramacao, type Agendado, type Programacao } from './ferias';
 import { agrupar, textoOciosidade, type ConsultorDia } from './ociosidade';
-import { fasesDe, filtrar, gpsDe, janelaGantt, porGp, SEM_GP, type ProjetoPortfolio } from './portfolio';
+import { alternar, fasesDe, filtrar, gpsDe, janelaGantt, paraGantt, planosPorCliente, porGp, SEM_GP, type ProjetoPortfolio, type RiscoPortfolio } from './portfolio';
 
 const c = (nome: string, situacao: ConsultorDia['situacao'], alocadas: number, sug: string[] = []): ConsultorDia => ({
   id: nome, nome, alocadas, ausencia: 0, capacidade: 8, livres: 8 - alocadas, situacao, agendas: [],
@@ -37,10 +37,22 @@ describe('portfólio', () => {
     expect(fasesDe(ps)).toEqual(['P1', 'P2', 'Sustentação', 'Avulso']);
     expect(gpsDe(ps)).toEqual(['Elson', 'Filipe', SEM_GP]);
   });
-  it('filtra por fase, GP e texto sem acento', () => {
-    expect(filtrar(ps, { gp: 'Filipe' }).map(x => x.nome)).toEqual(['C', 'D']);
-    expect(filtrar(ps, { fase: 'P2', gp: SEM_GP })).toHaveLength(1);
+  it('filtra por fases e GPs (seleção múltipla) e texto sem acento', () => {
+    expect(filtrar(ps, { gps: ['Filipe'] }).map(x => x.nome)).toEqual(['C', 'D']);
+    expect(filtrar(ps, { fases: ['P2'], gps: [SEM_GP] })).toHaveLength(1);
+    expect(filtrar(ps, { fases: ['P1', 'Avulso'] }).map(x => x.nome)).toEqual(['A', 'C']);
+    expect(filtrar(ps, { gps: ['Elson', SEM_GP] }).map(x => x.nome)).toEqual(['A', 'B']);
+    expect(filtrar(ps, { fases: [], gps: [] })).toHaveLength(4);
     expect(filtrar(ps, { texto: 'sustentacao' }).map(x => x.nome)).toEqual(['D']);
+    expect(alternar(alternar(['P1'], 'P2'), 'P1')).toEqual(['P2']);
+  });
+  it('Gantt: Avulso só com cronograma; plano de ação por cliente', () => {
+    const g = paraGantt([...ps, p('E', 'Avulso', null, { cronograma: true })]).map(x => x.nome);
+    expect(g).toEqual(['B', 'C', 'D', 'E']);
+    const r = (projeto_id: string, cliente_id?: string) => ({ demanda_id: 'x', nome: 'P', projeto_id, projeto: '', cliente_id, cliente: '', responsavel: null,
+      vencimento: null, dias: null, prioridade: 'normal', nivel: 'moderado' }) as RiscoPortfolio;
+    const m = planosPorCliente([r('A'), r('B'), r('zz', 'c9')], [p('A', 'P1', null, { cliente_id: 'c1' }), p('B', 'P1', null, { cliente_id: 'c1' })]);
+    expect([...m]).toEqual([['c1', 2], ['c9', 1]]);
   });
   it('projetos por GP com atrasados', () => {
     expect(porGp(ps).find(x => x.gp === 'Filipe')).toEqual({ gp: 'Filipe', n: 2, atrasados: 1 });

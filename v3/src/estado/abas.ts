@@ -1,6 +1,7 @@
 // Abas por módulo aberto: cada rota aberta vira uma aba (sem repetir); fechar a ativa ativa a vizinha. O Início é o fundo:
 // nunca vira aba e aparece quando nenhuma aba está ativa.
 // Funções puras: o componente guarda o resultado (e o localStorage, por escritório).
+import { RETIRADOS } from './rotas';
 
 export interface Aba { caminho: string; titulo: string }
 export interface EstadoAbas { abas: Aba[]; ativa: string | null }
@@ -63,7 +64,7 @@ export function lerAbasSalvas(texto: string | null): EstadoAbas {
   try {
     const v = JSON.parse(texto || '');
     if (Array.isArray(v?.abas)) {
-      const abas = v.abas.filter((a: Aba) => typeof a?.caminho === 'string' && typeof a?.titulo === 'string' && a.caminho !== INICIO).slice(0, MAX_ABAS);
+      const abas = v.abas.filter((a: Aba) => typeof a?.caminho === 'string' && typeof a?.titulo === 'string' && a.caminho !== INICIO && !(a.caminho in RETIRADOS)).slice(0, MAX_ABAS);
       return { abas, ativa: v.ativa === INICIO || abas.some((a: Aba) => a.caminho === v.ativa) ? v.ativa : abas[0]?.caminho ?? null };
     }
   } catch { /* vazio ou corrompido */ }

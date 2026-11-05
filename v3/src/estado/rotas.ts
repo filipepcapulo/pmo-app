@@ -29,7 +29,6 @@ export const MODULOS: Modulo[] = [
   { id: 'equipe', titulo: 'Equipe', area: 'cadastros', icone: 'pessoas' },
   { id: 'demandas', titulo: 'Demandas', area: 'execucao', icone: 'lista' },
   { id: 'agenda', titulo: 'Agenda da equipe', area: 'execucao', icone: 'calendario' },
-  { id: 'equipe-dev', titulo: 'Equipe dev', area: 'execucao', icone: 'pessoas' },
   { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: 'chamado' },
   { id: 'consultor', titulo: 'Minha agenda', area: 'execucao', icone: 'relogio' },
   { id: 'desvios', titulo: 'Desvios de agenda', area: 'execucao', icone: 'seta', permissao: 'desvio.aprovar' },
@@ -58,12 +57,16 @@ export type Rota =
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Telas que saíram: o link antigo cai na que ficou no lugar (Equipe dev → Agenda da equipe, 3.13.0). */
+export const RETIRADOS: Record<string, string> = { 'equipe-dev': 'agenda' };
+
 /** Caminho normalizado ("inicio", "projeto/<id>") a partir do hash. Hash que não é rota (#access_token=…) → null. */
 export function caminhoDoHash(hash: string): string | null {
   const h = hash.replace(/^#/, '');
   if (h === '' || h === '/') return 'inicio';
   if (!h.startsWith('/')) return null;
-  return h.slice(1).split('?')[0].replace(/\/+$/, '').toLowerCase() || 'inicio';
+  const c = h.slice(1).split('?')[0].replace(/\/+$/, '').toLowerCase() || 'inicio';
+  return RETIRADOS[c] ?? c;
 }
 
 export function lerRota(caminho: string): Rota {

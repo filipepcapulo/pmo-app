@@ -2,8 +2,10 @@
 // se a demanda tiver, as subdemandas. A tarefa vai na subdemanda escolhida ou, sem ela, na própria demanda.
 // Não achou? A última opção de Demanda e de Subdemanda é "+ Adicionar nova …": cria na hora só com o nome (e o projeto, se o
 // cliente tiver mais de um) e já deixa escolhida.
+// No desvio de agenda (`desvio`): todas as demandas abertas do escritório (api.v1_desvio_escolha) e nunca "+ Adicionar nova".
 import { useEffect, useMemo, useState } from 'react';
 import { api, type ProjetoLinha } from '../api/cadastros';
+import { desvios } from '../api/desvios';
 import { cascataDemandas, exec, type OpcaoCliente, type OpcaoDemandaCliente } from '../api/execucao';
 import { traduzirErro } from '../api/mensagens';
 import { usePode } from '../estado/equipe';
@@ -13,9 +15,11 @@ import { Campo } from './Campo';
 
 const NOVA = '__nova__';
 
-export function EscolhaDemanda({ aoMudar }: { aoMudar: (demandaId: string) => void }) {
+export function EscolhaDemanda({ aoMudar, desvio }: { aoMudar: (demandaId: string) => void; desvio?: boolean }) {
   const esc = useSessao().eu!.escritorio_id!;
-  const podeCriar = usePode()('demanda.criar');
+  const pode = usePode();
+  const podeCriar = !desvio && pode('demanda.criar');
+  const fonte = desvio ? desvios.escolha : exec.demandasEscolhaCli;
   const [clientes, setClientes] = useState<OpcaoCliente[] | null>(null);
   const [cliente, setCliente] = useState('');
   const [itens, setItens] = useState<OpcaoDemandaCliente[] | null>(null);
@@ -29,16 +33,16 @@ export function EscolhaDemanda({ aoMudar }: { aoMudar: (demandaId: string) => vo
   const escolher = (d: string, s: string) => { setDemanda(d); setSub(s); aoMudar(s || d); };
 
   useEffect(() => {
-    exec.clientesEscolha(esc).then(setClientes).catch(e => { setClientes([]); setErro(traduzirErro(e).mensagem); });
-  }, [esc]);
+    fonte(esc, null).then(l => setClientes(l as OpcaoCliente[])).catch(e => { setClientes([]); setErro(traduzirErro(e).mensagem); });
+  }, [esc, fonte]);
   useEffect(() => {
     setItens(null); escolher('', ''); setNova(null); setProjetos(null);
     if (!cliente) return;
     let vivo = true;
-    exec.demandasEscolha(esc, cliente).then(l => { if (vivo) setItens(l); })
+    fonte(esc, cliente).then(l => { if (vivo) setItens(l as OpcaoDemandaCliente[]); })
       .catch(e => { if (vivo) { setItens([]); setErro(traduzirErro(e).mensagem); } });
     return () => { vivo = false; };
-  }, [esc, cliente]);
+  }, [esc, cliente, fonte]);
   const { demandas, subdemandas } = useMemo(() => cascataDemandas(itens ?? [], demanda), [itens, demanda]);
   // um projeto só no cliente: o nome do projeto não precisa repetir em cada demanda
   const variosProjetos = new Set(demandas.map(d => d.projeto_id)).size > 1;

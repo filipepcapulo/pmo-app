@@ -1,6 +1,7 @@
 // Desvio de agenda (V10b, escopo §6.2): o consultor informa, o GP do projeto atendido aprova (troca automática, D9) ou
 // recusa. Tudo no banco (0037); aqui só as chamadas e as contas da tela.
 import { novaOperacao, rpc } from './cliente';
+import type { OpcaoCliente, OpcaoDemandaCliente } from './execucao';
 
 export type SituacaoDesvio = 'pendente' | 'aprovado' | 'recusado';
 export interface Desvio extends Record<string, unknown> {
@@ -25,7 +26,9 @@ export const desvios = {
   indicador: (esc: string, de: string, ate: string) => rpc<IndicadorDesvio[]>('v1_desvios_indicador', { p_escritorio: esc, p_de: de, p_ate: ate }),
   projetos: (esc: string, texto: string) => rpc<OpcaoProjeto[]>('v1_desvio_opcoes', { p_escritorio: esc, p_texto: texto || null }),
   demandas: (esc: string, projeto: string) => rpc<OpcaoDemanda[]>('v1_desvio_opcoes', { p_escritorio: esc, p_projeto: projeto }),
-  informar: (esc: string, d: { tarefa_prevista_id: string; projeto_atendido_id: string; demanda_atendida_id?: string; orientado_por?: string; motivo: string }) =>
+  /** Cascata do desvio (0049): sem cliente, os clientes; com cliente, as demandas e subdemandas abertas — todas do escritório. */
+  escolha: (esc: string, cliente: string | null) => rpc<OpcaoCliente[] | OpcaoDemandaCliente[]>('v1_desvio_escolha', { p_escritorio: esc, p_cliente: cliente }),
+  informar: (esc: string, d: { tarefa_prevista_id: string; demanda_atendida_id: string; orientado_por?: string; motivo: string }) =>
     gravar('v1_desvio_salvar', esc, d),
   aprovar: (esc: string, d: Desvio, demanda?: string) =>
     gravar('v1_desvio_decidir', esc, { id: d.id, versao: d.versao, decisao: 'aprovar', ...(demanda ? { demanda_atendida_id: demanda } : {}) }),

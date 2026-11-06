@@ -153,7 +153,7 @@ export function Tabela<T extends Record<string, unknown>>({ id, nome, colunas, l
           <thead>
             <tr>{visiveis.map(c => {
               const alvo = arrasto?.para === c.chave ? (arrasto.depois ? ' drop-dir' : ' drop-esq') : '';
-              const cls = `${c.alinhar === 'dir' ? 'dir' : ''}${c.fixa ? '' : ' movel'}${arrasto?.de === c.chave ? ' drag-origem' : ''}${alvo}`.trim();
+              const cls = `${c.alinhar === 'dir' ? 'dir' : ''}${c.fixa ? ' acao-fixa' : ' movel'}${arrasto?.de === c.chave ? ' drag-origem' : ''}${alvo}`.trim();
               const filtrada = ativo(filtros[c.chave]);
               return (
                 <th key={c.chave} className={cls || undefined} data-k={c.chave}
@@ -183,7 +183,7 @@ export function Tabela<T extends Record<string, unknown>>({ id, nome, colunas, l
             {p.itens.length === 0 && <tr><td colSpan={visiveis.length} className="tabela-vazia">{comFiltro ? 'Nenhuma linha com os filtros aplicados.' : vazio}</td></tr>}
             {p.itens.map(l => (
               <tr key={chave(l)} onClick={aoClicar ? () => aoClicar(l) : undefined} className={aoClicar ? 'clicavel' : undefined}>
-                {visiveis.map(c => <td key={c.chave} className={c.alinhar === 'dir' ? 'dir' : undefined}>{c.render ? c.render(l) : textoDe(c, l)}</td>)}
+                {visiveis.map(c => <td key={c.chave} className={[c.alinhar === 'dir' ? 'dir' : '', c.fixa ? 'acao-fixa' : ''].join(' ').trim() || undefined}>{c.render ? c.render(l) : textoDe(c, l)}</td>)}
               </tr>
             ))}
           </tbody>

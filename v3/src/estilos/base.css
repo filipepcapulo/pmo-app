@@ -876,3 +876,23 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
   .manual-figura img { max-height: 520px; }
   .manual-texto mark { background: none; }
 }
+
+/* Reembolso KM (V11d-1) */
+.rkm-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; align-items: start; margin-top: 10px; }
+.rkm-lista > div { display: contents; }
+.rkm-dia { grid-column: 1 / -1; margin: 6px 0 0; color: var(--laranja); }
+.rkm-cartao { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; }
+.rkm-titulo { font-size: 15px; }
+.rkm-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rkm-cli { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.rkm-cli select { flex: 1; min-width: 0; }
+.rkm-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.rkm-linha { display: flex; gap: 10px; align-items: center; text-align: left; font: inherit; color: inherit; border: 0; cursor: pointer; padding: 10px 12px; width: 100%; }
+div.rkm-linha { cursor: default; }
+.rkm-data { width: 46px; flex: none; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.rkm-data small, .rkm-fim small { color: var(--texto-2); font-size: 12px; }
+.rkm-meio { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rkm-meio strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rkm-fim { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
+.rkm-mes { min-width: 130px; text-align: center; text-transform: capitalize; }
+@media (max-width: 600px) { .rkm-lista { grid-template-columns: 1fr; } }

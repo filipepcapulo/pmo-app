@@ -26,6 +26,7 @@ import { EnvioAgendas } from '../telas/EnvioAgendas';
 import { EmConstrucao, NaoEncontrada } from '../telas/EmConstrucao';
 import { Produtividade } from '../telas/Produtividade';
 import { Ferias } from '../telas/Ferias';
+import { Reembolso } from '../telas/Reembolso';
 import { Ociosidade } from '../telas/Ociosidade';
 import { Portfolio } from '../telas/Portfolio';
 import { Equipe } from '../telas/Equipe';
@@ -159,6 +160,7 @@ export function Casca() {
     if (r.modulo.id === 'ociosidade') return <Ociosidade />;
     if (r.modulo.id === 'portfolio') return <Portfolio />;
     if (r.modulo.id === 'ferias') return <Ferias />;
+    if (r.modulo.id === 'reembolso') return <Reembolso parametro={r.parametro} />;
     return <EmConstrucao titulo={r.modulo.titulo} etapa={r.modulo.etapa} />;
   };
 

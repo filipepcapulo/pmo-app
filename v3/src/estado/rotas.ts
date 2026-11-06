@@ -35,6 +35,8 @@ export const MODULOS: Modulo[] = [
   { id: 'envio-agendas', titulo: 'Envio de agendas', area: 'execucao', icone: 'calendario', permissao: 'agenda.enviar' },
   { id: 'ociosidade', titulo: 'Ociosidade', area: 'execucao', icone: 'pessoas', permissao: 'ociosidade.ver' },
   { id: 'ferias', titulo: 'Controle de Férias', area: 'execucao', icone: 'calendario', permissao: 'ferias.ver' },
+  // V11d-1: módulo pessoal (só o Admin por padrão); #/reembolso/relatorio abre direto na aba (link do aviso do dia 1º)
+  { id: 'reembolso', titulo: 'Reembolso KM', area: 'execucao', icone: 'carro', permissao: 'reembolso.usar', parametro: true },
   { id: 'portfolio', titulo: 'Portfólio', area: 'relatorios', icone: 'grade', permissao: 'portfolio.ver' },
   // todos entram; sem produtividade.ver_todos o banco devolve só o próprio (0045)
   { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: 'grafico' },

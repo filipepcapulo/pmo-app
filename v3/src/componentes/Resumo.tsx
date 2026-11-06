@@ -1,6 +1,7 @@
 // Nome de cliente, projeto, demanda ou subdemanda com o resumo flutuante: passar o mouse (ou focar) mostra GP, horas previstas ×
 // executadas, início e fim. Fora do prazo ou das horas sombreia em vermelho claro; plano de ação em aberto mostra a advertência.
-// `comGp` põe a pílula com o GP na frente do nome (árvore do backlog); `local` troca o rótulo do topo da dica. Componente único: toda tela que mostra um desses nomes usa este.
+// `comGp` põe a pílula com o GP na frente do nome (árvore do backlog); `local` troca o rótulo do topo da dica; `rodape` (tarefa da
+// Agenda da equipe) vai no fim, à direita e menor: quem criou ou editou por último. Componente único: toda tela que mostra um desses nomes usa este.
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { data, horas } from '../api/cadastros';
 import { useEquipe } from '../estado/equipe';
@@ -12,7 +13,7 @@ import { DicaFlutuante } from './DicaFlutuante';
 const ROTULO = { cliente: 'Cliente', projeto: 'Projeto', demanda: 'Demanda' };
 const planos = (n: number) => `${n} plano${n > 1 ? 's' : ''} de ação em aberto`;
 
-function Dica({ tipo, r, gp, local, id, ancora }: { tipo: TipoResumo; r: DadosResumo; gp: string | null; local?: string; id: string; ancora: DOMRect }) {
+function Dica({ tipo, r, gp, local, rodape, id, ancora }: { tipo: TipoResumo; r: DadosResumo; gp: string | null; local?: string; rodape?: string; id: string; ancora: DOMRect }) {
   return (
     <DicaFlutuante id={id} className="res-dica" ancora={ancora}>
       <small>{local ?? (r.sub ? 'Subdemanda' : ROTULO[tipo])}</small>
@@ -30,11 +31,12 @@ function Dica({ tipo, r, gp, local, id, ancora }: { tipo: TipoResumo; r: DadosRe
       {r.fora_prazo && <em>Fora do prazo</em>}
       {r.fora_horas && <em>Fora das horas</em>}
       {r.planos_abertos > 0 && <em>⚠ {planos(r.planos_abertos)}</em>}
+      {rodape && <small className="res-rodape">{rodape}</small>}
     </DicaFlutuante>
   );
 }
 
-export function Resumo({ tipo, id, comGp, local, children }: { tipo: TipoResumo; id: string | null | undefined; comGp?: boolean; local?: string; children: ReactNode }) {
+export function Resumo({ tipo, id, comGp, local, rodape, children }: { tipo: TipoResumo; id: string | null | undefined; comGp?: boolean; local?: string; rodape?: string; children: ReactNode }) {
   const r = useResumo(tipo, id);
   const { porId } = useEquipe();
   const [pos, setPos] = useState<DOMRect | null>(null);
@@ -60,7 +62,7 @@ export function Resumo({ tipo, id, comGp, local, children }: { tipo: TipoResumo;
       {comGp && gp && <span className="pilula pilula-gp">{gp.split(' ')[0]}</span>}
       {children}
       {r.planos_abertos > 0 && <span className="res-plano" role="img" aria-label={planos(r.planos_abertos)}>⚠</span>}
-      {pos && <Dica tipo={tipo} r={r} gp={gp} local={local} id={dica} ancora={pos} />}
+      {pos && <Dica tipo={tipo} r={r} gp={gp} local={local} rodape={rodape} id={dica} ancora={pos} />}
     </span>
   );
 }

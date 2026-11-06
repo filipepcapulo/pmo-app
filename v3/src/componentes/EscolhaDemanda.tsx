@@ -15,7 +15,7 @@ import { Campo } from './Campo';
 
 const NOVA = '__nova__';
 
-export function EscolhaDemanda({ aoMudar, desvio }: { aoMudar: (demandaId: string) => void; desvio?: boolean }) {
+export function EscolhaDemanda({ aoMudar, aoMudarCliente, desvio }: { aoMudar: (demandaId: string) => void; aoMudarCliente?: (clienteId: string) => void; desvio?: boolean }) {
   const esc = useSessao().eu!.escritorio_id!;
   const pode = usePode();
   const podeCriar = !desvio && pode('demanda.criar');
@@ -37,6 +37,7 @@ export function EscolhaDemanda({ aoMudar, desvio }: { aoMudar: (demandaId: strin
   }, [esc, fonte]);
   useEffect(() => {
     setItens(null); escolher('', ''); setNova(null); setProjetos(null);
+    aoMudarCliente?.(cliente);
     if (!cliente) return;
     let vivo = true;
     fonte(esc, cliente).then(l => { if (vivo) setItens(l as OpcaoDemandaCliente[]); })

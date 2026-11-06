@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { podeApontar } from '../api/consultor';
 import { podeDesviar } from '../api/desvios';
-import { exec, rotuloModalidade, rotuloPeriodo } from '../api/execucao';
+import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { Anexos } from '../componentes/Anexos';
 import { StatusPilula } from '../componentes/ArvoreDemandas';
@@ -34,7 +34,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
   useEffect(() => { if (nome) aoRenomear(nome); }, [nome, aoRenomear]);
   if (c.erro) return <div className="vazio-tela"><h2>Tarefa</h2><p>{c.erro}</p></div>;
   if (!c.dados) return <div className="carregando-tela"><span className="giro" /> Carregando…</div>;
-  const { tarefa: t, demanda, pai, projeto, cliente, apontamentos, grupo } = c.dados;
+  const { tarefa: t, demanda, pai, projeto, cliente, apontamentos, grupo, usuario_cliente: uc, autoria } = c.dados;
   const souResp = t.responsavel_id === eu!.usuario.id;
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'apontamentos', rotulo: `Apontamentos (${apontamentos.length})` }, { id: 'checklist', rotulo: `Checklist (${c.dados.checklist.length})` },
@@ -69,6 +69,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
           <div><dt>Período</dt><dd>{rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim)}</dd></div>
           <div><dt>Horas</dt><dd>{t.horas_reais != null ? <>{horas(t.horas_reais)} <small className="ajuda">reais · {horas(t.horas_previstas)} previstas</small></> : <>{horas(t.horas_previstas)} <small className="ajuda">previstas</small></>}</dd></div>
           <div><dt>Agenda</dt><dd>{rotuloModalidade(t.modalidade) || '—'}</dd></div>
+          <div><dt>Usuário do cliente</dt><dd>{uc ? <>{uc.nome}{(uc.email || uc.telefone) && <small className="ajuda"> · {[uc.email, uc.telefone].filter(Boolean).join(' · ')}</small>}</> : '—'}</dd></div>
           <div><dt>Etapa</dt><dd>{t.etapa ?? '—'}</dd></div>
           <div><dt>Agendamento</dt><dd>{t.agendamento ?? '—'}</dd></div>
           <div><dt>Experience</dt><dd>{t.experience ?? '—'}</dd></div>
@@ -77,6 +78,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
         </dl>
         {t.detalhamento && <p className="descricao">{t.detalhamento}</p>}
         {t.motivo_status && <p className="ajuda">Motivo: {t.motivo_status}</p>}
+        {autoria && <p className="ajuda autoria">{rotuloAutoria(autoria)}</p>}
         {grupo.length > 0 && (
           <p className="ajuda">Criada junto com: {grupo.map((g, i) => <span key={g.id}>{i > 0 && ', '}
             <a href={hashDe(caminhoEntidade('tarefa', g.id))}><NomePessoa id={g.responsavel_id} /> {data(g.data)}</a></span>)}</p>

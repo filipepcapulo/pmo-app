@@ -1,7 +1,7 @@
 // Visão da equipe (V8): grade semana a semana, Kanban das agendas em aberto (3.13.0), backlog lateral, mover tarefas,
 // ausências e as regras puras da tela (semanas, árvore do backlog, mover em massa, colunas do Kanban).
 import { novaOperacao, rpc } from './cliente';
-import { STATUS_DEMANDA } from './execucao';
+import { STATUS_DEMANDA, type Autoria } from './execucao';
 import { diaNum, hojeIso, somarDias } from './projeto';
 
 // ---------------------------------------------------------------- tipos
@@ -9,6 +9,7 @@ export interface TarefaGrade {
   id: string; versao: number; data: string; periodo: string; hora_ini: string | null; hora_fim: string | null; horas_previstas: number | null;
   modalidade: string | null; status: string; nome: string; consultor_id: string; demanda_id: string; demanda: string;
   projeto_id: string; projeto: string; cliente: string;
+  usuario_cliente?: string | null; autoria?: Autoria | null;
 }
 export type TipoAusencia = 'ferias' | 'folga' | 'licenca' | 'ausencia';
 export const TIPOS_AUSENCIA: { valor: TipoAusencia; rotulo: string }[] = [
@@ -201,7 +202,7 @@ export const marcasEscala = (e: [number, number]) =>
 /** Faixa de cor da carga do dia (mesmos degraus do 2.x). */
 export const nivelCarga = (h: number) => (h === 0 ? 'livre' : h <= 7 ? 'parcial' : h === 8 ? 'cheio' : h <= 12 ? 'acima' : 'excesso');
 export const horasTexto = (h: number) => `${String(Math.round(h * 100) / 100).replace('.', ',')} h`;
-export const rotuloAgenda = (m: string | null) => ({ presencial: 'Presencial', interno: 'Interno', remoto: 'Remoto' })[m ?? ''] ?? '';
+export const rotuloAgenda = (m: string | null) => ({ presencial: 'Presencial', unidade: 'Unidade Sankhya', interno: 'Interno', remoto: 'Remoto' })[m ?? ''] ?? '';
 
 // ---------------------------------------------------------------- mover (arrastar uma ou várias)
 /** Soltar leva a tarefa arrastada para o destino: as demais andam os mesmos dias e, se eram do mesmo consultor, trocam junto. */

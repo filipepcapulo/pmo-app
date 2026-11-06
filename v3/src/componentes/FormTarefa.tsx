@@ -4,6 +4,7 @@
 // restante dos dados. Cada combinação é gravada numa chamada própria (grupo próprio = tarefa própria no ClickUp).
 // Tarefa já lançada: "+ Mais agenda" duplica a agenda (mesmos cliente/demanda/subdemanda, título, tipo e detalhes) pedindo só a
 // nova data e o horário, como o "Alocar mais" do 2.x.
+// Usuário do cliente (0051): contato do cliente da demanda, escolhido da lista ou cadastrado na hora; vai para todas as combinações.
 // Antes de gravar, os choques de horário (agenda, ausência, o próprio lote) aparecem para confirmar ou voltar ao lançamento.
 import { useEffect, useState } from 'react';
 import { horas } from '../api/cadastros';
@@ -16,6 +17,7 @@ import { Campo, Formulario } from './Campo';
 import { EscolhaChips } from './Chips';
 import { ConflitosAgenda } from './ConflitosAgenda';
 import { EscolhaDemanda } from './EscolhaDemanda';
+import { EscolhaUsuarioCliente } from './EscolhaUsuarioCliente';
 import { CaixaEscolhida, dataCurta, hojeLocal, opcoesDe, proximoDiaUtil } from './FormComum';
 import { Popup } from './Popup';
 import { useToast } from './Toasts';
@@ -35,9 +37,10 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
   const { lista: equipe, porId } = useEquipe();
   const [orig, setOrig] = useState<Tarefa | null>(null);
   const [caixa, setCaixa] = useState<{ local: string; nome: string } | null>(null);
+  const [cliente, setCliente] = useState<string | null>(null);
   const dataInicial = alvo.data ?? hojeLocal();
   const [f, setF] = useState({ demanda: alvo.demanda_id ?? '', nome: '', modalidade: '', status: 'planejada', detalhamento: '', etapa: '',
-    agendamento: '', experience: '', apontamento: '', periodo: 'manha', ini: '', fim: '', data: dataInicial, resp: '' });
+    agendamento: '', experience: '', apontamento: '', periodo: 'manha', ini: '', fim: '', data: dataInicial, resp: '', usuario: '' });
   const umResp = alvo.responsaveis?.length === 1 ? alvo.responsaveis[0] : '';
   const [mont, setMont] = useState<Combinacao>({ resp: umResp, data: dataInicial, periodo: 'manha', ini: '', fim: '', modalidade: 'remoto' });
   const [combos, setCombos] = useState<Combinacao[]>(
@@ -57,10 +60,12 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
       setOrig(t);
       setF({ demanda: t.demanda_id, nome: t.nome, periodo: t.periodo, ini: t.hora_ini?.slice(0, 5) ?? '', fim: t.hora_fim?.slice(0, 5) ?? '',
         modalidade: t.modalidade ?? '', status: t.status, detalhamento: t.detalhamento ?? '', etapa: t.etapa ?? '', agendamento: t.agendamento ?? '',
-        experience: t.experience ?? '', apontamento: t.apontamento ?? '', data: t.data, resp: t.responsavel_id });
+        experience: t.experience ?? '', apontamento: t.apontamento ?? '', data: t.data, resp: t.responsavel_id, usuario: t.usuario_cliente_id ?? '' });
       setCaixa({ local: local(r), nome: r.demanda.nome });
+      setCliente(r.cliente.id);
     }).catch(e => setErro((e as Error).message));
-    else if (alvo.demanda_id) exec.demanda(esc, alvo.demanda_id).then(r => setCaixa({ local: local(r), nome: r.demanda.nome })).catch(() => setCaixa(null));
+    else if (alvo.demanda_id) exec.demanda(esc, alvo.demanda_id).then(r => { setCaixa({ local: local(r), nome: r.demanda.nome }); setCliente(r.cliente.id); })
+      .catch(() => setCaixa(null));
   }, [alvo, esc]);
 
   const montadorPronto = !!mont.resp && !!mont.data && !horarioInvalido(mont);
@@ -108,7 +113,8 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
     const forcar = ignorarAusencia ? { ignorar_ausencia: true } : {};
     setGravando(true);
     const comuns = { nome: f.nome.trim(), modalidade: f.modalidade || null, status: f.status, detalhamento: f.detalhamento.trim() || null,
-      etapa: f.etapa || null, agendamento: f.agendamento || null, experience: f.experience || null, apontamento: f.apontamento || null };
+      etapa: f.etapa || null, agendamento: f.agendamento || null, experience: f.experience || null, apontamento: f.apontamento || null,
+      usuario_cliente_id: f.usuario || null };
     const horario = (c: { periodo: string; ini: string; fim: string }) =>
       ({ periodo: c.periodo, hora_ini: c.periodo === 'livre' ? c.ini : null, hora_fim: c.periodo === 'livre' ? c.fim : null });
     if (novo) {
@@ -150,7 +156,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
     try {
       // a nova nasce planejada e sem Experience lançado; o resto vem da agenda já lançada (não do que foi editado e não gravado)
       await exec.tarefasSalvar(esc, { demanda_id: orig.demanda_id, nome: orig.nome, modalidade: orig.modalidade, detalhamento: orig.detalhamento,
-        etapa: orig.etapa, agendamento: orig.agendamento, apontamento: orig.apontamento, status: 'planejada',
+        etapa: orig.etapa, agendamento: orig.agendamento, apontamento: orig.apontamento, usuario_cliente_id: orig.usuario_cliente_id ?? null, status: 'planejada',
         periodo: mais.periodo, hora_ini: mais.periodo === 'livre' ? mais.ini : null, hora_fim: mais.periodo === 'livre' ? mais.fim : null,
         responsaveis: [orig.responsavel_id], datas: [mais.data], ...(ignorarAusencia ? { ignorar_ausencia: true } : {}) });
       avisar(`Agenda adicionada em ${dataCurta(mais.data)}`, 'ok');
@@ -178,7 +184,9 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
         {caixa ? (
           <div className="campo"><span className="rotulo">Demanda</span>
             <CaixaEscolhida {...caixa} rotuloTrocar="Trocar demanda" /></div>
-        ) : !alvo.id && !alvo.demanda_id && <EscolhaDemanda aoMudar={v => setF(x => ({ ...x, demanda: v }))} />}
+        ) : !alvo.id && !alvo.demanda_id && <EscolhaDemanda aoMudar={v => setF(x => ({ ...x, demanda: v }))}
+          aoMudarCliente={v => { setCliente(v || null); setF(x => ({ ...x, usuario: '' })); }} />}
+        <EscolhaUsuarioCliente cliente={cliente} valor={f.usuario} aoMudar={v => setF(x => ({ ...x, usuario: v }))} />
         <Campo rotulo="Título" valor={f.nome} aoMudar={v => setF({ ...f, nome: v })} obrigatorio maxLength={300} placeholder="O que será feito" />
 
         {novo ? (

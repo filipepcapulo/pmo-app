@@ -24,6 +24,7 @@ export const PERIODOS: Op[] = [
 ];
 export const MODALIDADES: Op[] = [
   { valor: '', rotulo: '—' }, { valor: 'remoto', rotulo: 'Remoto' }, { valor: 'interno', rotulo: 'Interno' }, { valor: 'presencial', rotulo: 'Presencial no cliente' },
+  { valor: 'unidade', rotulo: 'Presencial na Unidade Sankhya' },
 ];
 const rotulo = (l: Op[], v: string | null | undefined) => l.find(x => x.valor === v)?.rotulo ?? v ?? '';
 export const rotuloStatusDemanda = (v: string) => rotulo(STATUS_DEMANDA, v);
@@ -50,7 +51,19 @@ export interface Tarefa {
   horas_previstas: number | null; modalidade: string | null; status: StatusTarefa; motivo_status: string | null; detalhamento: string | null;
   etapa: string | null; agendamento: string | null; experience: string | null; apontamento: string | null; grupo_criacao: string | null;
   versao: number; clickup_id: string | null; horas_reais: number | null; apontamentos: number;
+  usuario_cliente_id?: string | null;
 }
+/** Quem criou ou editou a tarefa por último (0051); `clickup` = nasceu no ClickUp e não foi gravada no app. */
+export interface Autoria { acao: 'criou' | 'editou' | 'clickup'; id: string | null; nome: string | null; em: string | null }
+/** Rodapé do cartão flutuante: "Criada por Ana · 06/11", "Editada por…", "Criada no ClickUp por…". */
+export function rotuloAutoria(a: Autoria | null | undefined): string {
+  if (!a) return '';
+  const quando = a.em ? ` · ${a.em.slice(8, 10)}/${a.em.slice(5, 7)}` : '';
+  if (a.acao === 'clickup') return `Criada no ClickUp${a.nome ? ` por ${a.nome}` : ''}${quando}`;
+  return `${a.acao === 'editou' ? 'Editada' : 'Criada'} por ${a.nome ?? '—'}${quando}`;
+}
+/** Contato (pessoa) do cliente: o "usuário do cliente" da tarefa/agenda. */
+export interface ContatoCliente { id: string; nome: string; email: string | null; telefone: string | null; papel: string }
 export interface ItemChecklist { id: string; texto: string; feito: boolean; feito_por: string | null; feito_em: string | null; ordem: number; versao: number }
 export interface Anexo { id: string; nome: string; caminho: string; tamanho: number | null; tipo: string | null; criado_em: string; criado_por: string | null }
 export interface FichaDemanda {
@@ -67,6 +80,7 @@ export interface Apontamento {
 export interface FichaTarefa {
   tarefa: Tarefa; demanda: { id: string; nome: string; pai_id: string | null; status: string }; pai: { id: string; nome: string } | null;
   projeto: { id: string; nome: string; fase: string }; cliente: { id: string; nome: string };
+  usuario_cliente?: { id: string; nome: string; email: string | null; telefone: string | null } | null; autoria?: Autoria | null;
   apontamentos: Apontamento[]; grupo: { id: string; responsavel_id: string; data: string; status: string }[];
   checklist: ItemChecklist[]; anexos: Anexo[]; comentarios: number; favorito: boolean;
 }
@@ -114,6 +128,11 @@ export const exec = {
   opcoes: (esc: string) => rpc<OpcoesExecucao>('v1_opcoes_execucao', { p_escritorio: esc }),
   demandaSalvar: (esc: string, d: Record<string, unknown>) => salvar<Demanda>('v1_demanda_salvar', esc, d),
   tarefasSalvar: (esc: string, d: Record<string, unknown>) => salvar<Tarefa>('v1_tarefas_salvar', esc, d),
+  /** Contatos do cliente para o campo "Usuário do cliente" (0051). */
+  contatos: (esc: string, cliente: string) => rpc<ContatoCliente[]>('v1_cliente_contatos', { p_escritorio: esc, p_cliente: cliente }),
+  /** Cadastro do contato na hora, pelo lançamento; mesmo nome/e-mail devolve o existente (`existente`). */
+  contatoRapido: (esc: string, d: { cliente_id: string; nome: string; email?: string | null; telefone?: string | null }) =>
+    salvar<ContatoCliente>('v1_cliente_contato_rapido', esc, d),
   /** Choques de horário (agenda, ausência e o próprio lote) das tarefas a gravar — 0044. */
   conflitos: (esc: string, itens: ItemConflito[]) => rpc<Conflito[]>('v1_conflitos_agenda', { p_escritorio: esc, p_itens: itens }),
   liberarHoras: (esc: string, d: { projeto_id: string; horas: number; justificativa: string }) => salvar('v1_liberacao_horas_salvar', esc, d),

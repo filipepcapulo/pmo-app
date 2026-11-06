@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { equipe, ausenciasNoDia, blocosDia, CAPACIDADE_DIA, diaInteiro, faixaEscala, marcasEscala, PX_HORA, diasEntre, horasAusentes, rotuloAusenciaDia, faixaTarefa, fimDeSemana, horasTexto, itensMover, janelaInicial, nivelCarga, ordenarDia, rotuloAgenda, rotuloAusencia, TURNOS, turnoDe, type Ausencia, type TarefaGrade } from '../api/equipe';
 import { hojeIso, somarDias } from '../api/projeto';
-import { rotuloPeriodo } from '../api/execucao';
+import { rotuloAutoria, rotuloPeriodo } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
 import { useEquipe, usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
@@ -319,7 +319,7 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
                                 onDragStart={e => { arrastada.current = t.id; e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; }}
                                 onDragEnd={() => { arrastada.current = null; }}
                                 onClick={e => { if (selecionando || e.ctrlKey || e.metaKey) alternar(t.id); else ed.tarefa({ id: t.id }); }}>
-                                <Resumo tipo="demanda" id={t.demanda_id} local={`${t.cliente} · ${t.projeto}`}><b>{t.cliente}</b><span>{t.nome}</span><small className="eq-tarefa-pe"><span>{semHora ? 'sem horário' : rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim).replace(/ \(.*/, '').replace(/:00/g, 'h').replace('–', '-')}</span>
+                                <Resumo tipo="demanda" id={t.demanda_id} local={`${t.cliente} · ${t.projeto}`} rodape={rotuloAutoria(t.autoria)}><b>{t.cliente}</b><span>{t.nome}</span><small className="eq-tarefa-pe"><span>{semHora ? 'sem horário' : rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim).replace(/ \(.*/, '').replace(/:00/g, 'h').replace('–', '-')}</span>
                                   {rotuloAgenda(t.modalidade) && <i className={`eq-agenda ag-${t.modalidade}`}>{rotuloAgenda(t.modalidade)}</i>}</small></Resumo>
                               </button>
                             );

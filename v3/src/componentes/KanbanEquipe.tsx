@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { novaOperacao, rpc, type FiltroSalvo } from '../api/cliente';
 import { AGRUPAMENTOS, colunasKanban, DIMENSOES, equipe, filtrarKanban, horasTexto, lerPrefKanban, opcoesKanban, ORDEM_FILTROS, PREF_KANBAN_PADRAO, rotuloAgenda,
   type AgrupaKanban, type DimKanban, type PrefKanban } from '../api/equipe';
-import { rotuloPeriodo, rotuloStatusTarefa } from '../api/execucao';
+import { rotuloAutoria, rotuloPeriodo, rotuloStatusTarefa } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
@@ -143,7 +143,7 @@ export function KanbanEquipe({ backlogMarcado, aoSoltarBacklog }: { backlogMarca
                 onDragStart={e => { arrastada.current = t.id; e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; }}
                 onDragEnd={() => { arrastada.current = null; }}
                 onClick={() => ed.tarefa({ id: t.id })}>
-                <Resumo tipo="demanda" id={t.demanda_id} local={`${t.cliente} · ${t.projeto}`}>
+                <Resumo tipo="demanda" id={t.demanda_id} local={`${t.cliente} · ${t.projeto}`} rodape={rotuloAutoria(t.autoria)}>
                   {por !== 'cliente' && <b>{t.cliente}</b>}
                   <span>{t.nome}</span>
                   {por !== 'demanda' && <small>{t.pai ? `${t.pai} › ${t.demanda}` : t.demanda}</small>}

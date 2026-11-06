@@ -666,7 +666,7 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .eq-tarefa-pe { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
 .eq-tarefa-pe span { opacity: .75; }
 .eq-agenda { flex: none; padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 700; font-style: normal; }
-.ag-presencial { background: #f7d3a8; color: #8a4a06; } .ag-interno { background: #d9d9de; color: #3f3f46; } .ag-remoto { background: #c9dcf7; color: #2c4e8c; }
+.ag-presencial { background: #f7d3a8; color: #8a4a06; } .ag-unidade { background: #e3d3f2; color: #5b2d82; } .ag-interno { background: #d9d9de; color: #3f3f46; } .ag-remoto { background: #c9dcf7; color: #2c4e8c; }
 .eq-tarefa.st-concluida { opacity: .55; }
 .eq-tarefa.st-nao_executada { background: var(--superficie-2); color: var(--texto-2); text-decoration: line-through; }
 .eq-tarefa.marcada { box-shadow: inset 3px 0 0 var(--t, var(--verde)), 0 0 0 2px var(--azul); }
@@ -758,6 +758,8 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .conflito small { color: var(--texto-2); overflow-wrap: anywhere; }
 .eq-tarefa { position: relative; }
 .res-dica small { padding: 0; color: var(--texto-2); }
+/* quem criou/editou por último a tarefa (0051): no fim do cartão, à direita e menor */
+.res-dica small.res-rodape { align-self: flex-end; text-align: right; font-size: 11px; margin-top: 2px; }
 
 /* Visão do consultor (V10a): dia em seções, tarefa em cartão com ação à mão no celular */
 .cons-nav { justify-content: space-between; }

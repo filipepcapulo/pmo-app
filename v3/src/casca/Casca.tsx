@@ -27,6 +27,7 @@ import { EmConstrucao, NaoEncontrada } from '../telas/EmConstrucao';
 import { Produtividade } from '../telas/Produtividade';
 import { Ferias } from '../telas/Ferias';
 import { Reembolso } from '../telas/Reembolso';
+import { NotificacoesAparelho } from '../telas/NotificacoesAparelho';
 import { Ociosidade } from '../telas/Ociosidade';
 import { Portfolio } from '../telas/Portfolio';
 import { Equipe } from '../telas/Equipe';
@@ -145,6 +146,7 @@ export function Casca() {
     if (!mods.includes(r.modulo)) return <div className="vazio-tela"><h2>Sem acesso</h2><p>Você não tem permissão para {r.modulo.titulo}.</p></div>;
     if (r.modulo.id === 'inicio') return <Inicio />;
     if (r.modulo.id === 'manuais') return <Manuais id={r.parametro} />;
+    if (r.modulo.id === 'notificacoes') return <NotificacoesAparelho />;
     if (r.modulo.id === 'componentes') return <Componentes />;
     if (r.modulo.id === 'clientes') return <Clientes ir={ir} />;
     if (r.modulo.id === 'projetos') return <Projetos ir={ir} />;

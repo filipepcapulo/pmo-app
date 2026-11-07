@@ -20,3 +20,29 @@ self.addEventListener('fetch', e => {
     return resp;
   }).catch(() => caches.match(e.request).then(r => r || caches.match('./'))));
 });
+
+// ---------------------------------------------------------------- notificações (push) — V11d-3
+// A Edge Function "push" do banco envia { tipo, titulo, corpo, url } (mesmo formato do 2.x). Tocar na notificação
+// abre o v3 na rota (url relativa ao escopo /pmo-app/v3/: ./#/ociosidade, ./#/reembolso, ./#/notificacoes).
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { corpo: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.titulo || 'PMO BP-MS', {
+    body: d.corpo || '',
+    icon: 'icones/icone-192.png',
+    badge: 'icones/icone-192.png',
+    tag: d.tipo || 'pmo',
+    renotify: true,
+    data: { url: d.url || './' },
+  }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const alvo = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(janelas => {
+    const j = janelas.find(w => w.url.startsWith(self.registration.scope));
+    if (j) return j.focus().then(w => (w && w.navigate ? w.navigate(alvo) : w)).catch(() => self.clients.openWindow(alvo));
+    return self.clients.openWindow(alvo);
+  }));
+});

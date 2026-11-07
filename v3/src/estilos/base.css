@@ -898,3 +898,16 @@ div.rkm-linha { cursor: default; }
 .rkm-fim { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
 .rkm-mes { min-width: 130px; text-align: center; text-transform: capitalize; }
 @media (max-width: 600px) { .rkm-lista { grid-template-columns: 1fr; } }
+
+/* V11d-3: Notificações no aparelho (#/notificacoes) — mesma ideia da tela do 2.x */
+.push-cartao { max-width: 640px; margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.push-cartao h2 { font-size: 15px; margin: 0; }
+.push-opcoes { display: flex; flex-direction: column; gap: 4px; }
+.push-opcao { align-items: flex-start; margin-top: 4px; padding: 10px 12px; border: 1px solid var(--linha); border-radius: var(--raio); cursor: pointer; }
+.push-opcao input { margin-top: 3px; }
+.push-opcao span { display: flex; flex-direction: column; gap: 2px; }
+.push-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.push-aparelhos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.push-aparelhos li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.dica-caixa { max-width: 640px; padding: 10px 12px; border-left: 4px solid var(--laranja); background: var(--superficie); border-radius: var(--raio); }
+@media (max-width: 600px) { .push-botoes .bt { flex: 1 1 100%; } }

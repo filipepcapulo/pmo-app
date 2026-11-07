@@ -231,7 +231,6 @@ export function Casca() {
           })}
         </div>
         <footer className="menu-rodape menu-texto">
-          <a href="../?ficar=2x">App atual (2.x)</a>
           <small>v{VERSAO}</small>
         </footer>
       </nav>

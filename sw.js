@@ -1,8 +1,10 @@
 // Service worker: abre o app na hora e funciona sem internet.
 // - Arquivos com versão (?v=), ícones e manifest: do cache (a versão nova tem outra URL).
 // - Página (index.html): rede com limite de 2,5 s; se demorar, abre do cache e atualiza por trás.
-const CACHE = 'pmo-web-v2.14.1';
-const ARQUIVOS = ['./', 'index.html', 'redirecionar.js?v=2.14.1', 'app.js?v=2.14.1', 'estilos.css?v=2.12.0', 'manifest.webmanifest', 'icones/icone-180.png', 'icones/icone-192.png', 'icones/icone-512.png'];
+// v2.15.0 (V11d-4): a PWA 2.x foi desligada — o index.html só redireciona para o v3 (./v3/, com service worker próprio).
+// Este sw continua para os aparelhos que tinham o 2.x: troca o cache antigo e mantém o push do 2.x (o toque abre o v3).
+const CACHE = 'pmo-web-v2.15.0';
+const ARQUIVOS = ['./', 'index.html', 'redirecionar.js?v=2.15.0', 'app.js?v=2.15.0', 'manifest.webmanifest', 'icones/icone-180.png', 'icones/icone-192.png', 'icones/icone-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));

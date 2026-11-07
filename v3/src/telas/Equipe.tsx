@@ -1,7 +1,10 @@
 // Equipe, usuários e permissões numa tela (escopo §1.3): lista de pessoas; ficha em abas (Info · Acessos · Skills);
 // acessos pela funcionalidade (marca usuários/perfis) e catálogo de módulos (skills).
+// V11d-2: aba "App/APK" da ficha e visão "App 2.x/APK" — acesso ao app 2.x/APK (antes nas Propriedades do servidor).
 import { useEffect, useMemo, useState } from 'react';
 import { api, PAPEIS, PERFIS, rotuloPerfil, type Acessos, type Membro, type ModuloSkill, type Papel, type UsuarioFicha } from '../api/cadastros';
+import { alternarCompleto, apiAcessoApp, completo, formDe, MODULOS_APP, normalizar, quando, resumo,
+  type AcessoApp, type FichaAcessoApp, type FormAcessoApp, type ModuloApp } from '../api/acessoApp';
 import { Botao } from '../componentes/Botao';
 import { Campo, Formulario } from '../componentes/Campo';
 import { NomePessoa, PilulasSkills } from '../componentes/NomePessoa';
@@ -14,32 +17,36 @@ import { useSessao } from '../estado/sessao';
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 const rotuloPapel = (p: string) => PAPEIS.find(x => x.valor === p)?.rotulo ?? p;
-type Visao = 'pessoas' | 'funcionalidade' | 'catalogo';
+type Visao = 'pessoas' | 'funcionalidade' | 'app' | 'catalogo';
 
 export function Equipe() {
   const pode = usePode();
   const [visao, setVisao] = useState<Visao>('pessoas');
   const [usuario, setUsuario] = useState<string | 'novo' | null>(null);
+  const [abaInicial, setAbaInicial] = useState<Aba>('info');
+  const abrir = (id: string | null, aba: Aba = 'info') => { setAbaInicial(aba); setUsuario(id); };
   const visoes: { id: Visao; titulo: string }[] = [
     { id: 'pessoas', titulo: 'Pessoas' },
-    ...(pode('permissao.editar') ? [{ id: 'funcionalidade' as Visao, titulo: 'Acessos por funcionalidade' }] : []),
+    ...(pode('permissao.editar') ? [{ id: 'funcionalidade' as Visao, titulo: 'Acessos por funcionalidade' },
+      { id: 'app' as Visao, titulo: 'App 2.x/APK' }] : []),
     { id: 'catalogo', titulo: 'Catálogo de skills' },
   ];
   return (
     <div className="pagina">
       <header className="pagina-topo">
         <h1>Equipe</h1>
-        {pode('equipe.editar') && <Botao variante="primario" onClick={() => setUsuario('novo')}>+ Novo usuário</Botao>}
+        {pode('equipe.editar') && <Botao variante="primario" onClick={() => abrir('novo')}>+ Novo usuário</Botao>}
       </header>
       <div className="segmentos" role="tablist" aria-label="Visão da equipe">
         {visoes.map(v => (
           <button key={v.id} type="button" role="tab" aria-selected={visao === v.id} onClick={() => setVisao(v.id)}>{v.titulo}</button>
         ))}
       </div>
-      {visao === 'pessoas' && <Pessoas aoAbrir={setUsuario} />}
+      {visao === 'pessoas' && <Pessoas aoAbrir={id => abrir(id)} />}
       {visao === 'funcionalidade' && <PorFuncionalidade />}
+      {visao === 'app' && <AcessosApp aoAbrir={id => abrir(id, 'app')} versao={usuario === null ? 0 : 1} />}
       {visao === 'catalogo' && <Catalogo />}
-      {usuario && <UsuarioPopup id={usuario} aoFechar={() => setUsuario(null)} aoCriar={setUsuario} />}
+      {usuario && <UsuarioPopup key={usuario} id={usuario} abaInicial={abaInicial} aoFechar={() => setUsuario(null)} aoCriar={id => abrir(id)} />}
     </div>
   );
 }
@@ -77,17 +84,19 @@ function Pessoas({ aoAbrir }: { aoAbrir: (id: string) => void }) {
 }
 
 // ---------------------------------------------------------------- ficha do usuário em abas
-type Aba = 'info' | 'acessos' | 'skills';
+type Aba = 'info' | 'acessos' | 'skills' | 'app';
 
-function UsuarioPopup({ id, aoFechar, aoCriar }: { id: string; aoFechar: () => void; aoCriar: (id: string) => void }) {
+function UsuarioPopup({ id, abaInicial = 'info', aoFechar, aoCriar }: { id: string; abaInicial?: Aba; aoFechar: () => void; aoCriar: (id: string) => void }) {
   const esc = useSessao().eu!.escritorio_id!;
+  const pode = usePode();
   const novo = id === 'novo';
-  const [aba, setAba] = useState<Aba>('info');
+  const [aba, setAba] = useState<Aba>(abaInicial);
   const c = useCarga(() => (novo ? Promise.resolve(null) : api.usuario(esc, id)), [esc, id]);
   const equipe = useEquipe();
   const { recarregarEu, eu } = useSessao();
   const depois = async () => { await Promise.all([c.recarregar(), equipe.recarregar(), id === eu?.usuario.id ? recarregarEu() : null]); };
-  const abas: { id: Aba; titulo: string }[] = [{ id: 'info', titulo: 'Info' }, { id: 'acessos', titulo: 'Acessos' }, { id: 'skills', titulo: 'Skills' }];
+  const abas: { id: Aba; titulo: string }[] = [{ id: 'info', titulo: 'Info' }, { id: 'acessos', titulo: 'Acessos' }, { id: 'skills', titulo: 'Skills' },
+    ...(pode('permissao.editar') ? [{ id: 'app' as Aba, titulo: 'App/APK' }] : [])];
   return (
     <Popup aberto titulo={novo ? 'Novo usuário' : c.dados?.usuario.nome ?? 'Usuário'} aoFechar={aoFechar} largura={760}>
       {!novo && (
@@ -100,6 +109,7 @@ function UsuarioPopup({ id, aoFechar, aoCriar }: { id: string; aoFechar: () => v
       {!novo && c.dados && aba === 'info' && <AbaInfo ficha={c.dados} aoGravar={depois} />}
       {!novo && c.dados && aba === 'acessos' && <AbaAcessos ficha={c.dados} aoGravar={depois} />}
       {!novo && c.dados && aba === 'skills' && <AbaSkills ficha={c.dados} aoGravar={depois} />}
+      {!novo && c.dados && aba === 'app' && <AbaApp ficha={c.dados} />}
       {!novo && !c.dados && !c.erro && <p className="ajuda"><span className="giro" /> Carregando…</p>}
     </Popup>
   );
@@ -253,6 +263,104 @@ function AbaSkills({ ficha, aoGravar }: { ficha: UsuarioFicha; aoGravar: () => P
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- app 2.x/APK (V11d-2)
+function AbaApp({ ficha }: { ficha: UsuarioFicha }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const eu = useSessao().eu?.usuario.id;
+  const avisar = useToast();
+  const c = useCarga<FichaAcessoApp>(() => apiAcessoApp.ficha(esc, ficha.usuario.id), [esc, ficha.usuario.id]);
+  const [f, setF] = useState<FormAcessoApp | null>(null);
+  const [gravando, setGravando] = useState<string | null>(null);
+  const a = c.dados?.acesso ?? null;
+  useEffect(() => { if (c.dados) setF(formDe(c.dados.acesso)); }, [c.dados]);
+  if (c.erro) return <p className="msg-erro">{c.erro}</p>;
+  if (!c.dados || !f) return <p className="ajuda"><span className="giro" /> Carregando…</p>;
+  const proprio = ficha.usuario.id === eu;
+  const executar = async (qual: string, fn: () => Promise<unknown>, msg: string) => {
+    setGravando(qual);
+    try { await fn(); avisar(msg, 'ok'); await c.recarregar(); }
+    catch (e) { avisar((e as Error).message, 'erro'); }
+    setGravando(null);
+  };
+  const marcar = (k: 'ativo' | 'admin' | 'agendar' | 'editar' | 'notifOciosidade', v: boolean) => setF(normalizar({ ...f, [k]: v }));
+  const modulo = (m: ModuloApp, v: boolean) => setF(normalizar({ ...f, modulos: v ? [...f.modulos, m] : f.modulos.filter(x => x !== m) }));
+  const temOci = f.modulos.includes('ociosidade');
+  return (
+    <div className="formulario">
+      <p className="ajuda">
+        Acesso ao <strong>app 2.x</strong> e ao <strong>APK</strong> (login por código no e-mail {ficha.usuario.email}).
+        {a ? <> {a.aparelhos} aparelho(s) conectado(s) · último uso {quando(a.ultimoUso)} · alterado {quando(a.alterado)}{a.por ? ` por ${a.por}` : ''}.</>
+          : ' Esta pessoa ainda não tem acesso: marque abaixo e grave para liberar.'}
+      </p>
+      <fieldset className="grupo" disabled={gravando !== null}>
+        <legend>Acesso</legend>
+        <label className="check"><input type="checkbox" checked={completo(f)} onChange={() => setF(alternarCompleto(f))} /> <strong>Permissão completa</strong></label>
+        <label className="check"><input type="checkbox" checked={f.ativo} disabled={proprio} onChange={e => marcar('ativo', e.target.checked)} /> Ativo (pode entrar no app 2.x/APK)</label>
+      </fieldset>
+      <fieldset className="grupo" disabled={gravando !== null}>
+        <legend>Módulos que pode ver</legend>
+        {MODULOS_APP.map(m => (
+          <label key={m.valor} className="check"><input type="checkbox" checked={f.modulos.includes(m.valor)} onChange={e => modulo(m.valor, e.target.checked)} /> {m.rotulo}</label>
+        ))}
+      </fieldset>
+      <fieldset className="grupo" disabled={gravando !== null}>
+        <legend>Ações</legend>
+        <label className="check"><input type="checkbox" checked={f.agendar} onChange={e => marcar('agendar', e.target.checked)} /> Agendar <small className="ajuda">criar agendas pelo app</small></label>
+        <label className="check"><input type="checkbox" checked={f.editar} onChange={e => marcar('editar', e.target.checked)} /> Editar agendas</label>
+        <label className="check"><input type="checkbox" checked={f.admin} disabled={proprio} onChange={e => marcar('admin', e.target.checked)} /> Administrador <small className="ajuda">cadastra e-mails e muda permissões pelo APK</small></label>
+      </fieldset>
+      <fieldset className="grupo" disabled={gravando !== null}>
+        <legend>Notificações</legend>
+        <label className="check"><input type="checkbox" checked={temOci && f.notifOciosidade} disabled={!temOci} onChange={e => marcar('notifOciosidade', e.target.checked)} />
+          {' '}Receber notificação de Ociosidade <small className="ajuda">{temOci ? '1 vez por dia útil, depois do relatório da manhã' : 'marque antes o módulo Ociosidade'}</small></label>
+      </fieldset>
+      <div className="linha">
+        <Botao variante="primario" carregando={gravando === 'gravar'} disabled={gravando !== null}
+          onClick={() => executar('gravar', () => apiAcessoApp.salvar(esc, ficha.usuario.id, f, a?.versao), a ? 'Acesso ao app gravado' : 'Acesso ao app liberado')}>
+          {a ? 'Gravar' : 'Liberar acesso'}</Botao>
+        {a && <Botao carregando={gravando === 'desc'} disabled={gravando !== null}
+          onClick={() => executar('desc', () => apiAcessoApp.desconectar(esc, ficha.usuario.id), 'Aparelhos desconectados (vale em até 1 minuto)')}>
+          Desconectar aparelhos</Botao>}
+        {a && !proprio && <Botao className="a-esquerda" carregando={gravando === 'rem'} disabled={gravando !== null}
+          onClick={() => { if (window.confirm(`Remover o acesso de ${ficha.usuario.nome} ao app 2.x/APK?`)) void executar('rem', () => apiAcessoApp.remover(esc, ficha.usuario.id), 'Acesso ao app removido'); }}>
+          Remover acesso</Botao>}
+      </div>
+    </div>
+  );
+}
+
+function AcessosApp({ aoAbrir, versao }: { aoAbrir: (id: string) => void; versao: number }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const c = useCarga(() => apiAcessoApp.lista(esc), [esc, versao]);
+  const [texto, setTexto] = useState('');
+  const [inativos, setInativos] = useState(false);
+  type L = AcessoApp & Record<string, unknown>;
+  const linhas = useMemo(() => (c.dados?.usuarios ?? []).filter(u => (inativos || u.ativo)
+    && (!texto || semAcento(`${u.nome} ${u.email}`).includes(semAcento(texto)))), [c.dados, texto, inativos]);
+  const cols: Coluna<L>[] = [
+    { chave: 'nome', titulo: 'Nome', render: l => <>{l.noV3 ? <NomePessoa id={l.usuarioId} comAvatar /> : l.nome}
+      {!l.noV3 && <span className="pilula pilula-neutra"> Só no app 2.x/APK</span>}
+      {!l.ativo && <span className="pilula pilula-neutra"> Inativo</span>}
+      {l.admin && <span className="pilula"> Admin</span>}</> },
+    { chave: 'email', titulo: 'E-mail' },
+    { chave: 'acesso', titulo: 'Acesso', ordem: l => resumo(l), texto: l => resumo(l), render: l => resumo(l) },
+    { chave: 'aparelhos', titulo: 'Aparelhos', alinhar: 'dir' },
+    { chave: 'ultimoUso', titulo: 'Último uso', ordem: l => l.ultimoUso ?? 0, texto: l => quando(l.ultimoUso), render: l => quando(l.ultimoUso) },
+  ];
+  return (
+    <>
+      <p className="ajuda">Quem entra no app 2.x e no APK (login por código no e-mail). Para dar acesso a alguém, abra a pessoa (ou cadastre em "+ Novo usuário") e use a aba App/APK.</p>
+      <div className="barra-filtros">
+        <input type="search" aria-label="Buscar pessoa" placeholder="Buscar nome ou e-mail" value={texto} onChange={e => setTexto(e.target.value)} />
+        <label className="check"><input type="checkbox" checked={inativos} onChange={e => setInativos(e.target.checked)} /> Mostrar inativos</label>
+      </div>
+      {c.erro && <p className="msg-erro">{c.erro}</p>}
+      <Tabela id="acesso-app" nome="Acesso ao app 2.x/APK" colunas={cols} linhas={linhas as L[]} chave={l => l.usuarioId} tamanhoInicial={30}
+        vazio={c.carregando ? 'Carregando…' : 'Ninguém com acesso.'} aoClicar={l => aoAbrir(l.usuarioId)} />
+    </>
   );
 }
 

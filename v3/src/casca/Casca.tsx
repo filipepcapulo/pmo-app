@@ -35,6 +35,7 @@ import { Inicio } from '../telas/Inicio';
 import { Manuais } from '../telas/Manuais';
 import { MANUAIS } from '../manuais';
 import { Modelos } from '../telas/Modelos';
+import { Organograma } from '../telas/Organograma';
 import { ProjetoTela } from '../telas/ProjetoTela';
 import { Projetos } from '../telas/Projetos';
 import { TarefaTela } from '../telas/TarefaTela';
@@ -152,6 +153,7 @@ export function Casca() {
     if (r.modulo.id === 'projetos') return <Projetos ir={ir} />;
     if (r.modulo.id === 'modelos') return <Modelos />;
     if (r.modulo.id === 'equipe') return <Equipe />;
+    if (r.modulo.id === 'organograma') return <Organograma />;
     if (r.modulo.id === 'demandas') return <Demandas />;
     if (r.modulo.id === 'agenda') return <AgendaEquipe />;
     if (r.modulo.id === 'chamados') return <Chamados ir={ir} />;

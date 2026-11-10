@@ -2,12 +2,15 @@
 // Gantt dos projetos com o Go Live (losango; vermelho = vencido em aberto, barra laranja = etapa vencida), grade e riscos.
 // 3.13.0: fases e GPs em seleção múltipla; Avulso só no Gantt com cronograma; a tabela sinaliza o cliente com plano de
 // ação aberto e o "+ Plano" abre o mesmo 5W2H da Tela de Projeto.
+// 3.25.0 (V13c-1): saldo dos pedidos do Experience × horas agendadas (seção própria e coluna "Pedido" na tabela).
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { diaNum } from '../api/projeto';
 import { alternar, fasesDe, filtrar, gpsDe, janelaGantt, paraGantt, planosPorCliente, porGp, portfolio, SEM_GP, type ProjetoPortfolio, type RiscoPortfolio } from '../api/portfolio';
 import type { DemandaProjeto } from '../api/projeto';
 import { Popup5W2H } from '../componentes/Popup5W2H';
+import { SaldoPedidos, SeloSituacao } from '../componentes/SaldoPedidos';
+import { pedidos, porProjeto } from '../api/pedidos';
 import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
@@ -62,6 +65,8 @@ export function Portfolio() {
   const esc = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
   const c = useCarga(() => portfolio.ler(esc), [esc, ed.geracao]);
+  const ped = useCarga(() => pedidos.ultima(esc), [esc, ed.geracao]);
+  const situacoes = useMemo(() => porProjeto(ped.dados?.linhas ?? []), [ped.dados]);
   const pode = usePode();
   const [fases, setFases] = useState<string[]>([]);
   const [gpsSel, setGps] = useState<string[]>([]);
@@ -90,9 +95,11 @@ export function Portfolio() {
     { chave: 'horas_agendadas', titulo: 'Agendadas', alinhar: 'dir', texto: p => horas(p.horas_agendadas), valor: p => p.horas_agendadas },
     { chave: 'horas_executadas', titulo: 'Executadas', alinhar: 'dir', texto: p => horas(p.horas_executadas), valor: p => p.horas_executadas },
     { chave: 'demandas_abertas', titulo: 'Demandas abertas', alinhar: 'dir' },
+    { chave: 'pedido', titulo: 'Pedido (Experience)', texto: p => situacoes.get(p.id)?.situacao ?? '', ordem: p => situacoes.get(p.id)?.situacao ?? 'ZZ',
+      render: p => { const l = situacoes.get(p.id); return l ? <span title={l.observacao || undefined}><SeloSituacao s={l.situacao} /></span> : null; } },
     { chave: 'plano', titulo: 'Plano de ação', texto: p => (planos.get(p.cliente_id) ? 'Sim' : ''), valor: p => planos.get(p.cliente_id) ?? 0,
       render: p => (podePlano ? <button type="button" className="link" aria-label={`Novo plano de ação em ${p.nome}`} onClick={() => setPlano({ projeto_id: p.id })}>+ Plano</button> : null) },
-  ], [planos, podePlano]);
+  ], [planos, podePlano, situacoes]);
   const colRiscos = useMemo<Coluna<RiscoPortfolio>[]>(() => [
     { chave: 'nivel', titulo: 'Nível', texto: r => ROT_NIVEL[r.nivel], render: r => <span className="pilula" style={{ background: COR_NIVEL[r.nivel], color: '#fff' }}>{ROT_NIVEL[r.nivel]}</span> },
     { chave: 'nome', titulo: 'Plano de ação', render: r => <a href={hashDe(caminhoEntidade('demanda', r.demanda_id))}>{r.nome}</a>, texto: r => r.nome },
@@ -141,6 +148,7 @@ export function Portfolio() {
           <input type="search" placeholder="Buscar projeto, cliente, GP ou fase" value={texto} onChange={e => setTexto(e.target.value)} aria-label="Buscar projeto" />
           {(fases.length > 0 || gpsSel.length > 0 || texto) && <button type="button" className="link" onClick={() => { setFases([]); setGps([]); setTexto(''); }}>Limpar filtros</button>}
         </div>
+        <SaldoPedidos />
         <section className="cartao"><h2 className="secao">Cronograma</h2><GanttPortfolio ps={paraGantt(lista)} hoje={c.dados.hoje} /></section>
         <section className="cartao">
           <Tabela id="portfolio" nome="Portfólio de projetos" colunas={colunas} linhas={lista} chave={p => p.id} tamanhoInicial={15} vazio="Nenhum projeto encontrado." />

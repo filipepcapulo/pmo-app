@@ -2,12 +2,13 @@
 // acessos pela funcionalidade (marca usuários/perfis) e catálogo de módulos (skills).
 // V11d-2: aba "App/APK" da ficha e visão "App 2.x/APK" — acesso ao app 2.x/APK (antes nas Propriedades do servidor).
 // V13a-1: e-mail do ClickUp (vínculo com o espelho), troca do e-mail de login (só Admin), Inativar/Reativar e Excluir (só sem histórico).
-// V13b-2: aba "Experience" — login e senha do Sankhya Experience da pessoa (a própria ou o Admin; senha testada e cifrada no banco).
+// V13b-2: aba "Conta Sankhya" — usuário e senha Sankhya da pessoa, os mesmos do Experience, OM e Zendesk (a própria ou o Admin;
+// senha testada e cifrada no banco).
 import { useEffect, useMemo, useState } from 'react';
 import { api, PAPEIS, PERFIS, rotuloPerfil, type Acessos, type Membro, type ModuloSkill, type Papel, type UsuarioFicha } from '../api/cadastros';
 import { alternarCompleto, apiAcessoApp, completo, formDe, MODULOS_APP, normalizar, quando, resumo,
   type AcessoApp, type FichaAcessoApp, type FormAcessoApp, type ModuloApp } from '../api/acessoApp';
-import { apiExperience, textoEstado, textoResultado } from '../api/experience';
+import { apiContaSankhya, textoEstado, textoResultado } from '../api/contaSankhya';
 import { Botao } from '../componentes/Botao';
 import { Campo, Formulario } from '../componentes/Campo';
 import { NomePessoa, PilulasSkills } from '../componentes/NomePessoa';
@@ -88,7 +89,7 @@ function Pessoas({ aoAbrir }: { aoAbrir: (id: string) => void }) {
 }
 
 // ---------------------------------------------------------------- ficha do usuário em abas
-type Aba = 'info' | 'acessos' | 'skills' | 'app' | 'experience';
+type Aba = 'info' | 'acessos' | 'skills' | 'app' | 'sankhya';
 
 function UsuarioPopup({ id, abaInicial = 'info', aoFechar, aoCriar }: { id: string; abaInicial?: Aba; aoFechar: () => void; aoCriar: (id: string) => void }) {
   const esc = useSessao().eu!.escritorio_id!;
@@ -101,7 +102,7 @@ function UsuarioPopup({ id, abaInicial = 'info', aoFechar, aoCriar }: { id: stri
   const depois = async () => { await Promise.all([c.recarregar(), equipe.recarregar(), id === eu?.usuario.id ? recarregarEu() : null]); };
   const abas: { id: Aba; titulo: string }[] = [{ id: 'info', titulo: 'Info' }, { id: 'acessos', titulo: 'Acessos' }, { id: 'skills', titulo: 'Skills' },
     ...(pode('permissao.editar') ? [{ id: 'app' as Aba, titulo: 'App/APK' }] : []),
-    ...(id === eu?.usuario.id || pode('integracao.gerenciar') ? [{ id: 'experience' as Aba, titulo: 'Experience' }] : [])];
+    ...(id === eu?.usuario.id || pode('integracao.gerenciar') ? [{ id: 'sankhya' as Aba, titulo: 'Conta Sankhya' }] : [])];
   return (
     <Popup aberto titulo={novo ? 'Novo usuário' : c.dados?.usuario.nome ?? 'Usuário'} aoFechar={aoFechar} largura={760}>
       {!novo && (
@@ -116,7 +117,7 @@ function UsuarioPopup({ id, abaInicial = 'info', aoFechar, aoCriar }: { id: stri
       {!novo && c.dados && aba === 'acessos' && <AbaAcessos ficha={c.dados} aoGravar={depois} />}
       {!novo && c.dados && aba === 'skills' && <AbaSkills ficha={c.dados} aoGravar={depois} />}
       {!novo && c.dados && aba === 'app' && <AbaApp ficha={c.dados} />}
-      {!novo && c.dados && aba === 'experience' && <AbaExperience ficha={c.dados} />}
+      {!novo && c.dados && aba === 'sankhya' && <AbaContaSankhya ficha={c.dados} />}
       {!novo && !c.dados && !c.erro && <p className="ajuda"><span className="giro" /> Carregando…</p>}
     </Popup>
   );
@@ -392,11 +393,11 @@ function AbaApp({ ficha }: { ficha: UsuarioFicha }) {
   );
 }
 
-function AbaExperience({ ficha }: { ficha: UsuarioFicha }) {
+function AbaContaSankhya({ ficha }: { ficha: UsuarioFicha }) {
   const esc = useSessao().eu!.escritorio_id!;
   const proprio = useSessao().eu?.usuario.id === ficha.usuario.id;
   const avisar = useToast();
-  const c = useCarga(() => apiExperience.ficha(esc, ficha.usuario.id), [esc, ficha.usuario.id]);
+  const c = useCarga(() => apiContaSankhya.ficha(esc, ficha.usuario.id), [esc, ficha.usuario.id]);
   const [login, setLogin] = useState('');
   const [senha, setSenha] = useState('');
   const [gravando, setGravando] = useState<string | null>(null);
@@ -416,23 +417,24 @@ function AbaExperience({ ficha }: { ficha: UsuarioFicha }) {
     setGravando(null);
   };
   return (
-    <Formulario aoEnviar={() => executar('gravar', () => apiExperience.salvar(esc, ficha.usuario.id, login, senha), 'Login do Experience aceito e gravado')}>
+    <Formulario aoEnviar={() => executar('gravar', () => apiContaSankhya.salvar(esc, ficha.usuario.id, login, senha), 'Conta Sankhya aceita e gravada')}>
       <p className="ajuda">
-        Login do <strong>Sankhya Experience</strong> {proprio ? 'que as rotinas do app usam em seu nome' : `de ${ficha.usuario.nome}`} (conferência e lançamento de OS).
-        A senha é testada no Experience antes de gravar, fica cifrada no banco e não aparece mais aqui.
+        Usuário e senha da <strong>conta Sankhya</strong> {proprio ? 'que as rotinas do app usam em seu nome' : `de ${ficha.usuario.nome}`}: os mesmos
+        do <strong>Experience</strong>, do <strong>Sankhya OM</strong> (skw.sankhya.com.br) e do <strong>Zendesk</strong>.
+        A senha é testada na Sankhya antes de gravar, fica cifrada no banco e não aparece mais aqui.
       </p>
       <p className={est.tom === 'erro' ? 'msg-erro' : 'ajuda'} role="status" data-estado={est.tom}>{est.texto}
         {d.temSenha && d.gravadoEm ? ` Gravado em ${new Date(d.gravadoEm).toLocaleDateString('pt-BR')}${d.gravadoPor ? ` por ${d.gravadoPor}` : ''}.` : ''}</p>
-      <Campo rotulo="Usuário do Experience" valor={login} aoMudar={setLogin} obrigatorio maxLength={200} autoComplete="off" name="experience-login" />
+      <Campo rotulo="Usuário Sankhya" valor={login} aoMudar={setLogin} obrigatorio maxLength={200} autoComplete="off" name="sankhya-login" />
       <Campo rotulo={d.temSenha ? 'Senha nova' : 'Senha'} tipo="password" valor={senha} aoMudar={setSenha} obrigatorio maxLength={200}
-        autoComplete="new-password" name="experience-senha" ajuda={d.temSenha ? 'Para trocar, digite a senha nova; a atual não é mostrada.' : undefined} />
+        autoComplete="new-password" name="sankhya-senha" ajuda={d.temSenha ? 'Para trocar, digite a senha nova; a atual não é mostrada.' : undefined} />
       <div className="linha">
         <Botao type="submit" variante="primario" carregando={gravando === 'gravar'} disabled={gravando !== null || !login.trim() || !senha}>Testar e gravar</Botao>
         {d.temSenha && <Botao carregando={gravando === 'testar'} disabled={gravando !== null}
-          onClick={() => executar('testar', () => apiExperience.testar(esc, ficha.usuario.id), 'Login aceito pelo Experience')}>Testar senha gravada</Botao>}
+          onClick={() => executar('testar', () => apiContaSankhya.testar(esc, ficha.usuario.id), 'Login aceito pela Sankhya')}>Testar senha gravada</Botao>}
         {d.temSenha && <Botao className="a-esquerda" carregando={gravando === 'rem'} disabled={gravando !== null}
-          onClick={() => { if (window.confirm(`Apagar o login do Experience de ${ficha.usuario.nome}?`)) void executar('rem', async () => apiExperience.remover(esc, ficha.usuario.id), 'Login do Experience apagado'); }}>
-          Apagar login</Botao>}
+          onClick={() => { if (window.confirm(`Apagar a conta Sankhya de ${ficha.usuario.nome}?`)) void executar('rem', async () => apiContaSankhya.remover(esc, ficha.usuario.id), 'Conta Sankhya apagada'); }}>
+          Apagar conta</Botao>}
       </div>
     </Formulario>
   );

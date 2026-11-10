@@ -70,14 +70,18 @@ export const PERFIS: { valor: string; rotulo: string }[] = [
 export const rotuloPerfil = (p: string | null) => PERFIS.find(x => x.valor === p)?.rotulo ?? p ?? '';
 export interface Skill { modulo_id: string; modulo: string; certificado: boolean; observacao?: string | null }
 export interface Membro extends Pessoa {
-  email: string; papeis: Papel[]; ativo: boolean; perfil: string; perfil_nome: string; skills: Skill[];
+  email: string; email_clickup?: string | null; papeis: Papel[]; ativo: boolean; perfil: string; perfil_nome: string; skills: Skill[];
 }
 export interface PermissaoEfetiva { codigo: string; modulo: string; descricao: string; do_perfil: boolean; excecao: boolean | null; efetivo: boolean }
 export interface UsuarioFicha {
-  usuario: { id: string; email: string; nome: string; ativo: boolean; iniciais: string | null; cor: string | null; papeis: Papel[]; versao: number; logou: boolean };
+  usuario: { id: string; email: string; email_clickup?: string | null; nome: string; ativo: boolean; iniciais: string | null; cor: string | null;
+    papeis: Papel[]; versao: number; logou: boolean };
   perfil: { id: string; codigo: string; nome: string };
   permissoes: PermissaoEfetiva[] | null;
   skills: Skill[];
+  /** V13a-1: membro do ClickUp ligado (local = criado pelo app, sem par no ClickUp) e histórico (decide Excluir × Inativar). */
+  clickup?: { nome: string; email: string | null; local: boolean } | null;
+  historico?: { total: number; itens: Record<string, number> } | null;
 }
 export interface Acessos {
   funcionalidades: { codigo: string; modulo: string; descricao: string }[];
@@ -105,6 +109,12 @@ export const api = {
   equipe: (esc: string, inativos = false) => rpc<Membro[]>('v1_equipe', { p_escritorio: esc, p_inativos: inativos }),
   usuario: (esc: string, id: string) => rpc<UsuarioFicha>('v1_usuario', { p_escritorio: esc, p_usuario: id }),
   usuarioSalvar: (esc: string, d: Record<string, unknown>) => salvar('v1_usuario_salvar', esc, d),
+  /** Só Admin: troca o e-mail de login; a conta do Auth acompanha (0055). */
+  usuarioEmailLogin: (esc: string, d: { id: string; email: string; versao: number }) => salvar('v1_usuario_email_login', esc, d),
+  /** Só sem histórico; com histórico o banco recusa (HISTORICO) e a tela oferece Inativar. */
+  usuarioExcluir: (esc: string, id: string) =>
+    rpc<{ ok: true; id: string; excluido: boolean; so_deste_escritorio: boolean }>('v1_usuario_excluir',
+      { p_escritorio: esc, p_dados: { id }, p_id_operacao: novaOperacao() }),
   acessos: (esc: string) => rpc<Acessos>('v1_acessos', { p_escritorio: esc }),
   permissaoSalvar: (esc: string, d: { usuario_id?: string; perfil_id?: string; funcionalidade: string; permitido: boolean | null }) =>
     salvar('v1_permissao_salvar', esc, d),

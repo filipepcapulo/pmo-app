@@ -1,6 +1,7 @@
 // Equipe, usuários e permissões numa tela (escopo §1.3): lista de pessoas; ficha em abas (Info · Acessos · Skills);
 // acessos pela funcionalidade (marca usuários/perfis) e catálogo de módulos (skills).
 // V11d-2: aba "App/APK" da ficha e visão "App 2.x/APK" — acesso ao app 2.x/APK (antes nas Propriedades do servidor).
+// V13a-1: e-mail do ClickUp (vínculo com o espelho), troca do e-mail de login (só Admin), Inativar/Reativar e Excluir (só sem histórico).
 import { useEffect, useMemo, useState } from 'react';
 import { api, PAPEIS, PERFIS, rotuloPerfil, type Acessos, type Membro, type ModuloSkill, type Papel, type UsuarioFicha } from '../api/cadastros';
 import { alternarCompleto, apiAcessoApp, completo, formDe, MODULOS_APP, normalizar, quando, resumo,
@@ -58,11 +59,12 @@ function Pessoas({ aoAbrir }: { aoAbrir: (id: string) => void }) {
   const [papel, setPapel] = useState('');
   const [inativos, setInativos] = useState(false);
   const linhas = useMemo(() => lista.filter(m => (inativos || m.ativo) && (!papel || m.papeis.includes(papel as Papel))
-    && (!texto || semAcento(`${m.nome} ${m.email}`).includes(semAcento(texto)))), [lista, texto, papel, inativos]);
+    && (!texto || semAcento(`${m.nome} ${m.email} ${m.email_clickup ?? ''}`).includes(semAcento(texto)))), [lista, texto, papel, inativos]);
   type L = Membro & Record<string, unknown>;
   const cols: Coluna<L>[] = [
     { chave: 'nome', titulo: 'Nome', render: l => <><NomePessoa id={l.id} comAvatar />{!l.ativo && <span className="pilula pilula-neutra"> Inativo</span>}</> },
-    { chave: 'email', titulo: 'E-mail' },
+    { chave: 'email', titulo: 'E-mail (login)' },
+    { chave: 'email_clickup', titulo: 'E-mail do ClickUp', texto: l => l.email_clickup ?? '', render: l => l.email_clickup ?? <span className="ajuda">—</span> },
     { chave: 'papeis', titulo: 'Papéis', ordem: l => l.papeis.map(rotuloPapel).join(', '), render: l => <span className="pilulas">{l.papeis.map(p => <span key={p} className="pilula pilula-neutra">{rotuloPapel(p)}</span>)}</span> },
     { chave: 'perfil_nome', titulo: 'Perfil' },
     { chave: 'skills', titulo: 'Skills', alinhar: 'dir', texto: l => `${l.skills.filter(s => s.certificado).length} cert. / ${l.skills.length}`, ordem: l => l.skills.filter(s => s.certificado).length * 1000 + l.skills.length, render: l => `${l.skills.filter(s => s.certificado).length} cert. / ${l.skills.length}` },
@@ -106,7 +108,8 @@ function UsuarioPopup({ id, abaInicial = 'info', aoFechar, aoCriar }: { id: stri
       )}
       {c.erro && <p className="msg-erro">{c.erro}</p>}
       {novo && <AbaInfo ficha={null} aoGravar={async nid => { await equipe.recarregar(); aoCriar(nid); }} />}
-      {!novo && c.dados && aba === 'info' && <AbaInfo ficha={c.dados} aoGravar={depois} />}
+      {!novo && c.dados && aba === 'info' && <AbaInfo ficha={c.dados} aoGravar={depois}
+        aoExcluir={async () => { await equipe.recarregar(); aoFechar(); }} />}
       {!novo && c.dados && aba === 'acessos' && <AbaAcessos ficha={c.dados} aoGravar={depois} />}
       {!novo && c.dados && aba === 'skills' && <AbaSkills ficha={c.dados} aoGravar={depois} />}
       {!novo && c.dados && aba === 'app' && <AbaApp ficha={c.dados} />}
@@ -115,31 +118,48 @@ function UsuarioPopup({ id, abaInicial = 'info', aoFechar, aoCriar }: { id: stri
   );
 }
 
-function AbaInfo({ ficha, aoGravar }: { ficha: UsuarioFicha | null; aoGravar: (id: string) => Promise<void> | void }) {
-  const esc = useSessao().eu!.escritorio_id!;
+function AbaInfo({ ficha, aoGravar, aoExcluir }: { ficha: UsuarioFicha | null; aoGravar: (id: string) => Promise<void> | void; aoExcluir?: () => Promise<void> }) {
+  const { eu } = useSessao();
+  const esc = eu!.escritorio_id!;
+  const admin = eu?.perfil === 'admin';
+  const proprio = !!ficha && ficha.usuario.id === eu?.usuario.id;
   const pode = usePode();
   const avisar = useToast();
   const u = ficha?.usuario;
-  const [f, setF] = useState({ email: u?.email ?? '', nome: u?.nome ?? '', iniciais: u?.iniciais ?? '', cor: u?.cor ?? '#1f7a45',
+  const [f, setF] = useState({ email: u?.email ?? '', emailCu: u?.email_clickup ?? '', nome: u?.nome ?? '', iniciais: u?.iniciais ?? '', cor: u?.cor ?? '#1f7a45',
     papeis: (u?.papeis ?? ['consultor']) as Papel[], ativo: u?.ativo ?? true, perfil: ficha?.perfil.codigo ?? 'consultor' });
   const [erros, setErros] = useState<Record<string, string>>({});
   const [gravando, setGravando] = useState(false);
+  const [acao, setAcao] = useState<string | null>(null);
+  const [novoLogin, setNovoLogin] = useState<string | null>(null);
   const editar = pode('equipe.editar');
+  const emailOk = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.trim());
+  const executar = async (qual: string, fn: () => Promise<unknown>, msg: string, depois: () => Promise<void> | void) => {
+    setAcao(qual);
+    try { await fn(); avisar(msg, 'ok'); await depois(); }
+    catch (x) { avisar((x as Error).message, 'erro'); }
+    setAcao(null);
+  };
+  const semHistorico = ficha?.historico?.total === 0;
   const mudaPerfil = pode('permissao.editar');
   const alternarPapel = (p: Papel) => setF(x => ({ ...x, papeis: x.papeis.includes(p) ? x.papeis.filter(y => y !== p) : [...x.papeis, p] }));
   const enviar = async () => {
     const e: Record<string, string> = {};
-    if (!ficha && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email.trim())) e.email = 'Informe um e-mail válido.';
+    if (!ficha && !emailOk(f.email)) e.email = 'Informe um e-mail válido.';
+    if (f.emailCu.trim() && !emailOk(f.emailCu)) e.emailCu = 'Informe um e-mail válido (ou deixe vazio).';
     if (!f.nome.trim()) e.nome = 'Informe o nome.';
     if (f.iniciais.trim().length > 4) e.iniciais = 'No máximo 4 letras.';
     setErros(e);
     if (Object.keys(e).length) return;
     setGravando(true);
     try {
-      const dados: Record<string, unknown> = { nome: f.nome.trim(), iniciais: f.iniciais.trim() || null, cor: f.cor, papeis: f.papeis, ativo: f.ativo };
+      const dados: Record<string, unknown> = { nome: f.nome.trim(), iniciais: f.iniciais.trim() || null, cor: f.cor, papeis: f.papeis };
+      if (!ficha) dados.ativo = f.ativo;
+      if ((f.emailCu.trim().toLowerCase() || null) !== (u?.email_clickup ?? null)) dados.email_clickup = f.emailCu.trim() || null;
       if (mudaPerfil && (!ficha || f.perfil !== ficha.perfil.codigo)) dados.perfil = f.perfil;
       const r = await api.usuarioSalvar(esc, ficha ? { id: ficha.usuario.id, versao: ficha.usuario.versao, ...dados } : { email: f.email.trim(), ...dados });
       avisar(ficha ? 'Usuário gravado' : 'Usuário cadastrado. Ele já pode entrar com o código por e-mail.', 'ok');
+      if (typeof r.aviso === 'string') avisar(r.aviso, 'info');
       await aoGravar(r.id);
     } catch (x) { avisar((x as Error).message, 'erro'); }
     setGravando(false);
@@ -148,8 +168,13 @@ function AbaInfo({ ficha, aoGravar }: { ficha: UsuarioFicha | null; aoGravar: (i
     <Formulario aoEnviar={enviar}>
       <div className="grade-campos">
         {ficha
-          ? <Campo rotulo="E-mail (login)" valor={f.email} aoMudar={() => {}} somenteLeitura ajuda={u?.logou ? 'Já entrou no v3.' : 'Ainda não entrou no v3.'} />
+          ? <Campo rotulo="E-mail (login)" valor={f.email} aoMudar={() => {}} somenteLeitura
+              ajuda={`${u?.logou ? 'Já entrou no v3.' : 'Ainda não entrou no v3.'}${admin ? '' : ' Só o Admin troca o e-mail de login.'}`} />
           : <Campo rotulo="E-mail (login)" tipo="email" valor={f.email} aoMudar={v => setF({ ...f, email: v })} obrigatorio erro={erros.email} autoComplete="off" />}
+        <Campo rotulo="E-mail do ClickUp" tipo="email" valor={f.emailCu} aoMudar={v => setF({ ...f, emailCu: v })} erro={erros.emailCu}
+          somenteLeitura={!editar} autoComplete="off"
+          ajuda={ficha?.clickup ? (ficha.clickup.local ? 'Sem membro no ClickUp (criado pelo app).' : `Ligado ao membro ${ficha.clickup.nome} do ClickUp.`)
+            : 'Usado para ligar a pessoa ao membro do ClickUp (pode ser diferente do login).'} />
         <Campo rotulo="Nome" valor={f.nome} aoMudar={v => setF({ ...f, nome: v })} obrigatorio erro={erros.nome} maxLength={120} />
         <Campo rotulo="Iniciais" valor={f.iniciais} aoMudar={v => setF({ ...f, iniciais: v.toUpperCase() })} erro={erros.iniciais} maxLength={4} />
         <div className="campo">
@@ -168,8 +193,39 @@ function AbaInfo({ ficha, aoGravar }: { ficha: UsuarioFicha | null; aoGravar: (i
           ))}
         </div>
       </fieldset>
-      <label className="check"><input type="checkbox" checked={f.ativo} disabled={!editar} onChange={e => setF({ ...f, ativo: e.target.checked })} /> Ativo neste escritório</label>
-      {editar && <Botao type="submit" variante="primario" carregando={gravando}>{ficha ? 'Gravar' : 'Cadastrar'}</Botao>}
+      {!ficha && <label className="check"><input type="checkbox" checked={f.ativo} disabled={!editar} onChange={e => setF({ ...f, ativo: e.target.checked })} /> Ativo neste escritório</label>}
+      {ficha && admin && novoLogin !== null && (
+        <fieldset className="grupo" disabled={acao !== null}>
+          <legend>Trocar e-mail de login</legend>
+          <p className="ajuda">A conta de login acompanha: {u!.nome} passa a entrar com o e-mail novo (v3, app 2.x e APK) e os aparelhos do app 2.x/APK pedem login de novo.</p>
+          <div className="linha">
+            <Campo rotulo="Novo e-mail de login" tipo="email" valor={novoLogin} aoMudar={setNovoLogin} autoComplete="off" />
+            <Botao variante="primario" carregando={acao === 'login'} disabled={!emailOk(novoLogin) || novoLogin.trim().toLowerCase() === u!.email}
+              onClick={() => executar('login', () => api.usuarioEmailLogin(esc, { id: u!.id, email: novoLogin.trim(), versao: u!.versao }),
+                'E-mail de login trocado', async () => { setNovoLogin(null); await aoGravar(u!.id); })}>Trocar</Botao>
+            <Botao onClick={() => setNovoLogin(null)}>Cancelar</Botao>
+          </div>
+        </fieldset>
+      )}
+      <div className="linha">
+        {editar && <Botao type="submit" variante="primario" carregando={gravando} disabled={acao !== null}>{ficha ? 'Gravar' : 'Cadastrar'}</Botao>}
+        {ficha && admin && novoLogin === null && <Botao disabled={acao !== null} onClick={() => setNovoLogin(u!.email)}>Trocar e-mail de login</Botao>}
+        {ficha && editar && !proprio && (f.ativo
+          ? <Botao className="a-esquerda" carregando={acao === 'ativo'} disabled={acao !== null}
+              onClick={() => { if (confirm(`Inativar ${u!.nome}? Some da Agenda da equipe, Minha agenda, Kanban, Ociosidade e das listas de responsável; o histórico fica.`))
+                void executar('ativo', () => api.usuarioSalvar(esc, { id: u!.id, versao: u!.versao, ativo: false }), 'Usuário inativado',
+                  async () => { setF(x => ({ ...x, ativo: false })); await aoGravar(u!.id); }); }}>Inativar</Botao>
+          : <Botao className="a-esquerda" carregando={acao === 'ativo'} disabled={acao !== null}
+              onClick={() => void executar('ativo', () => api.usuarioSalvar(esc, { id: u!.id, versao: u!.versao, ativo: true }), 'Usuário reativado',
+                async () => { setF(x => ({ ...x, ativo: true })); await aoGravar(u!.id); })}>Reativar</Botao>)}
+        {ficha && editar && !proprio && semHistorico && (
+          <Botao variante="perigo" carregando={acao === 'excluir'} disabled={acao !== null}
+            onClick={() => { if (confirm(`Excluir ${u!.nome}? Não tem histórico; o cadastro, os acessos e as skills somem e não dá para desfazer.`))
+              void executar('excluir', () => api.usuarioExcluir(esc, u!.id), 'Usuário excluído', async () => { await aoExcluir?.(); }); }}>Excluir</Botao>)}
+      </div>
+      {ficha && editar && !proprio && ficha.historico && !semHistorico && (
+        <p className="ajuda">Tem histórico ({ficha.historico.total} registro(s)): não pode ser excluído. Use Inativar.</p>)}
+      {ficha && !f.ativo && <p className="ajuda"><span className="pilula pilula-neutra">Inativo</span> neste escritório.</p>}
     </Formulario>
   );
 }

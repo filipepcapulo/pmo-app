@@ -74,7 +74,8 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
   const pessoas = useMemo(() => {
     const t = texto.trim().toLowerCase();
     const comTarefa = new Set(tarefas.map(x => x.consultor_id));
-    return lista.filter(m => (m.ativo || comTarefa.has(m.id))
+    // V13a-1: inativo some da Agenda da equipe (as tarefas dele continuam no histórico)
+    return lista.filter(m => m.ativo
       && (m.papeis.some(p => p === 'consultor' || p === 'desenvolvedor') || comTarefa.has(m.id))
       && (!t || m.nome.toLowerCase().includes(t))).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [lista, tarefas, texto]);

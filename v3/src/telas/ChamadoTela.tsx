@@ -57,7 +57,7 @@ function Triagem({ f, opcoes, aoFechar, aoGravar }: { f: FichaChamado; opcoes: O
       <EscolhaChips rotulo="Fila" valor={v.fila} opcoes={FILAS} aoMudar={t => setV({ ...v, fila: t })} />
       <div className="duas-col">
         <Campo rotulo="Responsável" tipo="select" valor={v.responsavel_id} aoMudar={t => setV({ ...v, responsavel_id: t })}
-          opcoes={[{ valor: '', rotulo: 'Sem responsável' }, ...lista.map(p => ({ valor: p.id, rotulo: p.nome }))]} />
+          opcoes={[{ valor: '', rotulo: 'Sem responsável' }, ...lista.filter(p => p.ativo || p.id === v.responsavel_id).map(p => ({ valor: p.id, rotulo: p.nome }))]} />
         <Campo rotulo="Horas previstas" valor={v.horas} aoMudar={t => setV({ ...v, horas: t })} />
       </div>
       {erro && <p className="msg-erro" role="alert">{erro}</p>}

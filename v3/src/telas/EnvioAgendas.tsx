@@ -1,8 +1,10 @@
 // Envio de agendas (#/envio-agendas, escopo §8): abre na próxima semana, mostra por cliente o que será enviado, desmarca
 // quem não deve receber e envia em um clique. Cada cliente recebe o próprio e-mail, só com as próprias agendas e contatos.
+// V13a-5 (regras da Agenda semanal da Central): Planejamento e gestores fora, 1º contato no Para e os demais em Cc, e
+// clientes que vêm desmarcados com o motivo (X-Horas Cruzadas, X-Interno, Energe), editável no cartão.
 import { useEffect, useRef, useState } from 'react';
 import { data } from '../api/cadastros';
-import { envioAgenda, marcadosPadrao, podeEnviar, proximaSemana, type ClienteEnvio, type ResultadoEnvio } from '../api/envioAgenda';
+import { destinatarios, envioAgenda, marcadosPadrao, podeEnviar, proximaSemana, rotuloFora, type ClienteEnvio, type ContatoEnvio, type ResultadoEnvio } from '../api/envioAgenda';
 import { traduzirErro } from '../api/mensagens';
 import { hojeIso } from '../api/projeto';
 import { Botao } from '../componentes/Botao';
@@ -12,10 +14,37 @@ import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 
 const PAPEL = { lider: 'Líder', patrocinador: 'Patrocinador' };
+const contato = (p: ContatoEnvio) => `${p.nome} (${PAPEL[p.papel]}) <${p.email}>`;
 
-function CartaoCliente({ c, marcado, aoMarcar }: { c: ClienteEnvio; marcado: boolean; aoMarcar: (v: boolean) => void }) {
+/** Motivo de o cliente vir desmarcado: mostra e deixa trocar (vazio = volta a vir marcado). */
+function Motivo({ c, aoGravar }: { c: ClienteEnvio; aoGravar: (motivo: string) => void }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const avisar = useToast();
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState(c.desmarcado_motivo ?? '');
+  const [gravando, setGravando] = useState(false);
+  async function gravar(m: string) {
+    setGravando(true);
+    try { await envioAgenda.desmarcar(esc, c.cliente_id, m.trim()); setEditando(false); avisar(m.trim() ? 'Motivo gravado' : 'Volta a vir marcado', 'ok'); aoGravar(m.trim()); }
+    catch (e) { avisar(traduzirErro(e).mensagem, 'erro'); }
+    setGravando(false);
+  }
+  if (editando) return (
+    <form className="linha envio-motivo" onSubmit={e => { e.preventDefault(); gravar(texto); }}>
+      <input value={texto} maxLength={200} onChange={e => setTexto(e.target.value)} placeholder="Motivo (vazio = vem marcado)" aria-label={`Motivo de ${c.cliente} vir desmarcado`} />
+      <Botao type="submit" carregando={gravando}>Gravar</Botao><Botao onClick={() => setEditando(false)}>Cancelar</Botao>
+    </form>);
+  return c.desmarcado_motivo
+    ? <p className="ajuda envio-motivo"><span className="pilula pilula-neutra">Vem desmarcado</span> {c.desmarcado_motivo}{' '}
+        <button type="button" className="link" onClick={() => { setTexto(c.desmarcado_motivo ?? ''); setEditando(true); }}>Alterar</button></p>
+    : <p className="ajuda envio-motivo"><button type="button" className="link" onClick={() => { setTexto(''); setEditando(true); }}>Sempre vir desmarcado…</button></p>;
+}
+
+function CartaoCliente({ c, marcado, aoMarcar, aoGravar }: { c: ClienteEnvio; marcado: boolean; aoMarcar: (v: boolean) => void; aoGravar: (motivo: string) => void }) {
   const avisar = useToast();
   const u = c.ultimo_envio;
+  const { para, cc } = destinatarios(c.contatos);
+  const fora = rotuloFora(c);
   return (
     <section className={`cartao envio-cliente${marcado ? '' : ' desmarcado'}`} aria-label={c.cliente}>
       <div className="envio-topo">
@@ -27,7 +56,7 @@ function CartaoCliente({ c, marcado, aoMarcar }: { c: ClienteEnvio; marcado: boo
         </span>
       </div>
       {c.contatos.length
-        ? <p className="ajuda">Para: {c.contatos.map(p => `${p.nome} (${PAPEL[p.papel]}) <${p.email}>`).join('; ')}</p>
+        ? <><p className="ajuda">Para: {para.map(contato).join('; ')}</p>{cc.length > 0 && <p className="ajuda">Cc: {cc.map(contato).join('; ')}</p>}</>
         : <p className="msg-erro">Sem líder ou patrocinador com e-mail. <a href={hashDe(caminhoEntidade('cliente', c.cliente_id))}>Cadastrar no cliente</a></p>}
       <div className="tabela-caixa envio-tabela">
         <table className="tabela">
@@ -38,6 +67,8 @@ function CartaoCliente({ c, marcado, aoMarcar }: { c: ClienteEnvio; marcado: boo
         </table>
       </div>
       {c.nao_confirmadas > 0 && <p className="ajuda">{c.nao_confirmadas} agenda(s) não confirmada(s) ficam de fora.</p>}
+      {fora && <p className="ajuda">{fora}</p>}
+      <Motivo key={c.desmarcado_motivo ?? ''} c={c} aoGravar={aoGravar} />
     </section>
   );
 }
@@ -81,7 +112,7 @@ export function EnvioAgendas() {
 
   return (
     <div className="pagina">
-      <header className="pagina-topo"><div><h1>Envio de agendas</h1><p className="ajuda">Só atendimentos confirmados. Cada cliente recebe o próprio e-mail, com as próprias agendas.</p></div>
+      <header className="pagina-topo"><div><h1>Envio de agendas</h1><p className="ajuda">Só atendimentos confirmados, sem Planejamento e sem agenda de gestor. Cada cliente recebe o próprio e-mail, com as próprias agendas.</p></div>
         <Botao variante="primario" carregando={enviando} disabled={!alvos.length} onClick={enviar}>Enviar a {alvos.length} cliente(s)</Botao></header>
       <div className="barra-filtros">
         <Botao onClick={() => setPeriodo(proximaSemana(hojeIso()))}>Próxima semana</Botao>
@@ -99,7 +130,7 @@ export function EnvioAgendas() {
       )}
       {c.carregando && !c.dados && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}
       {c.dados && !comAgenda.length && <p className="ajuda">Nenhuma agenda confirmada no período.</p>}
-      {comAgenda.map(x => <CartaoCliente key={x.cliente_id} c={x} marcado={marcados.has(x.cliente_id)} aoMarcar={v => setMarcados(m => {
+      {comAgenda.map(x => <CartaoCliente key={x.cliente_id} c={x} marcado={marcados.has(x.cliente_id)} aoGravar={m => { if (m) setMarcados(s => { const n = new Set(s); n.delete(x.cliente_id); return n; }); setRecarga(n => n + 1); }} aoMarcar={v => setMarcados(m => {
         const n = new Set(m); if (v) n.add(x.cliente_id); else n.delete(x.cliente_id); return n;
       })} />)}
       {semConfirmada.length > 0 && <p className="ajuda">Sem agenda confirmada: {semConfirmada.map(x => `${x.cliente} (${x.nao_confirmadas})`).join(', ')}.</p>}

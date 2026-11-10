@@ -1,6 +1,7 @@
 // Módulo Demandas (#/demandas): todas as demandas/subdemandas visíveis, agrupadas por cliente · projeto, com a barra
-// de horas e as mesmas ações (popup único) de qualquer tela. Filtros por status e texto.
-import { useMemo, useState } from 'react';
+// de horas e as mesmas ações (popup único) de qualquer tela. Filtros por status (vários, guardados no aparelho — V13a-5,
+// módulo 09 da Central) e texto; "Relatório HTML" baixa o que está na tela.
+import { useEffect, useMemo, useState } from 'react';
 import { consultor } from '../api/consultor';
 import { exec, STATUS_DEMANDA, type DemandaLinha } from '../api/execucao';
 import { ArvoreDemandas } from '../componentes/ArvoreDemandas';
@@ -11,19 +12,23 @@ import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
+import { ABERTAS, lerStatus, relatorioDemandas, rotuloStatus, TODOS } from '../api/relatorios';
+import { baixarRelatorioHtml } from '../util/relatorioHtml';
 
-const ABERTAS = ['backlog', 'planejada', 'em_andamento', 'pausada'];
+const CHAVE_STATUS = 'pmo3.demandas.status';
 
 export function Demandas({ minhas }: { minhas?: boolean }) {
   const esc = useSessao().eu!.escritorio_id!;
   const pode = usePode();
   const ed = useEdicao();
-  const [status, setStatus] = useState<string>('abertas');
+  const [status, setStatus] = useState<string[]>(() => { try { return lerStatus(localStorage.getItem(CHAVE_STATUS)); } catch { return ABERTAS; } });
+  useEffect(() => { try { localStorage.setItem(CHAVE_STATUS, JSON.stringify(status)); } catch { /* sem armazenamento */ } }, [status]);
+  const trocar = (v: string) => setStatus(l => { const n = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; return n.length ? TODOS.filter(x => n.includes(x)) : l; });
   const [texto, setTexto] = useState('');
   const [busca, setBusca] = useState('');
-  const filtro = status === 'abertas' ? ABERTAS : status === 'todas' ? null : [status];
+  const filtro = status.length === TODOS.length ? null : status;
   const c = useCarga(() => (minhas ? consultor.demandas(esc, filtro, busca || null) : exec.demandas(esc, { status: filtro, texto: busca || null, limite: 500 })),
-    [esc, minhas, status, busca, ed.geracao]);
+    [esc, minhas, status.join(), busca, ed.geracao]);
   const grupos = useMemo(() => {
     const m = new Map<string, { cliente: string; projeto: string; projeto_id: string; itens: DemandaLinha[] }>();
     for (const d of c.dados?.itens ?? []) {
@@ -43,12 +48,20 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
         </div>
       </header>}
       <form className="barra-filtros" onSubmit={e => { e.preventDefault(); setBusca(texto.trim()); }}>
-        <select value={status} onChange={e => setStatus(e.target.value)} aria-label="Status">
-          <option value="abertas">Abertas</option><option value="todas">Todas</option>
-          {STATUS_DEMANDA.map(s => <option key={s.valor} value={s.valor}>{s.rotulo}</option>)}
-        </select>
+        <details className="filtro-status">
+          <summary>Status: {rotuloStatus(status)}</summary>
+          <div className="filtro-status-caixa">
+            <div className="linha">
+              <button type="button" className="link" onClick={() => setStatus(ABERTAS)}>Abertas</button>
+              <button type="button" className="link" onClick={() => setStatus(TODOS)}>Todas</button>
+            </div>
+            {STATUS_DEMANDA.map(s => <label key={s.valor} className="check"><input type="checkbox" checked={status.includes(s.valor)} onChange={() => trocar(s.valor)} /> {s.rotulo}</label>)}
+          </div>
+        </details>
         <input value={texto} onChange={e => setTexto(e.target.value)} placeholder="Nome da demanda…" aria-label="Buscar demanda" />
         <Botao type="submit">Filtrar</Botao>
+        <Botao disabled={!c.dados?.itens.length} onClick={() => baixarRelatorioHtml(relatorioDemandas(c.dados!.itens,
+          [`Status: ${rotuloStatus(status)}`, busca ? `Busca: ${busca}` : '', minhas ? 'Minhas demandas' : ''].filter(Boolean)))}>Relatório HTML</Botao>
         <span className="legenda-barra"><span className="leg leg-real">real (OS/app)</span><span className="leg leg-plan">planejado</span></span>
       </form>
       {c.erro && <p className="msg-erro">{c.erro}</p>}

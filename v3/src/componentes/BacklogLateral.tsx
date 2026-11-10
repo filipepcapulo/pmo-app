@@ -3,10 +3,13 @@
 // (a escolha fica guardada no aparelho). Todo nível tem o lápis: cliente e projeto levam à tela própria; demanda e subdemanda
 // abrem o popup único de edição. O que já tem agenda em aberto fica marcado em verde ("2 agendas em aberto · próx. 05/11") e
 // pode ser escondido, para sobrar só o que ainda precisa de alocação. O filtro "GP responsável" (3.13.0) usa a regra da pílula:
-// responsável da demanda, senão o da mãe, o do projeto, o do cliente (gp_id vem do banco).
+// responsável da demanda, senão o da mãe, o do projeto, o do cliente (gp_id vem do banco). "Relatório" (V13a-5, módulo 09
+// da Central) baixa o que está na tela, com os filtros, num HTML único para guardar, mandar ou imprimir.
 import { useEffect, useMemo, useState } from 'react';
 import { arvoreBacklog, doGp, ORIGENS, porProjeto, rotuloAgendas, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
 import { rotuloPrioridade } from '../api/execucao';
+import { relatorioBacklog } from '../api/relatorios';
+import { baixarRelatorioHtml } from '../util/relatorioHtml';
 import { useEdicao } from '../estado/edicao';
 import { gps, useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe, type Entidade } from '../estado/rotas';
@@ -66,6 +69,15 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
   const opcoesStatus = useMemo(() => statusBacklog(itens ?? []), [itens]);
   const escolhidos = opcoesStatus.filter(o => !fora.has(o.valor));
   const visiveis = arvore.reduce((s, c) => s + c.total, 0);
+  function relatorio() {
+    const f = [
+      `Origem: ${ORIGENS.find(o => o.valor === origem)?.rotulo ?? 'tudo'}`,
+      `Status: ${escolhidos.length === opcoesStatus.length ? 'todos' : escolhidos.map(o => o.rotulo).join(', ') || 'nenhum'}`,
+      gp ? `GP: ${lista.find(m => m.id === gp)?.nome ?? ''}` : '', texto.trim() ? `Busca: ${texto.trim()}` : '',
+      soSemAgenda ? 'Sem agenda em aberto' : '',
+    ].filter(Boolean);
+    baixarRelatorioHtml(relatorioBacklog(arvore, f));
+  }
   const trocarStatus = (v: string) => setFora(s => { const n = new Set(s); if (n.has(v)) n.delete(v); else n.add(v); return n; });
   const alternar = (id: string) => setAbertos(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   // com filtro de texto tudo abre: quem busca quer ver o item
@@ -102,6 +114,7 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
           ))}
         </details>
         <label className="check bl-so-sem"><input type="checkbox" checked={soSemAgenda} onChange={e => setSoSemAgenda(e.target.checked)} /> Esconder o que já tem agenda</label>
+        <button type="button" className="link bl-relatorio" disabled={!itens} onClick={relatorio}>Relatório HTML</button>
       </div>
       {erro && <p className="msg-erro">{erro}</p>}
       {itens && arvore.length === 0 && <p className="ajuda">Nada no backlog com esse filtro.</p>}

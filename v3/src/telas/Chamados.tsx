@@ -1,13 +1,13 @@
 // Módulo Chamados (#/chamados, escopo §7): Busca paginada (10/15/30/50) em qualquer campo, Backlog por prioridade ×
-// antiguidade com a grade da equipe ao lado, e Indicadores. "+ Chamado" abre o formulário do 2.x.
+// antiguidade (ordem escolhida clicando nas colunas, guardada por usuário — V13a-2), e Indicadores. "+ Chamado" abre o formulário do 2.x.
 import { useEffect, useState } from 'react';
-import { cham, FILAS, rotuloFila, rotuloSituacao, SITUACOES, slaDaLinha, type ChamadoLinha, type FiltrosChamado, type OpcoesChamado } from '../api/chamados';
+import { cham, FILAS, idadeDias, ordenarBacklog, prazoSla, rankPrioridade, rotuloFila, rotuloSituacao, SITUACOES, slaDaLinha, type ChamadoLinha, type FiltrosChamado, type OpcoesChamado } from '../api/chamados';
 import { PRIORIDADES, rotuloPrioridade } from '../api/execucao';
 import { hojeIso, somarDias } from '../api/projeto';
 import { Botao } from '../componentes/Botao';
 import { ConfigChamados } from '../componentes/ConfigChamados';
 import { FormChamado } from '../componentes/FormChamado';
-import { PainelEquipe } from '../componentes/PainelEquipe';
+import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
@@ -96,19 +96,38 @@ function Busca({ geracao }: { geracao: number }) {
   );
 }
 
+type LinhaBacklog = ChamadoLinha & Record<string, unknown>;
+
 function Backlog({ geracao }: { geracao: number }) {
-  const esc = useSessao().eu!.escritorio_id!;
+  const eu = useSessao().eu!;
+  const esc = eu.escritorio_id!;
   const ed = useEdicao();
   const pode = usePode();
-  const c = useCarga(() => cham.buscar(esc, { abertos: true, ordem: 'backlog' }, 50, 0), [esc, geracao, ed.geracao]);
-  return <>
+  const c = useCarga(() => cham.buscarTodos(esc, { abertos: true, ordem: 'backlog' }), [esc, geracao, ed.geracao]);
+  const agora = Date.now();
+  const linhas = c.dados ? ordenarBacklog(c.dados.itens) as LinhaBacklog[] : [];
+  const link = (l: ChamadoLinha, t: string) => <a href={hashDe(caminhoEntidade('chamado', l.id))}>{t}</a>;
+  const colunas: Coluna<LinhaBacklog>[] = [
+    { chave: 'numero', titulo: 'Nº', render: l => link(l, `#${l.numero}`), texto: l => `#${l.numero}` },
+    { chave: 'cliente', titulo: 'Cliente', render: l => <Resumo tipo="cliente" id={l.cliente_id}>{l.cliente}</Resumo> },
+    { chave: 'titulo', titulo: 'Assunto', render: l => <>{link(l, l.titulo)}<br /><small className="ajuda">{[l.tipo, rotuloFila(l.fila), l.tem_agenda ? 'com agenda' : ''].filter(Boolean).join(' · ')}</small></> },
+    { chave: 'prioridade', titulo: 'Prioridade', render: l => <PilulaPrioridade p={l.prioridade} />, texto: l => rotuloPrioridade(l.prioridade), ordem: l => rankPrioridade(l.prioridade) },
+    { chave: 'situacao', titulo: 'Situação', render: l => <PilulaSituacao s={l.situacao} />, texto: l => rotuloSituacao(l.situacao) },
+    { chave: 'sla', titulo: 'SLA', render: l => { const s = slaDaLinha(l, agora); return <span className={`sla sla-${s.classe}`}>{s.texto}</span>; },
+      texto: l => slaDaLinha(l, agora).texto, valor: l => prazoSla(l), ordem: l => prazoSla(l) },
+    { chave: 'criado_em', titulo: 'Aberto em', texto: l => new Date(l.criado_em).toLocaleDateString('pt-BR') },
+    { chave: 'idade', titulo: 'Idade (dias)', alinhar: 'dir', valor: l => idadeDias(l.criado_em, agora) },
+    ...(pode('tarefa.criar') ? [{ chave: 'alocar', titulo: '', fixa: true, render: (l: LinhaBacklog) => <Botao onClick={() => ed.tarefa({ demanda_id: l.demanda_id })}>Alocar</Botao> }] : []),
+  ];
+  return (
     <section className="cartao">
       <h2 className="secao">Fila por prioridade e antiguidade{c.dados ? ` (${c.dados.total})` : ''}</h2>
+      <p className="ajuda">Clique no título da coluna para ordenar; de novo inverte e, na terceira vez, volta à ordem padrão (prioridade e depois idade). A escolha fica guardada para você.</p>
       {c.erro && <p className="msg-erro">{c.erro}</p>}
-      {c.dados && <Lista itens={c.dados.itens} alocar={pode('tarefa.criar') ? l => ed.tarefa({ demanda_id: l.demanda_id }) : undefined} />}
+      {c.dados && <Tabela id={`chamados-backlog:${eu.usuario.id}`} nome="Backlog de chamados" colunas={colunas} linhas={linhas} chave={l => l.id}
+        tamanhoInicial={30} vazio="Nenhum chamado aberto." guardarOrdem />}
     </section>
-    <PainelEquipe origemInicial="backlog_base" />
-  </>;
+  );
 }
 
 function Indicadores({ geracao }: { geracao: number }) {

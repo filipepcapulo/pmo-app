@@ -3,7 +3,7 @@
 // restaura) e muda de lugar arrastando o título; o botão "Colunas" mostra/oculta e reordena (também no celular) e
 // "Excel" baixa um .xlsx (e "CSV" um .csv) das linhas filtradas, na ordem e com as colunas da tela. Layout salvo neste navegador.
 import { useEffect, useMemo, useState, type DragEvent, type PointerEvent as PE, type ReactNode } from 'react';
-import { alternar, deslocar, gravarLayout, lerLayout, mover, normalizar, type Layout } from '../estado/colunas';
+import { alternar, deslocar, gravarLayout, lerLayout, mover, normalizar, proximaOrdem, type Layout } from '../estado/colunas';
 import { ativo, deduzirTipo, normal, OPS_NUMERO, OPS_TEXTO, passa, type Filtro, type Operador, type TipoColuna } from '../estado/filtro';
 import { ordenar, paginar, TAMANHOS, valorOrdem } from '../estado/paginacao';
 import { baixarCsv } from '../util/csv';
@@ -43,19 +43,21 @@ function textoDe<T extends Record<string, unknown>>(c: Coluna<T>, l: T): string 
   return /^\d{4}-\d{2}-\d{2}/.test(String(v)) ? dataBR(String(v)) : String(v);
 }
 
-export function Tabela<T extends Record<string, unknown>>({ id, nome, colunas, linhas, chave, tamanhoInicial = 10, vazio = 'Nada para mostrar.', aoClicar }: {
+export function Tabela<T extends Record<string, unknown>>({ id, nome, colunas, linhas, chave, tamanhoInicial = 10, vazio = 'Nada para mostrar.', aoClicar, guardarOrdem = false }: {
   /** Nome do layout salvo; sem ele, vale o conjunto de colunas. */
   id?: string;
   /** Nome do arquivo/aba do Excel (padrão: o id). */
   nome?: string;
   colunas: Coluna<T>[]; linhas: T[]; chave: (l: T) => string; tamanhoInicial?: number; vazio?: string; aoClicar?: (l: T) => void;
+  /** Guarda a ordenação no layout salvo (com o `id`); o 3º clique na mesma coluna volta à ordem em que as linhas chegaram. */
+  guardarOrdem?: boolean;
 }) {
   const moveis = colunas.filter(c => !c.fixa);
   const idLayout = id ?? moveis.map(c => c.chave).join(',');
   const chaves = moveis.map(c => c.chave).join(',');
   const [pagina, setPagina] = useState(1);
   const [tamanho, setTamanho] = useState(tamanhoInicial);
-  const [ord, setOrd] = useState<{ chave: string | null; desc: boolean }>({ chave: null, desc: false });
+  const [ordLocal, setOrd] = useState<{ chave: string | null; desc: boolean }>({ chave: null, desc: false });
   const [salvo, setSalvo] = useState<Partial<Layout> | null>(() => lerLayout(idLayout));
   const [seletor, setSeletor] = useState(false);
   const [arrasto, setArrasto] = useState<{ de: string; para?: string; depois?: boolean } | null>(null);
@@ -66,6 +68,7 @@ export function Tabela<T extends Record<string, unknown>>({ id, nome, colunas, l
   useEffect(() => setSalvo(lerLayout(idLayout)), [idLayout]);
 
   const layout = useMemo(() => normalizar(chaves.split(','), salvo), [chaves, salvo]);
+  const ord = guardarOrdem ? (layout.ordenar ?? { chave: null, desc: false }) : ordLocal;
   const porChave = new Map(colunas.map(c => [c.chave, c]));
   const visiveis = [...layout.ordem.filter(k => !layout.ocultas.includes(k)).map(k => porChave.get(k)!), ...colunas.filter(c => c.fixa)];
   const trocar = (l: Layout | null) => { gravarLayout(idLayout, l); setSalvo(l); };
@@ -82,7 +85,11 @@ export function Tabela<T extends Record<string, unknown>>({ id, nome, colunas, l
   const colOrd = ord.chave ? porChave.get(ord.chave) : undefined;
   const ordenadas = ordenar(base, colOrd ? (colOrd.ordem ?? ((l: T) => valorOrdem(valorDe(colOrd, l)))) : null, ord.desc);
   const p = paginar(ordenadas, pagina, tamanho);
-  const ordenarPor = (k: string) => { setOrd(o => ({ chave: k, desc: o.chave === k ? !o.desc : false })); setPagina(1); };
+  const ordenarPor = (k: string) => {
+    if (guardarOrdem) { const o = proximaOrdem(layout.ordenar, k); const { ordenar: _, ...resto } = layout; trocar(o ? { ...resto, ordenar: o } : resto); }
+    else setOrd(o => ({ chave: k, desc: o.chave === k ? !o.desc : false }));
+    setPagina(1);
+  };
 
   // larguras: no <colgroup> (com table-layout fixo), uma por coluna visível; sem nenhuma salva, a tabela se ajusta sozinha
   const largs = larg ?? layout.larguras;

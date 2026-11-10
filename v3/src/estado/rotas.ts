@@ -29,6 +29,8 @@ export const MODULOS: Modulo[] = [
   { id: 'projetos', titulo: 'Projetos', area: 'cadastros', icone: 'pasta' },
   { id: 'modelos', titulo: 'Modelos de projeto', area: 'cadastros', icone: 'copia', permissao: 'projeto.criar' },
   { id: 'equipe', titulo: 'Equipe', area: 'cadastros', icone: 'pessoas' },
+  // V13a-3: POs e áreas da Sankhya (módulo 14 da Central); todos veem, organograma.editar edita
+  { id: 'organograma', titulo: 'Organograma Sankhya', area: 'cadastros', icone: 'organograma' },
   { id: 'demandas', titulo: 'Demandas', area: 'execucao', icone: 'lista' },
   { id: 'agenda', titulo: 'Agenda da equipe', area: 'execucao', icone: 'calendario' },
   { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: 'chamado' },

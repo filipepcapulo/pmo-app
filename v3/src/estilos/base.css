@@ -911,3 +911,27 @@ div.rkm-linha { cursor: default; }
 .push-aparelhos li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .dica-caixa { max-width: 640px; padding: 10px 12px; border-left: 4px solid var(--laranja); background: var(--superficie); border-radius: var(--raio); }
 @media (max-width: 600px) { .push-botoes .bt { flex: 1 1 100%; } }
+/* V13a-3 Organograma Sankhya: nó raiz → grupos → cartões de área */
+.org { display: flex; flex-direction: column; gap: 18px; }
+.org-raiz { display: flex; justify-content: center; }
+.org-raiz span { background: var(--verde); color: #fff; font-weight: 700; padding: 8px 22px; border-radius: 999px; box-shadow: var(--sombra); }
+:root[data-tema="escuro"] .org-raiz span { color: #04210f; }
+.org-grupo { border-left: 3px solid var(--verde); padding-left: 12px; }
+.org-grupo-nome { margin: 0 0 8px; font-size: 1.05rem; }
+.org-areas { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.org-area h3 { margin: 0 0 4px; font-size: .95rem; }
+.org-pessoas { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.org-pessoas li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.org-avatar { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--verde-escuro); color: #fff; font-size: 10px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; }
+.org-demandas { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.org-demandas li { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--superficie-2); color: var(--texto-2); border: 1px solid var(--linha); }
+.org-demandas li.achada { background: var(--verde-claro); color: var(--verde-texto); border-color: transparent; font-weight: 700; }
+.org-editor { display: flex; flex-direction: column; gap: 10px; }
+.org-grupo-topo { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.org-grupo-topo input { flex: 1; min-width: 0; font-weight: 600; }
+.org-area-edicao { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) minmax(0, 3fr) minmax(0, 2fr) auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+.org-area-edicao input { min-width: 0; }
+.org-editor-rodape { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; padding: 8px 0; background: var(--fundo); }
+ul.msg-erro { padding-left: 18px; }
+@media (max-width: 700px) { .org-area-edicao { grid-template-columns: 1fr auto; } .org-area-edicao input:not(:first-child) { grid-column: 1; } }

@@ -1,5 +1,6 @@
 // Módulo Chamados (#/chamados, escopo §7): Busca paginada (10/15/30/50) em qualquer campo, Backlog por prioridade ×
-// antiguidade (ordem escolhida clicando nas colunas, guardada por usuário — V13a-2), e Indicadores. "+ Chamado" abre o formulário do 2.x.
+// antiguidade (ordem escolhida clicando nas colunas, guardada por usuário — V13a-2), e Indicadores (dos chamados e, desde a
+// V13a-4, dos atendimentos WhatsApp do Total Chat). "+ Chamado" abre o formulário do 2.x.
 import { useEffect, useState } from 'react';
 import { cham, FILAS, idadeDias, ordenarBacklog, prazoSla, rankPrioridade, rotuloFila, rotuloSituacao, SITUACOES, slaDaLinha, type ChamadoLinha, type FiltrosChamado, type OpcoesChamado } from '../api/chamados';
 import { PRIORIDADES, rotuloPrioridade } from '../api/execucao';
@@ -15,6 +16,7 @@ import { TAMANHOS } from '../estado/paginacao';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
+import { AtendimentosWhatsapp } from '../componentes/AtendimentosWhatsapp';
 
 type Aba = 'busca' | 'backlog' | 'indicadores';
 
@@ -131,6 +133,17 @@ function Backlog({ geracao }: { geracao: number }) {
 }
 
 function Indicadores({ geracao }: { geracao: number }) {
+  const [qual, setQual] = useState<'chamados' | 'whatsapp'>('chamados');
+  return <>
+    <div className="segmentos" role="tablist" aria-label="Indicadores">
+      {([['chamados', 'Chamados'], ['whatsapp', 'WhatsApp (Total Chat)']] as const).map(([id, r]) =>
+        <button key={id} type="button" role="tab" aria-selected={qual === id} className={qual === id ? 'ativo' : undefined} onClick={() => setQual(id)}>{r}</button>)}
+    </div>
+    {qual === 'chamados' ? <IndicadoresChamados geracao={geracao} /> : <AtendimentosWhatsapp />}
+  </>;
+}
+
+function IndicadoresChamados({ geracao }: { geracao: number }) {
   const esc = useSessao().eu!.escritorio_id!;
   const [de, setDe] = useState(() => somarDias(hojeIso(), -30));
   const [ate, setAte] = useState(hojeIso);

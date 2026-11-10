@@ -935,3 +935,42 @@ div.rkm-linha { cursor: default; }
 .org-editor-rodape { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; padding: 8px 0; background: var(--fundo); }
 ul.msg-erro { padding-left: 18px; }
 @media (max-width: 700px) { .org-area-edicao { grid-template-columns: 1fr auto; } .org-area-edicao input:not(:first-child) { grid-column: 1; } }
+
+/* Atendimentos WhatsApp (V13a-4): Chamados › Indicadores › WhatsApp; PDF pela impressão (body.imprimir-wa) */
+.wa-capa { background: var(--barra); color: var(--barra-texto, #fff); border-radius: var(--raio); padding: 16px 18px; margin: 4px 0 12px; }
+.wa-capa h2 { margin: 0 0 4px; font-size: 1.3rem; }
+.wa-capa p { margin: 0; opacity: .9; font-size: .9rem; }
+.wa-pagina { margin-bottom: 18px; }
+.wa-pagina h3 { margin: 0 0 8px; font-size: 1rem; text-transform: uppercase; letter-spacing: .03em; color: var(--verde-texto); }
+.wa-cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.wa-cartao { background: var(--superficie); border-radius: var(--raio); box-shadow: var(--sombra); padding: 10px 12px; border-left: 5px solid var(--verde); display: flex; flex-direction: column; gap: 6px; }
+.wa-cartao.ruim { border-left-color: var(--vermelho); }
+.wa-cartao small { color: var(--texto-2); font-size: 11px; text-transform: uppercase; }
+.wa-cartao > div { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.wa-cartao em { display: block; font-style: normal; font-size: 11px; color: var(--texto-2); text-transform: uppercase; }
+.wa-cartao strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.wa-cartao > b { font-size: 12px; color: var(--verde-texto); }
+.wa-cartao.ruim > b { color: var(--vermelho); }
+.wa-destaques { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+.wa-graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.wa-grafico h2.secao { margin-top: 0; }
+.wa-legenda { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-2); margin: 0 0 6px; }
+.wa-legenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-left: 6px; }
+.wa-linha { display: grid; grid-template-columns: minmax(60px, 130px) 1fr; gap: 8px; align-items: center; padding: 3px 0; font-size: 12px; }
+.wa-linha > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-barras { display: grid; gap: 2px; }
+.wa-barras > span { display: flex; align-items: center; gap: 4px; }
+.wa-barras i { display: block; height: 8px; border-radius: 4px; min-width: 2px; }
+.wa-barras b { font-size: 11px; font-variant-numeric: tabular-nums; }
+.wa-nota { margin: 8px 0 0; font-size: .9rem; }
+.wa-parceiros td.num, .wa-parceiros th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.wa-sobe { color: var(--verde-texto); font-weight: 600; }
+.wa-desce { color: var(--vermelho); font-weight: 600; }
+@media print {
+  body.imprimir-wa .pagina-topo, body.imprimir-wa .segmentos, body.imprimir-wa .wa-controles, body.imprimir-wa .msg-erro { display: none !important; }
+  body.imprimir-wa .wa-relatorio { color: #000; }
+  body.imprimir-wa .wa-capa, body.imprimir-wa .wa-barras i, body.imprimir-wa .wa-legenda i { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body.imprimir-wa .wa-pagina { break-before: page; }
+  body.imprimir-wa .wa-cartao, body.imprimir-wa .wa-grafico, body.imprimir-wa tr { break-inside: avoid; }
+  body.imprimir-wa .tabela-rolagem { overflow: visible !important; }
+}

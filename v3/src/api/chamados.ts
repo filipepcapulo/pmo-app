@@ -83,6 +83,17 @@ const salvar = <T = unknown>(funcao: string, esc: string, d: unknown) =>
 export const cham = {
   buscar: (esc: string, f: FiltrosChamado, tamanho: number, pagina: number) =>
     rpc<{ total: number; itens: ChamadoLinha[] }>('v1_chamados_buscar', { p_escritorio: esc, p_filtros: f, p_tamanho: tamanho, p_pagina: pagina }),
+  /** Todas as linhas do filtro (o banco devolve até 50 por página): para ordenar na tela qualquer coluna. */
+  buscarTodos: async (esc: string, f: FiltrosChamado, maxPaginas = 20) => {
+    const itens: ChamadoLinha[] = [];
+    let total = 0;
+    for (let p = 0; p < maxPaginas; p++) {
+      const r = await cham.buscar(esc, f, 50, p);
+      total = r.total; itens.push(...r.itens);
+      if (r.itens.length < 50 || itens.length >= total) break;
+    }
+    return { total, itens };
+  },
   ficha: (esc: string, id: string) => rpc<FichaChamado>('v1_chamado', { p_escritorio: esc, p_chamado: id }),
   opcoes: (esc: string) => rpc<OpcoesChamado>('v1_chamado_opcoes', { p_escritorio: esc }),
   indicadores: (esc: string, de: string, ate: string) => rpc<Indicadores>('v1_chamados_indicadores', { p_escritorio: esc, p_de: de, p_ate: ate }),
@@ -97,6 +108,18 @@ export const cham = {
 };
 
 // ---------------------------------------------------------------- regras puras
+const RANK_PRIORIDADE = ['urgente', 'alta', 'normal', 'baixa'];
+/** Posição da prioridade na fila (urgente = 0 … baixa = 3; desconhecida no fim). */
+export const rankPrioridade = (p: string) => { const i = RANK_PRIORIDADE.indexOf(p); return i < 0 ? RANK_PRIORIDADE.length : i; };
+/** Ordem padrão do Backlog (igual a api.v1_chamados_buscar com ordem 'backlog'): prioridade e depois idade (mais antigo antes). */
+export function ordenarBacklog<T extends Pick<ChamadoLinha, 'prioridade' | 'criado_em' | 'numero'>>(l: T[]): T[] {
+  return [...l].sort((a, b) => rankPrioridade(a.prioridade) - rankPrioridade(b.prioridade) || a.criado_em.localeCompare(b.criado_em) || a.numero - b.numero);
+}
+/** Idade do chamado em dias inteiros. */
+export const idadeDias = (criadoEm: string, agora: number) => Math.max(0, Math.floor((agora - new Date(criadoEm).getTime()) / 86_400_000));
+/** Prazo que o SLA da linha está contando (resposta enquanto não houve 1ª resposta; senão solução). */
+export const prazoSla = (c: ChamadoLinha) => (!c.primeira_resposta_em && !c.resolvido_em && c.sla_resposta_em ? c.sla_resposta_em : c.sla_solucao_em);
+
 /** Mesma matriz de app.prioridade_matriz (0032): mostra a prioridade enquanto a pessoa escolhe. */
 export function prioridadeMatriz(impacto: string, urgencia: string): string {
   if (impacto === 'alto') return urgencia === 'alta' ? 'urgente' : urgencia === 'media' ? 'alta' : 'normal';

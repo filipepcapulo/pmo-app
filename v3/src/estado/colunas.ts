@@ -1,6 +1,7 @@
 // Layout das colunas de cada tabela (ordem e ocultas), guardado neste navegador — como o seletor de colunas das
 // grades dos dashboards Sankhya. Coluna nova no código entra visível no fim; sempre resta ao menos uma visível.
-export interface Layout { ordem: string[]; ocultas: string[]; larguras?: Record<string, number> }
+export interface Ordenacao { chave: string; desc: boolean }
+export interface Layout { ordem: string[]; ocultas: string[]; larguras?: Record<string, number>; ordenar?: Ordenacao }
 
 const PREFIXO = 'pmo3:tabela:';
 
@@ -12,7 +13,16 @@ export function normalizar(chaves: string[], salvo: Partial<Layout> | null): Lay
   let ocultas = (salvo?.ocultas ?? []).filter(k => existe.has(k));
   if (ocultas.length >= ordem.length) ocultas = [];
   const larguras = Object.fromEntries(Object.entries(salvo?.larguras ?? {}).filter(([, w]) => w >= 40));
-  return Object.keys(larguras).length ? { ordem, ocultas, larguras } : { ordem, ocultas };
+  const l: Layout = Object.keys(larguras).length ? { ordem, ocultas, larguras } : { ordem, ocultas };
+  const o = salvo?.ordenar;
+  if (o && typeof o.chave === 'string' && existe.has(o.chave)) l.ordenar = { chave: o.chave, desc: !!o.desc };
+  return l;
+}
+
+/** Clique no título quando a tabela guarda a ordem: outra coluna → crescente; mesma → decrescente; de novo → padrão (null). */
+export function proximaOrdem(atual: Ordenacao | null | undefined, chave: string): Ordenacao | null {
+  if (!atual || atual.chave !== chave) return { chave, desc: false };
+  return atual.desc ? null : { chave, desc: true };
 }
 
 /** Move `de` para antes (ou depois) de `para`. */

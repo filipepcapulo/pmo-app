@@ -3,6 +3,7 @@
 // Sem produtividade.ver_todos (o consultor), o banco devolve só o próprio (0045) e a tela vira "Minha produtividade".
 // Travados (V13c-2): apontamentos travados no Experience fora do prazo retroativo, por ciclo 21–20 (substitui a planilha).
 // Conferência de OS (V13c-3): OS do Experience × agendas do banco, relatório por consultor e vínculo da OS na agenda.
+// Planilhas (V13e-1): planilhas de horas dos consultores (Drive) × agendas de planilha; Fechar (OBS/VISTO + validação) e aba do novo ciclo.
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { consultor } from '../api/consultor';
@@ -11,6 +12,7 @@ import { traduzirErro } from '../api/mensagens';
 import { hojeIso } from '../api/projeto';
 import { ApontamentosTravados } from '../componentes/ApontamentosTravados';
 import { ConferenciaOS } from '../componentes/ConferenciaOS';
+import { ConferenciaPlanilhas } from '../componentes/ConferenciaPlanilhas';
 import { RelatorioApontamentos } from '../componentes/RelatorioApontamentos';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
@@ -94,7 +96,7 @@ function Fechamento({ todos }: { todos: boolean }) {
 
 export function Produtividade() {
   const todos = usePode()('produtividade.ver_todos');
-  const [aba, setAba] = useState<'fechamento' | 'apontamentos' | 'travados' | 'conferencia'>('fechamento');
+  const [aba, setAba] = useState<'fechamento' | 'apontamentos' | 'travados' | 'conferencia' | 'planilhas'>('fechamento');
   return (
     <div className="pagina">
       <header className="pagina-topo"><div>
@@ -107,9 +109,10 @@ export function Produtividade() {
         <button type="button" role="tab" aria-selected={aba === 'apontamentos'} onClick={() => setAba('apontamentos')}>{todos ? 'Apontamentos' : 'Meus apontamentos'}</button>
         <button type="button" role="tab" aria-selected={aba === 'travados'} onClick={() => setAba('travados')}>{todos ? 'Travados' : 'Meus travados'}</button>
         <button type="button" role="tab" aria-selected={aba === 'conferencia'} onClick={() => setAba('conferencia')}>{todos ? 'Conferência de OS' : 'Minha conferência de OS'}</button>
+        <button type="button" role="tab" aria-selected={aba === 'planilhas'} onClick={() => setAba('planilhas')}>{todos ? 'Planilhas' : 'Minha planilha'}</button>
       </div>
       {aba === 'fechamento' ? <Fechamento todos={todos} /> 
-        : aba === 'apontamentos' ? <RelatorioApontamentos equipe={todos} /> : aba === 'travados' ? <ApontamentosTravados /> : <ConferenciaOS />}
+        : aba === 'apontamentos' ? <RelatorioApontamentos equipe={todos} /> : aba === 'travados' ? <ApontamentosTravados /> : aba === 'conferencia' ? <ConferenciaOS /> : <ConferenciaPlanilhas />}
     </div>
   );
 }

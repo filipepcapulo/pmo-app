@@ -37,6 +37,8 @@ export const MODULOS: Modulo[] = [
   { id: 'consultor', titulo: 'Minha agenda', area: 'execucao', icone: 'relogio' },
   { id: 'desvios', titulo: 'Desvios de agenda', area: 'execucao', icone: 'seta', permissao: 'desvio.aprovar' },
   { id: 'envio-agendas', titulo: 'Envio de agendas', area: 'execucao', icone: 'calendario', permissao: 'agenda.enviar' },
+  // V13d-3: Aceite de OS (módulo 05 da Central); #/aceite-os/<FAP> é o atalho do Projeto
+  { id: 'aceite-os', titulo: 'Aceite de OS', area: 'execucao', icone: 'seta', permissao: 'aceite_os.gerenciar', parametro: true },
   { id: 'ociosidade', titulo: 'Ociosidade', area: 'execucao', icone: 'pessoas', permissao: 'ociosidade.ver' },
   { id: 'ferias', titulo: 'Controle de Férias', area: 'execucao', icone: 'calendario', permissao: 'ferias.ver' },
   // V11d-1: módulo pessoal (só o Admin por padrão); #/reembolso/relatorio abre direto na aba (link do aviso do dia 1º)

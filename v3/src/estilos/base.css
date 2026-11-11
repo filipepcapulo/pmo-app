@@ -413,6 +413,9 @@ body.redimensionando, body.redimensionando * { cursor: col-resize !important; us
 .linha-exec .barra-horas { margin-left: 26px; }
 .seta { width: 20px; height: 20px; flex: 0 0 20px; border: 0; background: none; color: var(--texto-2); cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 .descricao { white-space: pre-wrap; margin: 12px 0 0; }
+/* V13d-1: desvio de agenda na ficha da Tarefa (prevista "não executada" ↔ tarefa criada) */
+.desvio-tarefa { margin: 12px 0 0; padding: 10px 12px; border-left: 4px solid var(--laranja); background: var(--superficie-2); border-radius: 8px; }
+.desvio-tarefa p { margin: 4px 0 0; }
 .texto-longo { white-space: pre-wrap; max-width: 420px; }
 .liberacao { margin-top: 10px; border-color: var(--laranja); display: flex; flex-direction: column; gap: 8px; }
 .checklist ul { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }

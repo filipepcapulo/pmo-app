@@ -11,6 +11,24 @@ export interface Desvio extends Record<string, unknown> {
   demanda_atendida_id: string | null; demanda_atendida: string | null; tarefa_criada_id: string | null; orientado_por: string | null; motivo: string;
   motivo_recusa: string | null; aprovado_por: string | null; aprovado_em: string | null; criado_em: string; pode_decidir: boolean;
 }
+/** 0064 (V13d-1): o desvio ligado à tarefa, na ficha — na prevista ("não executada"), a criada; na criada, a prevista. */
+export interface DesvioDaTarefa {
+  id: string; papel: 'prevista' | 'criada'; situacao: SituacaoDesvio; data: string; periodo: string; motivo: string; orientado_por: string | null;
+  consultor: string | null; aprovado_por: string | null; aprovado_em: string | null; motivo_recusa: string | null;
+  outra_tarefa: { id: string; nome: string; status: string; demanda: string; projeto: string } | null;
+}
+
+/** Texto do cartão do desvio na ficha da Tarefa. */
+export function rotuloDesvioTarefa(d: DesvioDaTarefa): string {
+  const quando = d.aprovado_em ? new Date(d.aprovado_em).toLocaleDateString('pt-BR') : null;
+  if (d.situacao === 'pendente') return d.papel === 'prevista' ? 'Desvio informado, aguardando o GP do projeto atendido' : 'Desvio pendente';
+  if (d.situacao === 'recusado') return `Desvio recusado${d.motivo_recusa ? `: ${d.motivo_recusa}` : ''}`;
+  const quem = [d.aprovado_por, quando].filter(Boolean).join(' em ');
+  return d.papel === 'prevista'
+    ? `Não executada por desvio de agenda aprovado${quem ? ` por ${quem}` : ''}`
+    : `Criada por desvio de agenda aprovado${quem ? ` por ${quem}` : ''}`;
+}
+
 export interface IndicadorDesvio extends Record<string, unknown> {
   consultor_id: string; consultor: string; desvios: number; pendentes: number; aprovados: number; recusados: number;
   horas_desviadas: number; horas_agendadas: number; perc_desviado: number | null;

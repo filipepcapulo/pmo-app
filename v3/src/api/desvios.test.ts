@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { podeDesviar } from './desvios';
+import { podeDesviar, rotuloDesvioTarefa, type DesvioDaTarefa } from './desvios';
 import { marcadosPadrao, podeEnviar, proximaSemana, type ClienteEnvio } from './envioAgenda';
 
 describe('desvio', () => {
@@ -27,5 +27,18 @@ describe('envio de agendas', () => {
   });
   it('já enviado abre desmarcado; quem falhou volta marcado', () => {
     expect(marcadosPadrao([c('a', 1, 1), c('b', 1, 1, 'enviado'), c('c', 1, 1, 'erro'), c('d', 1, 0)])).toEqual(['a', 'c']);
+  });
+});
+
+describe('rotuloDesvioTarefa (V13d-1, ficha da Tarefa)', () => {
+  const base: DesvioDaTarefa = { id: 'd', papel: 'prevista', situacao: 'aprovado', data: '2026-11-05', periodo: 'manha', motivo: 'Atendi outro cliente',
+    orientado_por: null, consultor: 'Carla', aprovado_por: 'Gil', aprovado_em: '2026-11-05T15:00:00Z', motivo_recusa: null, outra_tarefa: null };
+  it('prevista aprovada: não executada, com quem aprovou', () => {
+    expect(rotuloDesvioTarefa(base)).toMatch(/^Não executada por desvio de agenda aprovado por Gil em \d{2}\/\d{2}\/2026$/);
+  });
+  it('criada aprovada', () => { expect(rotuloDesvioTarefa({ ...base, papel: 'criada' })).toMatch(/^Criada por desvio de agenda aprovado por Gil/); });
+  it('pendente e recusado', () => {
+    expect(rotuloDesvioTarefa({ ...base, situacao: 'pendente', aprovado_por: null, aprovado_em: null })).toBe('Desvio informado, aguardando o GP do projeto atendido');
+    expect(rotuloDesvioTarefa({ ...base, situacao: 'recusado', motivo_recusa: 'Sem orientação' })).toBe('Desvio recusado: Sem orientação');
   });
 });

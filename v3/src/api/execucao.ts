@@ -84,6 +84,8 @@ export interface FichaTarefa {
   projeto: { id: string; nome: string; fase: string }; cliente: { id: string; nome: string };
   usuario_cliente?: { id: string; nome: string; email: string | null; telefone: string | null } | null; autoria?: Autoria | null;
   apontamentos: Apontamento[]; grupo: { id: string; responsavel_id: string; data: string; status: string }[];
+  /** 0064 (V13d-1): desvio de agenda ligado à tarefa (prevista ↔ criada). */
+  desvio?: import('./desvios').DesvioDaTarefa | null;
   checklist: ItemChecklist[]; anexos: Anexo[]; comentarios: number; favorito: boolean;
 }
 export type EntidadeComentavel = 'projeto' | 'demanda' | 'tarefa' | 'chamado';

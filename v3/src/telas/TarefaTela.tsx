@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { podeApontar } from '../api/consultor';
-import { podeDesviar } from '../api/desvios';
+import { podeDesviar, rotuloDesvioTarefa } from '../api/desvios';
 import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo, type Apontamento } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { Anexos } from '../componentes/Anexos';
@@ -43,7 +43,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
   useEffect(() => { if (nome) aoRenomear(nome); }, [nome, aoRenomear]);
   if (c.erro) return <div className="vazio-tela"><h2>Tarefa</h2><p>{c.erro}</p></div>;
   if (!c.dados) return <div className="carregando-tela"><span className="giro" /> Carregando…</div>;
-  const { tarefa: t, demanda, pai, projeto, cliente, apontamentos, grupo, usuario_cliente: uc, autoria } = c.dados;
+  const { tarefa: t, demanda, pai, projeto, cliente, apontamentos, grupo, usuario_cliente: uc, autoria, desvio } = c.dados;
   const souResp = t.responsavel_id === eu!.usuario.id;
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'apontamentos', rotulo: `Apontamentos (${apontamentos.length})` }, { id: 'checklist', rotulo: `Checklist (${c.dados.checklist.length})` },
@@ -86,7 +86,21 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
           <div><dt>ClickUp</dt><dd>{t.clickup_id ? <a href={`https://app.clickup.com/t/${t.clickup_id}`} target="_blank" rel="noopener">{t.clickup_id}</a> : '—'}</dd></div>
         </dl>
         {t.detalhamento && <p className="descricao">{t.detalhamento}</p>}
-        {t.motivo_status && <p className="ajuda">Motivo: {t.motivo_status}</p>}
+        {t.motivo_status && !(desvio && t.motivo_status === 'desvio') && <p className="ajuda">Motivo: {t.motivo_status}</p>}
+        {desvio && (
+          <div className="desvio-tarefa" data-testid="desvio-tarefa">
+            <strong>{rotuloDesvioTarefa(desvio)}</strong>
+            <p className="ajuda">
+              {desvio.consultor ? `${desvio.consultor} · ` : ''}{data(desvio.data)} · Motivo: {desvio.motivo}
+              {desvio.orientado_por ? ` · Orientado por ${desvio.orientado_por}` : ''}
+            </p>
+            {desvio.outra_tarefa && (
+              <p className="ajuda">{desvio.papel === 'prevista' ? 'Atendido em: ' : 'No lugar de: '}
+                <a href={hashDe(caminhoEntidade('tarefa', desvio.outra_tarefa.id))}>{desvio.outra_tarefa.projeto} · {desvio.outra_tarefa.demanda}</a>
+                {' '}<StatusPilula status={desvio.outra_tarefa.status} tipo="tarefa" /> · <a href="#/desvios">Desvios</a></p>
+            )}
+          </div>
+        )}
         {autoria && <p className="ajuda autoria">{rotuloAutoria(autoria)}</p>}
         {grupo.length > 0 && (
           <p className="ajuda">Criada junto com: {grupo.map((g, i) => <span key={g.id}>{i > 0 && ', '}

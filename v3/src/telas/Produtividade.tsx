@@ -1,12 +1,14 @@
 // Produtividade (#/produtividade): fechamento por consultor e apontamentos da equipe, OS do Sankhya OM + app (D10: substitui
 // as planilhas do Drive e a planilha mestre). O relatório por consultor abre pronto para imprimir ou salvar em PDF.
 // Sem produtividade.ver_todos (o consultor), o banco devolve só o próprio (0045) e a tela vira "Minha produtividade".
+// Travados (V13c-2): apontamentos travados no Experience fora do prazo retroativo, por ciclo 21–20 (substitui a planilha).
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { consultor } from '../api/consultor';
 import { fechamento, periodoFechamento, totais, type LinhaFechamento } from '../api/fechamento';
 import { traduzirErro } from '../api/mensagens';
 import { hojeIso } from '../api/projeto';
+import { ApontamentosTravados } from '../componentes/ApontamentosTravados';
 import { RelatorioApontamentos } from '../componentes/RelatorioApontamentos';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
@@ -90,7 +92,7 @@ function Fechamento({ todos }: { todos: boolean }) {
 
 export function Produtividade() {
   const todos = usePode()('produtividade.ver_todos');
-  const [aba, setAba] = useState<'fechamento' | 'apontamentos'>('fechamento');
+  const [aba, setAba] = useState<'fechamento' | 'apontamentos' | 'travados'>('fechamento');
   return (
     <div className="pagina">
       <header className="pagina-topo"><div>
@@ -101,8 +103,9 @@ export function Produtividade() {
       <div className="segmentos" role="tablist" aria-label="Seções de produtividade">
         <button type="button" role="tab" aria-selected={aba === 'fechamento'} onClick={() => setAba('fechamento')}>Fechamento</button>
         <button type="button" role="tab" aria-selected={aba === 'apontamentos'} onClick={() => setAba('apontamentos')}>{todos ? 'Apontamentos' : 'Meus apontamentos'}</button>
+        <button type="button" role="tab" aria-selected={aba === 'travados'} onClick={() => setAba('travados')}>{todos ? 'Travados' : 'Meus travados'}</button>
       </div>
-      {aba === 'fechamento' ? <Fechamento todos={todos} /> : <RelatorioApontamentos equipe={todos} />}
+      {aba === 'fechamento' ? <Fechamento todos={todos} /> : aba === 'apontamentos' ? <RelatorioApontamentos equipe={todos} /> : <ApontamentosTravados />}
     </div>
   );
 }

@@ -117,6 +117,8 @@ Conferido, o consultor não edita nem exclui mais. As OS do Sankhya OM não pass
 
 *Produtividade › Fechamento: período de 21 a 20, totais da equipe e uma linha por consultor. Arraste a tabela para o lado para ver Normais, Extras, Ocupação, Sem conferência e o botão Relatório.*
 
+**Apontamentos travados (aba Travados):** as OS que estão travadas no Experience esperando a sua liberação e já passaram do prazo de lançamento retroativo (3 dias úteis), por ciclo de 21 a 20 (Ciclo atual, Ciclo anterior ou a lista dos ciclos, que são as antigas abas #RETRO da planilha). **Atualizar do Experience** busca com a sua Conta Sankhya e só acrescenta: o que já estava na lista não muda. Erro "3" do Sankhya já vem com Desconta SIM e Motivo "Sem apontamento de OS"; os demais você preenche na própria tabela (Desconta e Motivo). A OS que você liberou depois fica na lista como **Liberada**. **Relatório do ciclo** abre pronto para imprimir/PDF; o Excel sai pela tabela. O consultor vê só os próprios.
+
 **Quem vê a produtividade de quem:** o consultor vê só a própria (fechamento, apontamentos e relatório); GP, Admin, Líder Tech e Triagem veem a de todos. Quem decide é a permissão **produtividade.ver_todos**, em **Equipe › Acessos por funcionalidade** (Relatórios · Ver a produtividade… de todos os consultores): dá para tirar ou dar a uma pessoa sem mudar o perfil dela. A regra vale no banco, não só na tela.
 
 ## 9. Dúvidas frequentes

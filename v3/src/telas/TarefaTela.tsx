@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { podeApontar } from '../api/consultor';
 import { podeDesviar } from '../api/desvios';
-import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo } from '../api/execucao';
+import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo, type Apontamento } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { Anexos } from '../componentes/Anexos';
 import { StatusPilula } from '../componentes/ArvoreDemandas';
@@ -21,6 +21,15 @@ import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
 
 type Aba = 'apontamentos' | 'checklist' | 'anexos' | 'comentarios';
+
+/** "Conferência de OS · Ana · 11/11/2026 09:05" e/ou "Conferido pela gerência · Bia · …" (0063: quem validou). */
+function rotuloValidacao(a: Apontamento): string {
+  const q = (x: string) => new Date(x).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+  const p: string[] = [];
+  if (a.validado_em) p.push(`${a.validado_rotina ?? 'Validado'}${a.validado_por ? ` · ${a.validado_por}` : ''} · ${q(a.validado_em)}`);
+  if (a.conferido_em) p.push(`Conferido pela gerência${a.conferido_por ? ` · ${a.conferido_por}` : ''} · ${q(a.conferido_em)}`);
+  return p.join(' / ') || '—';
+}
 
 export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: string) => void }) {
   const { eu } = useSessao();
@@ -92,7 +101,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
         {aba === 'apontamentos' && (apontamentos.length === 0 ? <p className="ajuda">Sem apontamento: a tarefa conta as horas previstas (outra cor na barra).</p> : (
           <div className="tabela-caixa"><div className="tabela-rolagem">
             <table className="tabela">
-              <thead><tr><th>Origem</th><th>Nº</th><th>Data</th><th>Início–fim</th><th className="dir">Horas</th><th>Texto</th></tr></thead>
+              <thead><tr><th>Origem</th><th>Nº</th><th>Data</th><th>Início–fim</th><th className="dir">Horas</th><th>Texto</th><th>Validação</th></tr></thead>
               <tbody>{apontamentos.map(a => (
                 <tr key={a.id}>
                   <td>{a.origem === 'sankhya_om' ? 'OS Sankhya OM' : a.origem === 'app' ? 'App' : 'Manual'}</td>
@@ -101,6 +110,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
                   <td>{a.hora_ini && a.hora_fim ? `${a.hora_ini.slice(0, 5)}–${a.hora_fim.slice(0, 5)}${a.intervalo_min ? ` (−${a.intervalo_min} min)` : ''}` : '—'}</td>
                   <td className="dir">{horas(a.horas)}</td>
                   <td className="texto-longo">{a.texto ?? ''}</td>
+                  <td className="ajuda">{rotuloValidacao(a)}</td>
                 </tr>))}</tbody>
             </table>
           </div></div>

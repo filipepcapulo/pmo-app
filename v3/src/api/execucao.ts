@@ -76,6 +76,8 @@ export interface FichaDemanda {
 export interface Apontamento {
   id: string; origem: 'sankhya_om' | 'app' | 'manual'; numero_os: string | null; numero_interno: number | null; data: string;
   hora_ini: string | null; hora_fim: string | null; intervalo_min: number; horas: number; texto: string | null;
+  /** 0063: quem conferiu (gerência) e quem validou (rotina + usuário) o apontamento. */
+  conferido_em?: string | null; conferido_por?: string | null; validado_em?: string | null; validado_por?: string | null; validado_rotina?: string | null;
 }
 export interface FichaTarefa {
   tarefa: Tarefa; demanda: { id: string; nome: string; pai_id: string | null; status: string }; pai: { id: string; nome: string } | null;

@@ -13,6 +13,7 @@ Entre em **https://filipepcapulo.github.io/pmo-app/v3/** com o seu e-mail da San
 - **Execução › Ociosidade**: quem está sem agenda ou com horas livres no dia, com sugestões.
 - **Relatórios › Produtividade**: conferir os apontamentos e fazer o fechamento.
 - **Relatórios › Portfólio** e **Execução › Controle de Férias**: visão geral dos projetos e prazos de férias. No Portfólio, fases e GPs aceitam vários de uma vez, o cliente com plano de ação aberto fica marcado e **+ Plano** cria um 5W2H ali mesmo.
+- **Sistema › Sync com o Experience**: cria, altera e exclui os lançamentos do Experience pelo campo Experience das tarefas com Apontamento "OS Experience" (vazio cria, "Alterar" altera, "Lixeira" exclui só o lançamento com a TAG da tarefa). Começa em **simulação** (mostra o que faria); a tarefa nunca é apagada no app e a ficha dela mostra o que foi feito. Na ficha, **Sincronizar esta tarefa** roda só ela.
 - **O sino (🔔) no topo**: os avisos que pedem a sua ação. Tocar no aviso abre a tela certa.
 - **Geral › Manuais**: este manual e o do consultor, para consultar ou imprimir.
 

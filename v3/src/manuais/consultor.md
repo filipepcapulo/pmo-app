@@ -100,7 +100,7 @@ Na aba **Meus apontamentos** você vê tudo o que conta como hora sua:
 ## 8. Fechamento do mês
 
 - O fechamento de produtividade vai do **dia 21 ao dia 20** e soma as OS do Sankhya OM e os apontamentos do app.
-- Em **Relatórios › Produtividade** você vê o **seu** fechamento (dias úteis, capacidade, horas de OS e do app, normais, extras e ocupação) e os seus apontamentos. A produtividade dos colegas só aparece para a gerência.
+- Em **Relatórios › Produtividade** você vê o **seu** fechamento (dias úteis, capacidade, horas de OS e do app, normais, extras e ocupação) e os seus apontamentos. A produtividade dos colegas só aparece para a gerência. Na aba **Meus travados** aparecem as suas OS travadas no Experience que passaram do prazo de 3 dias úteis (as que podem descontar): lance as OS em dia para não cair nela.
 - Aponte no próprio dia do atendimento, enquanto o horário está fresco. Assim nada fica de fora no fechamento.
 - A gerência confere os apontamentos do app. Os conferidos ficam travados.
 

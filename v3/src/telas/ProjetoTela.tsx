@@ -1,7 +1,7 @@
 // Tela de Projeto (#/projeto/<id>), escopo §3. Cabeçalho com a barra de horas e abas: Indicadores (horas, %, atraso,
 // Go Live, riscos do 5W2H, próximos marcos, dados), Horas (pedidos, liberações, saldo do pedido no Experience (V13c-1), consumo por demanda/consultor/mês),
 // Cronograma (Gantt que grava datas + dependências, PNG/PDF), 5W2H (lista ↔ demandas plano_acao), Demandas (drilldown
-// demanda → subdemanda → tarefa, CSV), Equipe, Comentários e Histórico (auditoria). Edição de demanda/tarefa sempre
+// demanda → subdemanda → tarefa, CSV), Equipe, Comentários e Histórico (auditoria); atalho para o Aceite de OS da FAP (V13d-3). Edição de demanda/tarefa sempre
 // pelo popup único (useEdicao); cadastro do projeto e pedidos de horas só aqui.
 import { useCallback, useEffect, useState } from 'react';
 import { api, data, FASES, horas, rotuloSituacao, SITUACOES, TIPOS_PEDIDO, type PedidoHoras, type ProjetoFicha } from '../api/cadastros';
@@ -32,6 +32,7 @@ import { useSessao } from '../estado/sessao';
 import { baixarCsv, nomeArquivo } from '../util/csv';
 import { Resumo } from '../componentes/Resumo';
 import { SaldoPedidos } from '../componentes/SaldoPedidos';
+import { fapDoNome } from '../api/aceiteOs';
 
 const rotuloTipo = (t: string) => TIPOS_PEDIDO.find(x => x.valor === t)?.rotulo ?? t;
 type Proj = ProjetoFicha['projeto'];
@@ -85,6 +86,7 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
         </div>
         <div className="linha">
           <BotaoFavorito entidade="projeto" id={p.id} />
+          {pode('aceite_os.gerenciar') && fapDoNome(p.nome) && <a className="bt bt-secundario" href={hashDe(`aceite-os/${fapDoNome(p.nome)}`)}>Aceite de OS</a>}
           {pode('projeto.editar') && <Botao onClick={() => setEdit(true)}>Editar</Botao>}
         </div>
       </header>

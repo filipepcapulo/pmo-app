@@ -44,6 +44,8 @@ export const MODULOS: Modulo[] = [
   { id: 'portfolio', titulo: 'Portfólio', area: 'relatorios', icone: 'grade', permissao: 'portfolio.ver' },
   // todos entram; sem produtividade.ver_todos o banco devolve só o próprio (0045)
   { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: 'grafico' },
+  // V13d-2: lançamentos do Experience pelas tarefas (módulo 02 da Central); começa em simulação
+  { id: 'sync-experience', titulo: 'Sync com o Experience', area: 'sistema', icone: 'seta', permissao: 'sync_experience.gerenciar' },
   { id: 'componentes', titulo: 'Componentes', area: 'sistema', icone: 'grade' },
 ];
 

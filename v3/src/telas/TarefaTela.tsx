@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { podeApontar } from '../api/consultor';
 import { podeDesviar, rotuloDesvioTarefa } from '../api/desvios';
+import { syncExperience, textoResultado as textoSync, textoSyncTarefa } from '../api/syncExperience';
 import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo, type Apontamento } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { Anexos } from '../componentes/Anexos';
@@ -19,6 +20,7 @@ import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
+import { useToast } from '../componentes/Toasts';
 
 type Aba = 'apontamentos' | 'checklist' | 'anexos' | 'comentarios';
 
@@ -39,11 +41,25 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
   const c = useCarga(() => exec.tarefa(esc, id), [esc, id, ed.geracao]);
   const [aba, setAba] = useState<Aba>('apontamentos');
   const [nCom, setNCom] = useState<number | null>(null);
+  const [sincronizando, setSincronizando] = useState(false);
+  const avisar = useToast();
   const nome = c.dados?.tarefa.nome;
   useEffect(() => { if (nome) aoRenomear(nome); }, [nome, aoRenomear]);
   if (c.erro) return <div className="vazio-tela"><h2>Tarefa</h2><p>{c.erro}</p></div>;
   if (!c.dados) return <div className="carregando-tela"><span className="giro" /> Carregando…</div>;
-  const { tarefa: t, demanda, pai, projeto, cliente, apontamentos, grupo, usuario_cliente: uc, autoria, desvio } = c.dados;
+  const { tarefa: t, demanda, pai, projeto, cliente, apontamentos, grupo, usuario_cliente: uc, autoria, desvio, experience_sync: sx } = c.dados;
+  const textoSx = textoSyncTarefa(sx);
+  const syncavel = pode('sync_experience.gerenciar') && ['OS Experience', 'Hora Dobrada'].includes(t.apontamento ?? '');
+  // V13d-2: roda o sync só desta tarefa (no modo do escritório: simulação ou real)
+  async function sincronizar() {
+    setSincronizando(true);
+    try {
+      const r = await syncExperience.rodar(esc, { de: t.data, ate: t.data, tarefa: t.id });
+      avisar(textoSync(r), r.ok ? 'ok' : 'erro');
+      if (r.ok) ed.mudou();
+    } catch (e) { avisar((e as Error).message, 'erro'); }
+    setSincronizando(false);
+  }
   const souResp = t.responsavel_id === eu!.usuario.id;
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'apontamentos', rotulo: `Apontamentos (${apontamentos.length})` }, { id: 'checklist', rotulo: `Checklist (${c.dados.checklist.length})` },
@@ -81,7 +97,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
           <div><dt>Usuário do cliente</dt><dd>{uc ? <>{uc.nome}{(uc.email || uc.telefone) && <small className="ajuda"> · {[uc.email, uc.telefone].filter(Boolean).join(' · ')}</small>}</> : '—'}</dd></div>
           <div><dt>Etapa</dt><dd>{t.etapa ?? '—'}</dd></div>
           <div><dt>Agendamento</dt><dd>{t.agendamento ?? '—'}</dd></div>
-          <div><dt>Experience</dt><dd>{t.experience ?? '—'}</dd></div>
+          <div><dt>Experience</dt><dd>{t.experience ?? '—'}{sx?.lancamento_id && <small className="ajuda"> · lançamento {sx.lancamento_id}</small>}</dd></div>
           <div><dt>Apontamento</dt><dd>{t.apontamento ?? '—'}</dd></div>
           <div><dt>ClickUp</dt><dd>{t.clickup_id ? <a href={`https://app.clickup.com/t/${t.clickup_id}`} target="_blank" rel="noopener">{t.clickup_id}</a> : '—'}</dd></div>
         </dl>
@@ -99,6 +115,13 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
                 <a href={hashDe(caminhoEntidade('tarefa', desvio.outra_tarefa.id))}>{desvio.outra_tarefa.projeto} · {desvio.outra_tarefa.demanda}</a>
                 {' '}<StatusPilula status={desvio.outra_tarefa.status} tipo="tarefa" /> · <a href="#/desvios">Desvios</a></p>
             )}
+          </div>
+        )}
+        {(textoSx || syncavel) && (
+          <div className="sync-tarefa" data-testid="sync-tarefa">
+            <strong>Sync com o Experience</strong>
+            {textoSx ? <p className="ajuda">{textoSx}</p> : <p className="ajuda">Ainda não passou pelo sync.</p>}
+            {syncavel && <Botao onClick={() => void sincronizar()} carregando={sincronizando} disabled={sincronizando}>Sincronizar esta tarefa</Botao>}
           </div>
         )}
         {autoria && <p className="ajuda autoria">{rotuloAutoria(autoria)}</p>}

@@ -86,6 +86,8 @@ export interface FichaTarefa {
   apontamentos: Apontamento[]; grupo: { id: string; responsavel_id: string; data: string; status: string }[];
   /** 0064 (V13d-1): desvio de agenda ligado à tarefa (prevista ↔ criada). */
   desvio?: import('./desvios').DesvioDaTarefa | null;
+  /** 0065 (V13d-2): Sync com o Experience (lançamento, ação, observação). */
+  experience_sync?: import('./syncExperience').SyncDaTarefa | null;
   checklist: ItemChecklist[]; anexos: Anexo[]; comentarios: number; favorito: boolean;
 }
 export type EntidadeComentavel = 'projeto' | 'demanda' | 'tarefa' | 'chamado';

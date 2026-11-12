@@ -1016,3 +1016,41 @@ ul.msg-erro { padding-left: 18px; }
 .cp-acoes { gap: 6px; }
 .cp-acoes a.bt { text-decoration: none; }
 .cp-manual { box-shadow: none; border: 1px solid var(--linha); }
+
+/* Gráfico de horas acumuladas da Produtividade (F2). Cores de série validadas para daltonismo no claro e no escuro. */
+:root { --gha-0: #1f7a45; --gha-1: #2a78d6; --gha-2: #eda100; --gha-3: #e87ba4; --gha-4: #6250d6; --gha-5: #eb6834; }
+@media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) { --gha-0: #2f9e5e; --gha-1: #3987e5; --gha-2: #c98500; --gha-3: #d55181; --gha-4: #9085e9; --gha-5: #d95926; } }
+:root[data-tema="escuro"] { --gha-0: #2f9e5e; --gha-1: #3987e5; --gha-2: #c98500; --gha-3: #d55181; --gha-4: #9085e9; --gha-5: #d95926; }
+.gha { margin: 12px 0; }
+.gha-topo { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.gha-topo h2 { margin: 0; }
+.gha-topo .ajuda { margin: 2px 0 0; }
+.gha-topo select { max-width: 100%; }
+.gha-caixa { position: relative; min-height: 60px; }
+.gha-rolagem { overflow-x: auto; }
+.gha-rolagem svg { display: block; touch-action: pan-x pan-y; }
+.gha-c0 { fill: var(--gha-0); background: var(--gha-0); } .gha-c1 { fill: var(--gha-1); background: var(--gha-1); }
+.gha-c2 { fill: var(--gha-2); background: var(--gha-2); } .gha-c3 { fill: var(--gha-3); background: var(--gha-3); }
+.gha-c4 { fill: var(--gha-4); background: var(--gha-4); } .gha-c5 { fill: var(--gha-5); background: var(--gha-5); }
+.gha-grade { stroke: var(--linha); stroke-width: 1; }
+.gha-base { stroke: var(--texto-2); stroke-width: 1; opacity: .6; }
+.gha-eixo { fill: var(--texto-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+.gha-rotulo { fill: var(--texto); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gha-alvo { fill: transparent; cursor: default; }
+.gha-apagada path, .gha-apagada rect:not(.gha-alvo) { opacity: .45; }
+.gha-dica { position: absolute; top: 4px; transform: translateX(-50%); z-index: 2; pointer-events: none; display: flex; flex-direction: column; gap: 2px;
+  min-width: 190px; max-width: 260px; padding: 8px 10px; border-radius: 10px; background: var(--superficie); border: 1px solid var(--linha);
+  box-shadow: var(--sombra-alta); font-size: 12px; color: var(--texto-2); }
+.gha-dica strong, .gha-dica b { color: var(--texto); }
+.gha-dica-linha { display: flex; align-items: center; gap: 6px; }
+.gha-dica-linha b { margin-left: auto; padding-left: 10px; font-variant-numeric: tabular-nums; }
+.gha-dica i, .gha-legenda i { flex: none; display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.gha-legenda { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--texto-2); }
+.gha-legenda li { display: inline-flex; align-items: center; gap: 6px; }
+.gha-legenda b { color: var(--texto); font-variant-numeric: tabular-nums; }
+.gha-vazio { padding: 18px 0; text-align: center; }
+.gha-tabela { margin-top: 10px; }
+.gha-tabela summary { cursor: pointer; color: var(--verde); font-size: 13px; font-weight: 600; width: fit-content; }
+.gha-tabela .tabela-rolagem { margin-top: 8px; }
+.gha-tabela .tabela { font-size: 13px; }
+.gha-tabela .tabela th, .gha-tabela .tabela td { padding: 6px 10px; white-space: nowrap; }

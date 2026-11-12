@@ -1,7 +1,7 @@
-// Anexos de projeto/demanda/tarefa: o arquivo sobe ao Storage (pasta do escritório) e o registro vai pela API.
+// Anexos de projeto/demanda/tarefa/chamado/sugestão: o arquivo sobe ao Storage (pasta do escritório) e o registro vai pela API.
 // Abrir = link assinado de 2 min. Em demanda/tarefa já espelhada, o anexo também vai para o ClickUp.
 import { useRef, useState } from 'react';
-import { abrirAnexo, enviarAnexo, exec, type Anexo, type EntidadeComentavel } from '../api/execucao';
+import { abrirAnexo, enviarAnexo, exec, type Anexo, type EntidadeAnexo } from '../api/execucao';
 import { usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
 import { Botao } from './Botao';
@@ -9,7 +9,7 @@ import { useToast } from './Toasts';
 
 const tamanho = (n: number | null) => (n == null ? '' : n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
-export function Anexos({ entidade, id, itens, aoMudar }: { entidade: EntidadeComentavel; id: string; itens: Anexo[]; aoMudar: () => void }) {
+export function Anexos({ entidade, id, itens, aoMudar }: { entidade: EntidadeAnexo; id: string; itens: Anexo[]; aoMudar: () => void }) {
   const { eu } = useSessao();
   const esc = eu!.escritorio_id!;
   const pode = usePode();

@@ -91,6 +91,8 @@ export interface FichaTarefa {
   checklist: ItemChecklist[]; anexos: Anexo[]; comentarios: number; favorito: boolean;
 }
 export type EntidadeComentavel = 'projeto' | 'demanda' | 'tarefa' | 'chamado';
+/** Entidades que aceitam anexos (0069: a sugestão de melhoria também). */
+export type EntidadeAnexo = EntidadeComentavel | 'sugestao';
 export interface Comentario { id: string; texto: string; mencoes: string[]; autor: Pessoa; criado_em: string; editado_em: string | null; versao: number; meu: boolean }
 export interface OpcoesExecucao {
   periodos: Record<string, number>; etapas: string[]; agendamento: string[]; experience: string[]; apontamento: string[];
@@ -147,6 +149,9 @@ export const exec = {
   comentarioSalvar: (esc: string, d: Record<string, unknown>) => salvar('v1_comentario_salvar', esc, d),
   checklistSalvar: (esc: string, d: Record<string, unknown>) => salvar<ItemChecklist>('v1_checklist_salvar', esc, d),
   anexoSalvar: (esc: string, d: Record<string, unknown>) => salvar<Anexo>('v1_anexo_salvar', esc, d),
+  /** 0069: anexos de uma entidade (a aba Anexos do Projeto lê por aqui). */
+  anexos: (esc: string, entidade: EntidadeAnexo, id: string) =>
+    rpc<Anexo[]>('v1_anexos', { p_escritorio: esc, p_entidade: entidade, p_id: id }),
   favoritosHome: (esc: string) => rpc<GrupoFavoritos[]>('v1_favoritos_home', { p_escritorio: esc }),
   notificacoes: (esc: string) => rpc<{ nao_lidas: number; itens: Notificacao[] }>('v1_notificacoes', { p_escritorio: esc, p_limite: 30 }),
   notificacoesLidas: (esc: string, ids: string[] | null) => rpc<{ marcadas: number }>('v1_notificacoes_lidas', { p_escritorio: esc, p_ids: ids }),
@@ -159,7 +164,7 @@ export function caminhoAnexo(esc: string, entidade: string, nome: string, id: st
   const limpo = nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\-]+/g, '_').slice(-120) || 'arquivo';
   return `${esc}/${entidade}/${id}-${limpo}`;
 }
-export async function enviarAnexo(esc: string, entidade: EntidadeComentavel, entidadeId: string, arquivo: File) {
+export async function enviarAnexo(esc: string, entidade: EntidadeAnexo, entidadeId: string, arquivo: File) {
   if (arquivo.size > 20 * 1024 * 1024) throw new Error('Arquivo acima de 20 MB.');
   const caminho = caminhoAnexo(esc, entidade, arquivo.name);
   const up = await sb.storage.from(BUCKET).upload(caminho, arquivo, { contentType: arquivo.type || undefined, upsert: false });

@@ -33,7 +33,8 @@ export const MODULOS: Modulo[] = [
   { id: 'organograma', titulo: 'Organograma Sankhya', area: 'cadastros', icone: 'organograma' },
   { id: 'demandas', titulo: 'Demandas', area: 'execucao', icone: 'lista' },
   { id: 'agenda', titulo: 'Agenda da equipe', area: 'execucao', icone: 'calendario' },
-  { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: 'chamado' },
+  // V13e-2: #/chamados/portal abre a aba Portal Sankhya (link dos avisos do sino)
+  { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: 'chamado', parametro: true },
   { id: 'consultor', titulo: 'Minha agenda', area: 'execucao', icone: 'relogio' },
   { id: 'desvios', titulo: 'Desvios de agenda', area: 'execucao', icone: 'seta', permissao: 'desvio.aprovar' },
   { id: 'envio-agendas', titulo: 'Envio de agendas', area: 'execucao', icone: 'calendario', permissao: 'agenda.enviar' },

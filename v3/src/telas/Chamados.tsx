@@ -17,8 +17,9 @@ import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
 import { AtendimentosWhatsapp } from '../componentes/AtendimentosWhatsapp';
+import { ChamadosPortal } from '../componentes/ChamadosPortal';
 
-type Aba = 'busca' | 'backlog' | 'indicadores';
+type Aba = 'busca' | 'backlog' | 'indicadores' | 'portal';
 
 function PilulaPrioridade({ p }: { p: string }) {
   return <span className={`pilula pri-${p}`}>{rotuloPrioridade(p)}</span>;
@@ -175,17 +176,19 @@ function IndicadoresChamados({ geracao }: { geracao: number }) {
   </>;
 }
 
-export function Chamados({ ir }: { ir: (caminho: string, titulo?: string) => void }) {
+export function Chamados({ ir, parametro }: { ir: (caminho: string, titulo?: string) => void; parametro?: string }) {
   const esc = useSessao().eu!.escritorio_id!;
   const pode = usePode();
-  const [aba, setAba] = useState<Aba>('busca');
+  // #/chamados/portal abre direto na aba do portal (link do aviso no sino)
+  const [aba, setAba] = useState<Aba>(parametro === 'portal' && pode('chamados_portal.usar') ? 'portal' : 'busca');
   const [novo, setNovo] = useState(false);
   const [config, setConfig] = useState(false);
   const [opcoes, setOpcoes] = useState<OpcoesChamado | null>(null);
   const [geracao, setGeracao] = useState(0);
   const carregar = () => cham.opcoes(esc).then(setOpcoes).catch(() => setOpcoes(null));
   useEffect(() => { carregar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [esc]);
-  const abas: { id: Aba; rotulo: string }[] = [{ id: 'busca', rotulo: 'Busca' }, { id: 'backlog', rotulo: 'Backlog e alocação' }, { id: 'indicadores', rotulo: 'Indicadores' }];
+  const abas: { id: Aba; rotulo: string }[] = [{ id: 'busca', rotulo: 'Busca' }, { id: 'backlog', rotulo: 'Backlog e alocação' }, { id: 'indicadores', rotulo: 'Indicadores' },
+    ...(pode('chamados_portal.usar') ? [{ id: 'portal' as Aba, rotulo: 'Portal Sankhya' }] : [])];
   return (
     <div className={`pagina${aba === 'backlog' ? ' pagina-larga' : ''}`}>
       <header className="pagina-topo">
@@ -201,6 +204,7 @@ export function Chamados({ ir }: { ir: (caminho: string, titulo?: string) => voi
       {aba === 'busca' && <Busca geracao={geracao} />}
       {aba === 'backlog' && <Backlog geracao={geracao} />}
       {aba === 'indicadores' && <Indicadores geracao={geracao} />}
+      {aba === 'portal' && <ChamadosPortal />}
       {novo && opcoes && <FormChamado opcoes={opcoes} aoFechar={() => setNovo(false)}
         aoGravar={id => { setNovo(false); setGeracao(g => g + 1); ir(caminhoEntidade('chamado', id)); }} />}
       {config && opcoes && <ConfigChamados opcoes={opcoes} aoFechar={() => setConfig(false)} aoMudar={carregar} />}

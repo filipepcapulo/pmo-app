@@ -990,3 +990,29 @@ ul.msg-erro { padding-left: 18px; }
   body.imprimir-wa .wa-cartao, body.imprimir-wa .wa-grafico, body.imprimir-wa tr { break-inside: avoid; }
   body.imprimir-wa .tabela-rolagem { overflow: visible !important; }
 }
+
+/* V13e-2 Chamados › Portal Sankhya (RF-04b: cores pelo significado) */
+.cp { display: flex; flex-direction: column; gap: 12px; }
+.cp-lista { display: flex; flex-direction: column; gap: 10px; }
+.cp-cartao { display: flex; flex-direction: column; gap: 6px; border-left: 4px solid transparent; }
+.cp-cartao.cp-atencao { border-left-color: var(--vermelho); }
+.cp-topo { gap: 6px; }
+.cp-numero { font-weight: 700; font-size: 15px; }
+.cp-parceiro { border: 0; cursor: pointer; background: var(--verde); color: #fff; font: inherit; font-size: 12px; font-weight: 700; }
+.cp-parceiro.vazio { background: var(--superficie-2); color: var(--texto-2); border: 1px dashed var(--linha); }
+.cp-parceiro-ed { width: 160px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--verde); font: inherit; font-size: 12px; }
+.cp-vermelho { background: var(--vermelho); color: #fff; }
+.cp-verde { background: var(--verde); color: #fff; }
+.cp-roxo { background: #6b3fa0; color: #fff; }
+.cp-laranja { background: var(--laranja); color: #fff; }
+.cp-azul { background: var(--azul); color: #fff; }
+.cp-cinza { background: var(--superficie-2); color: var(--texto-2); }
+.cp-assunto { margin: 2px 0 0; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.cp-resposta { margin: 0; padding: 8px 12px; border-left: 4px solid var(--azul); background: var(--superficie-2); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.cp-data { padding: 4px 10px; border-radius: 10px; border: 2px solid var(--laranja); font-size: 13px; }
+.cp-data.vencido { background: var(--laranja); color: #fff; }
+.cp-acomp input[type=date] { padding: 6px 8px; border-radius: 12px; border: 1px solid var(--linha); background: var(--superficie); color: var(--texto); font: inherit; }
+.cp-nota { margin: 0; font-size: 14px; cursor: pointer; overflow-wrap: anywhere; }
+.cp-acoes { gap: 6px; }
+.cp-acoes a.bt { text-decoration: none; }
+.cp-manual { box-shadow: none; border: 1px solid var(--linha); }

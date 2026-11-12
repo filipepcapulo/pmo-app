@@ -1,6 +1,7 @@
 // Ficha do chamado (#/chamado/<id>): situação, SLA, dados do formulário, triagem, interações (com respostas prontas), extrato
 // para o WhatsApp, tarefas, anexos e relacionados. A tarefa nova usa o popup único e encerra a triagem no banco.
 import { useEffect, useState } from 'react';
+import { ChamadosPortal } from '../componentes/ChamadosPortal';
 import { aplicarResposta, CANAIS, cham, estadoSla, extratoChamado, FILAS, IMPACTOS, prioridadeMatriz, rotuloCanal, rotuloFila, rotuloForma, rotuloSituacao, TIPOS, URGENCIAS, type FichaChamado, type OpcoesChamado } from '../api/chamados';
 import { data, horas } from '../api/cadastros';
 import { PRIORIDADES, rotuloPrioridade } from '../api/execucao';
@@ -21,7 +22,7 @@ import { useSessao } from '../estado/sessao';
 import { PilulaSituacao } from './Chamados';
 import { Resumo } from '../componentes/Resumo';
 
-type Aba = 'interacoes' | 'tarefas' | 'anexos' | 'relacionados';
+type Aba = 'interacoes' | 'tarefas' | 'anexos' | 'relacionados' | 'portal';
 
 function Triagem({ f, opcoes, aoFechar, aoGravar }: { f: FichaChamado; opcoes: OpcoesChamado | null; aoFechar: () => void; aoGravar: () => void }) {
   const esc = useSessao().eu!.escritorio_id!;
@@ -182,6 +183,8 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'interacoes', rotulo: `Interações (${f.interacoes.length})` }, { id: 'tarefas', rotulo: `Tarefas (${f.tarefas.length})` },
     { id: 'anexos', rotulo: `Anexos (${f.anexos.length})` }, { id: 'relacionados', rotulo: `Relacionados (${f.relacionados.length})` },
+    // V13e-2: chamados do portal Sankhya ligados a este chamado
+    ...(pode('chamados_portal.usar') ? [{ id: 'portal' as Aba, rotulo: 'Portal Sankhya' }] : []),
   ];
   return (
     <div className="pagina">
@@ -235,6 +238,7 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
           {ch.sem_anexo && <p className="ajuda">Aberto sem anexo: {ch.sem_anexo}</p>}
         </>}
         {aba === 'relacionados' && <Relacionados f={f} aoMudar={c.recarregar} />}
+        {aba === 'portal' && <ChamadosPortal chamado={ch.id} />}
       </section>
 
       {triagem && <Triagem f={f} opcoes={opcoes} aoFechar={() => setTriagem(false)} aoGravar={() => { setTriagem(false); c.recarregar(); }} />}

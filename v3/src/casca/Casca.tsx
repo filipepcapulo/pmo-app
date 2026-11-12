@@ -160,7 +160,7 @@ export function Casca() {
     if (r.modulo.id === 'organograma') return <Organograma />;
     if (r.modulo.id === 'demandas') return <Demandas />;
     if (r.modulo.id === 'agenda') return <AgendaEquipe />;
-    if (r.modulo.id === 'chamados') return <Chamados ir={ir} />;
+    if (r.modulo.id === 'chamados') return <Chamados ir={ir} parametro={r.parametro} />;
     if (r.modulo.id === 'consultor') return <Consultor />;
     if (r.modulo.id === 'desvios') return <Desvios />;
     if (r.modulo.id === 'envio-agendas') return <EnvioAgendas />;

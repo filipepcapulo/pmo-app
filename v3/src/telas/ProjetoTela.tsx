@@ -1,15 +1,16 @@
 // Tela de Projeto (#/projeto/<id>), escopo §3. Cabeçalho com a barra de horas e abas: Indicadores (horas, %, atraso,
 // Go Live, riscos do 5W2H, próximos marcos, dados), Horas (pedidos, liberações, saldo do pedido no Experience (V13c-1), consumo por demanda/consultor/mês),
 // Cronograma (Gantt que grava datas + dependências, PNG/PDF), 5W2H (lista ↔ demandas plano_acao), Demandas (drilldown
-// demanda → subdemanda → tarefa, CSV), Equipe, Comentários e Histórico (auditoria); atalho para o Aceite de OS da FAP (V13d-3). Edição de demanda/tarefa sempre
+// demanda → subdemanda → tarefa, CSV), Equipe, Anexos (0069), Comentários e Histórico (auditoria); atalho para o Aceite de OS da FAP (V13d-3). Edição de demanda/tarefa sempre
 // pelo popup único (useEdicao); cadastro do projeto e pedidos de horas só aqui.
 import { useCallback, useEffect, useState } from 'react';
 import { api, data, FASES, horas, rotuloSituacao, SITUACOES, TIPOS_PEDIDO, type PedidoHoras, type ProjetoFicha } from '../api/cadastros';
-import { rotuloPeriodo, rotuloStatusDemanda, rotuloStatusTarefa } from '../api/execucao';
+import { exec, rotuloPeriodo, rotuloStatusDemanda, rotuloStatusTarefa } from '../api/execucao';
 import {
   dependenciaViolada, diaNum, hojeIso, linhasGantt, porConsultor, proj, proximosMarcos, riscos, rotuloCampo, rotuloTabela,
   TIPOS_DEPENDENCIA, type DemandaProjeto, type ItemCronograma, type ItemHistorico, type PainelProjeto,
 } from '../api/projeto';
+import { Anexos } from '../componentes/Anexos';
 import { ArvoreDemandas, StatusPilula } from '../componentes/ArvoreDemandas';
 import { BarraHoras } from '../componentes/BarraHoras';
 import { Botao } from '../componentes/Botao';
@@ -36,7 +37,7 @@ import { fapDoNome } from '../api/aceiteOs';
 
 const rotuloTipo = (t: string) => TIPOS_PEDIDO.find(x => x.valor === t)?.rotulo ?? t;
 type Proj = ProjetoFicha['projeto'];
-type Aba = 'indicadores' | 'horas' | 'cronograma' | 'w5h2' | 'demandas' | 'equipe' | 'comentarios' | 'historico';
+type Aba = 'indicadores' | 'horas' | 'cronograma' | 'w5h2' | 'demandas' | 'equipe' | 'anexos' | 'comentarios' | 'historico';
 const CHAVE_ABA = 'pmo3:projeto:aba';
 const lerAba = (): Aba => { try { return (localStorage.getItem(CHAVE_ABA) as Aba) || 'indicadores'; } catch { return 'indicadores'; } };
 const irDemanda = (id: string) => { location.hash = hashDe(caminhoEntidade('demanda', id)); };
@@ -49,6 +50,7 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   const { porId } = useEquipe();
   const c = useCarga(() => api.projeto(esc, id), [esc, id, ed.geracao]);
   const pn = useCarga(() => proj.painel(esc, id), [esc, id, ed.geracao]);
+  const ax = useCarga(() => exec.anexos(esc, 'projeto', id), [esc, id]);
   const [aba, setAbaEstado] = useState<Aba>(lerAba);
   const [edit, setEdit] = useState(false);
   const [pedido, setPedido] = useState<Partial<PedidoHoras> | null>(null);
@@ -74,7 +76,8 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'indicadores', rotulo: 'Indicadores' }, { id: 'horas', rotulo: 'Horas' }, { id: 'cronograma', rotulo: 'Cronograma' },
     { id: 'w5h2', rotulo: `5W2H (${planos.length})` }, { id: 'demandas', rotulo: `Demandas (${demandas.filter(d => !d.pai_id).length})` },
-    { id: 'equipe', rotulo: 'Equipe' }, { id: 'comentarios', rotulo: `Comentários${nCom != null ? ` (${nCom})` : ''}` }, { id: 'historico', rotulo: 'Histórico' },
+    { id: 'equipe', rotulo: 'Equipe' }, { id: 'anexos', rotulo: `Anexos${ax.dados ? ` (${ax.dados.length})` : ''}` },
+    { id: 'comentarios', rotulo: `Comentários${nCom != null ? ` (${nCom})` : ''}` }, { id: 'historico', rotulo: 'Histórico' },
   ];
   return (
     <div className="pagina">
@@ -119,6 +122,12 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
         </section>
       )}
       {aba === 'equipe' && <AbaEquipe demandas={demandas} painel={painel} gp={p.gp_id} />}
+      {aba === 'anexos' && (
+        <section className="cartao">
+          <h2 className="secao">Anexos do projeto</h2>
+          {ax.erro ? <p className="msg-erro">{ax.erro}</p> : <Anexos entidade="projeto" id={p.id} itens={ax.dados ?? []} aoMudar={ax.recarregar} />}
+        </section>
+      )}
       {aba === 'comentarios' && <section className="cartao"><Comentarios entidade="projeto" id={p.id} aoMudar={setNCom} /></section>}
       {aba === 'historico' && <Historico projeto={p.id} />}
 

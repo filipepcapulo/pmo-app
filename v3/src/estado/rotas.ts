@@ -25,6 +25,8 @@ export const MODULOS: Modulo[] = [
   { id: 'manuais', titulo: 'Manuais', area: 'geral', icone: 'livro', parametro: true },
   // V11d-3: avisos push no aparelho (Ociosidade, Reembolso KM); link dos avisos de teste (./#/notificacoes)
   { id: 'notificacoes', titulo: 'Notificações', area: 'geral', icone: 'sino' },
+  // F1 (0069): todos veem e sugerem; sugestao.gerenciar responde
+  { id: 'sugestoes', titulo: 'Sugestões de melhoria', area: 'geral', icone: 'chamado' },
   { id: 'clientes', titulo: 'Clientes', area: 'cadastros', icone: 'predio' },
   { id: 'projetos', titulo: 'Projetos', area: 'cadastros', icone: 'pasta' },
   { id: 'modelos', titulo: 'Modelos de projeto', area: 'cadastros', icone: 'copia', permissao: 'projeto.criar' },

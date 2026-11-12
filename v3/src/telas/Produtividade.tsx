@@ -3,6 +3,7 @@
 // Sem produtividade.ver_todos (o consultor), o banco devolve só o próprio (0045) e a tela vira "Minha produtividade".
 // Travados (V13c-2): apontamentos travados no Experience fora do prazo retroativo, por ciclo 21–20 (substitui a planilha).
 // Conferência de OS (V13c-3): OS do Experience × agendas do banco, relatório por consultor e vínculo da OS na agenda.
+// Gráfico (F2): horas executadas acumuladas no período, por dia, empilhadas por tipo de OS (aba Fechamento).
 // Planilhas (V13e-1): planilhas de horas dos consultores (Drive) × agendas de planilha; Fechar (OBS/VISTO + validação) e aba do novo ciclo.
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
@@ -12,6 +13,7 @@ import { traduzirErro } from '../api/mensagens';
 import { hojeIso } from '../api/projeto';
 import { ApontamentosTravados } from '../componentes/ApontamentosTravados';
 import { ConferenciaOS } from '../componentes/ConferenciaOS';
+import { GraficoHorasAcumuladas } from '../componentes/GraficoHorasAcumuladas';
 import { ConferenciaPlanilhas } from '../componentes/ConferenciaPlanilhas';
 import { RelatorioApontamentos } from '../componentes/RelatorioApontamentos';
 import { Tabela, type Coluna } from '../componentes/Tabela';
@@ -86,6 +88,8 @@ function Fechamento({ todos }: { todos: boolean }) {
         <div className="indicador"><small>Extras</small><strong>{horas(t.extras)}</strong></div>
         <div className="indicador"><small>Sem conferência</small><strong>{t.pendentes}</strong></div>
       </section>}
+      <GraficoHorasAcumuladas escritorio={escritorio} de={de} ate={ate}
+        consultores={todos ? c.dados?.consultores.map(l => ({ id: l.consultor_id, nome: l.consultor })) ?? [] : undefined} />
       {c.dados && <section className="cartao">
         <Tabela id="fechamento" nome={`Fechamento ${data(de)} a ${data(ate)}`} colunas={colunas} linhas={c.dados.consultores} chave={l => l.consultor_id} tamanhoInicial={30} vazio="Nenhum consultor." />
       </section>}

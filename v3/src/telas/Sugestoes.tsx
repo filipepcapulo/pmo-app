@@ -63,7 +63,7 @@ export function Sugestoes() {
     <div className="pagina">
       <header className="pagina-topo">
         <div><h1>Sugestões de melhoria</h1><p className="ajuda">Conte o que deixaria o app melhor. Todos veem as sugestões e as respostas.</p></div>
-        <Botao onClick={() => setR({ titulo: '', descricao: '', status: 'nova', resposta: '' })}>+ Sugestão</Botao>
+        <Botao variante="primario" onClick={() => setR({ titulo: '', descricao: '', status: 'nova', resposta: '' })}>+ Sugestão</Botao>
       </header>
       <div className="barra-filtros">
         <select value={status} onChange={e => setStatus(e.target.value)} aria-label="Status">

@@ -18,11 +18,15 @@ import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
+import { podeRentabilidade } from '../api/rentabilidade';
+import { Rentabilidade } from '../componentes/Rentabilidade';
 
-type Aba = 'tarefas' | 'checklist' | 'anexos' | 'comentarios';
+type Aba = 'tarefas' | 'checklist' | 'anexos' | 'comentarios' | 'rentabilidade';
 
 export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: string) => void }) {
-  const esc = useSessao().eu!.escritorio_id!;
+  const { eu } = useSessao();
+  const esc = eu!.escritorio_id!;
+  const veRenta = podeRentabilidade(eu!.fin);   // F5: papel Dono ou Rentabilidade do cofre (Admin e GP não herdam)
   const pode = usePode();
   const ed = useEdicao();
   const c = useCarga(() => exec.demanda(esc, id), [esc, id, ed.geracao]);
@@ -37,6 +41,7 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'tarefas', rotulo: `Tarefas (${tarefas.length})` }, { id: 'checklist', rotulo: `Checklist (${c.dados.checklist.length})` },
     { id: 'anexos', rotulo: `Anexos (${c.dados.anexos.length})` }, { id: 'comentarios', rotulo: `Comentários (${nCom ?? c.dados.comentarios})` },
+    ...(veRenta ? [{ id: 'rentabilidade' as Aba, rotulo: 'Rentabilidade' }] : []),
   ];
   return (
     <div className="pagina">
@@ -89,6 +94,7 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
         {aba === 'anexos' && <Anexos entidade="demanda" id={d.id} itens={c.dados.anexos} aoMudar={c.recarregar} />}
         {aba === 'comentarios' && <Comentarios entidade="demanda" id={d.id} aoMudar={setNCom} />}
       </section>
+      {aba === 'rentabilidade' && veRenta && <Rentabilidade tipo="demanda" id={d.id} geracao={ed.geracao} />}
     </div>
   );
 }

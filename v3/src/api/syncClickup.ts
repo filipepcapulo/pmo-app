@@ -17,14 +17,19 @@ export interface ExecucaoLog extends Record<string, unknown> {
 export interface ItemParado extends Record<string, unknown> {
   fila: FilaSync; tipo: string; nome: string; cliente: string | null; clickup_id: string | null;
   clickup_tipo: 'tarefa' | 'lista' | 'pasta' | null; desde: string; tentativas: number; erro: string | null; estado: string | null;
+  /** Nova tentativa agendada ou saída segurada: só aparece na lista por ter erro (0077). */
+  espera_ate: string | null;
 }
-interface FilaEspelho { total: number; vencidos: number; com_erro: number; mais_antiga: string | null; por_tipo: Record<string, number> }
+interface FilaEspelho {
+  total: number; vencidos: number; com_erro: number; mais_antiga: string | null; mais_antiga_vencida: string | null;
+  em_espera_ate: string | null; por_tipo: Record<string, number>;
+}
 export interface StatusSync {
   agora: string; destino: 'clickup' | 'local'; parado_min: number; trava_ate: string | null; ultima_execucao_em: string | null;
   modos: ModoStatus[]; execucoes: ExecucaoLog[];
   filas: {
     entrada: { pendentes: number; com_erro: number; mais_antiga: string | null };
-    saida: { pendente: number; enviando: number; erro: number; ok_24h: number; mais_antiga: string | null };
+    saida: { pendente: number; enviando: number; erro: number; ok_24h: number; mais_antiga: string | null; vencidos: number; mais_antiga_vencida: string | null };
     espelho_fila: FilaEspelho; espelho_saida: FilaEspelho;
   };
   itens: ItemParado[]; itens_total: number;
@@ -100,20 +105,23 @@ export function textoModo(m: ModoStatus, agora: string): string {
   return 'Funcionando';
 }
 
-/** Filas com o total pendente e a data do item mais antigo. */
-export function resumoFilas(s: StatusSync): { fila: FilaSync; pendentes: number; com_erro: number; mais_antiga: string | null; detalhe: string }[] {
+/** Uma fila na tela: `mais_antiga` é a do item VENCIDO mais antigo (item em espera — nova tentativa agendada ou saída
+ *  segurada de propósito — não conta como parado; 0077). */
+export interface ResumoFila { fila: FilaSync; pendentes: number; vencidos: number; com_erro: number; mais_antiga: string | null; detalhe: string }
+export function resumoFilas(s: StatusSync): ResumoFila[] {
   const f = s.filas;
   const tipos = (p: Record<string, number>) => Object.entries(p).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k}`).join(' · ');
+  const esp = (x: FilaEspelho) => [tipos(x.por_tipo), x.total > x.vencidos ? `${x.total - x.vencidos} em espera${x.em_espera_ate ? ` até ${quando(x.em_espera_ate)}` : ''}` : ''].filter(Boolean).join(' · ');
   return [
-    { fila: 'entrada', pendentes: f.entrada.pendentes, com_erro: f.entrada.com_erro, mais_antiga: f.entrada.mais_antiga, detalhe: '' },
-    { fila: 'saida', pendentes: f.saida.pendente + f.saida.enviando, com_erro: f.saida.erro, mais_antiga: f.saida.mais_antiga,
+    { fila: 'entrada', pendentes: f.entrada.pendentes, vencidos: f.entrada.pendentes, com_erro: f.entrada.com_erro, mais_antiga: f.entrada.mais_antiga, detalhe: '' },
+    { fila: 'saida', pendentes: f.saida.pendente + f.saida.enviando, vencidos: f.saida.vencidos, com_erro: f.saida.erro, mais_antiga: f.saida.mais_antiga_vencida,
       detalhe: `${f.saida.pendente} pendente(s) · ${f.saida.enviando} enviando · ${f.saida.ok_24h} enviado(s) em 24 h` },
-    { fila: 'espelho_fila', pendentes: f.espelho_fila.total, com_erro: f.espelho_fila.com_erro, mais_antiga: f.espelho_fila.mais_antiga, detalhe: tipos(f.espelho_fila.por_tipo) },
-    { fila: 'espelho_saida', pendentes: f.espelho_saida.total, com_erro: f.espelho_saida.com_erro, mais_antiga: f.espelho_saida.mais_antiga, detalhe: tipos(f.espelho_saida.por_tipo) },
+    { fila: 'espelho_fila', pendentes: f.espelho_fila.total, vencidos: f.espelho_fila.vencidos, com_erro: f.espelho_fila.com_erro, mais_antiga: f.espelho_fila.mais_antiga_vencida, detalhe: esp(f.espelho_fila) },
+    { fila: 'espelho_saida', pendentes: f.espelho_saida.total, vencidos: f.espelho_saida.vencidos, com_erro: f.espelho_saida.com_erro, mais_antiga: f.espelho_saida.mais_antiga_vencida, detalhe: esp(f.espelho_saida) },
   ];
 }
-export function nivelFila(r: { pendentes: number; com_erro: number; mais_antiga: string | null }, s: Pick<StatusSync, 'agora' | 'parado_min'>): Nivel {
-  const min = r.pendentes > 0 ? minutosDesde(r.mais_antiga, s.agora) ?? 0 : 0;
+export function nivelFila(r: Pick<ResumoFila, 'vencidos' | 'com_erro' | 'mais_antiga'>, s: Pick<StatusSync, 'agora' | 'parado_min'>): Nivel {
+  const min = r.vencidos > 0 ? minutosDesde(r.mais_antiga, s.agora) ?? 0 : 0;
   if (min >= LIMITE.filaVermelhoMin) return 'vermelho';
   if (min >= s.parado_min || r.com_erro > 0) return 'amarelo';
   return 'verde';
@@ -143,8 +151,8 @@ export function situacaoGeral(s: StatusSync): { nivel: Nivel; motivos: string[] 
   for (const r of resumoFilas(s)) {
     const n = nivelFila(r, s);
     if (n === 'verde') continue;
-    const min = r.pendentes > 0 ? minutosDesde(r.mais_antiga, s.agora) ?? 0 : 0;
-    const partes = [min >= s.parado_min ? `${r.pendentes} item(ns), o mais antigo ${haQuanto(r.mais_antiga, s.agora)}` : '', r.com_erro > 0 ? `${r.com_erro} com erro` : ''];
+    const min = r.vencidos > 0 ? minutosDesde(r.mais_antiga, s.agora) ?? 0 : 0;
+    const partes = [min >= s.parado_min ? `${r.vencidos} item(ns), o mais antigo ${haQuanto(r.mais_antiga, s.agora)}` : '', r.com_erro > 0 ? `${r.com_erro} com erro` : ''];
     (n === 'vermelho' ? verm : amar).push(`Fila ${ROTULO_FILA[r.fila]}: ${partes.filter(Boolean).join(', ')}.`);
   }
   if (local && !verm.length && !amar.length) return { nivel: 'verde', motivos: ['ClickUp desligado: o banco processa as filas sozinho (sem Edge Function, webhook nem merge).'] };

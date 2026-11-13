@@ -6,13 +6,13 @@ const antes = (min: number) => new Date(Date.parse(AGORA) - min * 60000).toISOSt
 const modo = (m: ModoStatus['modo'], p: Partial<ModoStatus> = {}): ModoStatus => ({
   modo: m, ultima_em: antes(1), ultima_ok: true, ultima_cota: false, ultima_duracao_ms: 900, ultima_boa_em: antes(1), falhas_seguidas: 0,
   falhando_desde: null, ultimo_erro: null, ultimo_erro_em: null, ...p });
-const vazia = { total: 0, vencidos: 0, com_erro: 0, mais_antiga: null, por_tipo: {} };
+const vazia = { total: 0, vencidos: 0, com_erro: 0, mais_antiga: null, mais_antiga_vencida: null, em_espera_ate: null, por_tipo: {} };
 function status(p: Partial<StatusSync> = {}): StatusSync {
   return {
     agora: AGORA, destino: 'clickup', parado_min: 10, trava_ate: null, ultima_execucao_em: antes(1),
     modos: [modo('puxar'), modo('merge'), modo('completo', { ultima_em: null, ultima_ok: null, ultima_boa_em: null }), modo('enviar'), modo('projetar')],
     execucoes: [],
-    filas: { entrada: { pendentes: 0, com_erro: 0, mais_antiga: null }, saida: { pendente: 0, enviando: 0, erro: 0, ok_24h: 12, mais_antiga: null },
+    filas: { entrada: { pendentes: 0, com_erro: 0, mais_antiga: null }, saida: { pendente: 0, enviando: 0, erro: 0, ok_24h: 12, mais_antiga: null, vencidos: 0, mais_antiga_vencida: null },
       espelho_fila: vazia, espelho_saida: vazia },
     itens: [], itens_total: 0,
     webhook: { registrado: true, criado_em: antes(9000), eventos: 12, ultimo_evento_em: antes(3), saude: { em: antes(600), status: 'active', alerta: null, reativado: null, falhas: null } },
@@ -39,9 +39,9 @@ describe('Status da sincronização com o ClickUp (0076)', () => {
       ultimo_erro: 'canceling statement due to statement timeout', ultimo_erro_em: antes(1) });
     const s = status({
       modos: [modo('puxar'), modo('merge'), modo('enviar'), proj],
-      filas: { entrada: { pendentes: 0, com_erro: 0, mais_antiga: null }, saida: { pendente: 0, enviando: 0, erro: 0, ok_24h: 0, mais_antiga: null },
-        espelho_fila: { total: 121, vencidos: 121, com_erro: 0, mais_antiga: antes(3340), por_tipo: { raiz: 121, lista: 0 } },
-        espelho_saida: { total: 115, vencidos: 115, com_erro: 0, mais_antiga: antes(3300), por_tipo: { tarefas: 100, demandas: 15 } } },
+      filas: { entrada: { pendentes: 0, com_erro: 0, mais_antiga: null }, saida: { pendente: 0, enviando: 0, erro: 0, ok_24h: 0, mais_antiga: null, vencidos: 0, mais_antiga_vencida: null },
+        espelho_fila: { ...vazia, total: 121, vencidos: 121, mais_antiga: antes(3340), mais_antiga_vencida: antes(3340), por_tipo: { raiz: 121, lista: 0 } },
+        espelho_saida: { ...vazia, total: 115, vencidos: 115, mais_antiga: antes(3300), mais_antiga_vencida: antes(3300), por_tipo: { tarefas: 100, demandas: 15 } } },
     });
     const g = situacaoGeral(s);
     expect(g.nivel).toBe('vermelho');
@@ -55,11 +55,11 @@ describe('Status da sincronização com o ClickUp (0076)', () => {
     expect(situacaoGeral(status({ modos: [modo('enviar', { ultima_ok: false, falhas_seguidas: 1, falhando_desde: antes(1), ultimo_erro: 'x' })] })).nivel).toBe('amarelo');
     expect(nivelModo(modo('merge', { ultima_cota: true }))).toBe('amarelo');
     const s = status();
-    s.filas.saida = { pendente: 2, enviando: 0, erro: 1, ok_24h: 5, mais_antiga: antes(12) };
+    s.filas.saida = { pendente: 2, enviando: 0, erro: 1, ok_24h: 5, mais_antiga: antes(12), vencidos: 2, mais_antiga_vencida: antes(12) };
     expect(situacaoGeral(s)).toEqual({ nivel: 'amarelo', motivos: ['Fila Saída para o ClickUp: 2 item(ns), o mais antigo há 12 min, 1 com erro.'] });
-    expect(nivelFila({ pendentes: 2, com_erro: 0, mais_antiga: antes(5) }, s)).toBe('verde');
-    expect(nivelFila({ pendentes: 2, com_erro: 0, mais_antiga: antes(31) }, s)).toBe('vermelho');
-    expect(nivelFila({ pendentes: 0, com_erro: 0, mais_antiga: antes(500) }, s)).toBe('verde');
+    expect(nivelFila({ vencidos: 2, com_erro: 0, mais_antiga: antes(5) }, s)).toBe('verde');
+    expect(nivelFila({ vencidos: 2, com_erro: 0, mais_antiga: antes(31) }, s)).toBe('vermelho');
+    expect(nivelFila({ vencidos: 0, com_erro: 0, mais_antiga: antes(500) }, s)).toBe('verde');
     expect(situacaoGeral(status({ merge: { ultimo_em: antes(80), marca: null, completo: null } })).motivos[0]).toMatch(/merge não roda há 1 h 20 min/);
   });
   it('vermelho: sync em silêncio, webhook sem registro ou sumido; ClickUp desligado não cobra modos nem webhook', () => {
@@ -71,6 +71,15 @@ describe('Status da sincronização com o ClickUp (0076)', () => {
     const local = situacaoGeral(status({ destino: 'local', ultima_execucao_em: null, webhook: semWebhook }));
     expect(local.nivel).toBe('verde');
     expect(local.motivos[0]).toMatch(/ClickUp desligado/);
+  });
+  it('item em espera não é fila parada: saída segurada até 20/11 fica verde; com erro em nova tentativa fica só amarelo (0077)', () => {
+    const s = status();
+    s.filas.espelho_saida = { ...vazia, total: 2, vencidos: 0, mais_antiga: antes(1500), em_espera_ate: '2026-11-20T12:00:00Z', por_tipo: { tarefas: 2 } };
+    expect(situacaoGeral(s)).toEqual({ nivel: 'verde', motivos: [] });
+    expect(resumoFilas(s)[3]).toMatchObject({ pendentes: 2, vencidos: 0, mais_antiga: null });
+    expect(resumoFilas(s)[3].detalhe).toMatch(/^2 tarefas · 2 em espera até 20\/11/);
+    s.filas.espelho_fila = { ...vazia, total: 1, vencidos: 0, com_erro: 1, mais_antiga: antes(4000), em_espera_ate: antes(-30), por_tipo: { raiz: 1 } };
+    expect(situacaoGeral(s)).toEqual({ nivel: 'amarelo', motivos: ['Fila ClickUp → app: 1 com erro.'] });
   });
   it('link do ClickUp: tarefa, lista e pasta; sem id não tem link', () => {
     expect(linkClickup({ clickup_id: '86abc', clickup_tipo: 'tarefa' })).toBe('https://app.clickup.com/t/86abc');

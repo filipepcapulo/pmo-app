@@ -45,7 +45,7 @@ export function SyncClickup() {
     { chave: 'nome', titulo: 'Item', texto: i => i.nome,
       render: i => { const l = linkClickup(i); return l ? <a href={l} target="_blank" rel="noopener">{i.nome}</a> : <span>{i.nome}</span>; } },
     { chave: 'cliente', titulo: 'Cliente', texto: i => i.cliente ?? '' },
-    { chave: 'desde', titulo: 'Na fila desde', valor: i => i.desde, texto: i => `${quando(i.desde)} (${haQuanto(i.desde, agora)})` },
+    { chave: 'desde', titulo: 'Na fila desde', valor: i => i.desde, texto: i => `${quando(i.desde)} (${haQuanto(i.desde, agora)})${i.espera_ate ? ` · nova tentativa em ${quando(i.espera_ate)}` : ''}` },
     { chave: 'tentativas', titulo: 'Tentativas', alinhar: 'dir', valor: i => i.tentativas, texto: i => String(i.tentativas) },
     { chave: 'erro', titulo: 'Erro', texto: i => i.erro ?? '' },
   ], [agora]);
@@ -100,7 +100,7 @@ export function SyncClickup() {
               const n = nivelFila(f, s);
               return (
                 <div className="indicador" key={f.fila} data-testid={`sync-cu-fila-${f.fila}`} style={{ borderTop: `4px solid ${COR_NIVEL[n]}` }}>
-                  <small>{f.pendentes > 0 ? `mais antigo ${haQuanto(f.mais_antiga, s.agora)}` : 'vazia'}{f.com_erro > 0 ? ` · ${f.com_erro} com erro` : ''}</small>
+                  <small>{f.pendentes === 0 ? 'vazia' : f.vencidos > 0 ? `mais antigo ${haQuanto(f.mais_antiga, s.agora)}` : 'só itens em espera'}{f.com_erro > 0 ? ` · ${f.com_erro} com erro` : ''}</small>
                   {f.detalhe && <small>{f.detalhe}</small>}
                   <strong>{f.pendentes}</strong>
                   <small><b>{ROTULO_FILA[f.fila]}</b></small>
@@ -110,6 +110,7 @@ export function SyncClickup() {
           <p className="ajuda"><small>
             Eventos do ClickUp: o que o webhook recebeu e ainda não entrou no banco. Saída para o ClickUp: o que falta enviar.
             ClickUp → app e App → ClickUp: o que o "projetar" ainda não levou de um lado para o outro. Em dia, tudo esvazia em 1 a 2 minutos.
+            "Em espera" é item com nova tentativa agendada ou segurado de propósito: não conta como parado.
           </small></p>
         </section>)}
 

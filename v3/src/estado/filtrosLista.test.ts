@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { juntarPaginas } from '../api/execucao';
 import {
-  consultoresPorDemanda, contarAtivos, fasesPorCliente, filtrarClientes, filtrarDemandas, filtrarProjetos, filtrarTarefas, normalizarFiltro,
-  opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_CLIENTES, PADRAO_DEMANDAS, PADRAO_PROJETOS, PADRAO_TAREFAS, SEM, temTexto,
+  candidatosGrade, consultoresPorDemanda, contarAtivos, fasesPorCliente, filtrarClientes, filtrarDemandas, filtrarProjetos, filtrarTarefas, normalizarFiltro,
+  opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_AGENDA_EQUIPE, PADRAO_CLIENTES, PADRAO_DEMANDAS, PADRAO_PROJETOS, PADRAO_TAREFAS, pessoasDaGrade, SEM, temTexto,
 } from './filtrosLista';
 
 const FASES = ['P1', 'P2', 'P3', 'Sustentação'];
@@ -143,6 +143,29 @@ describe('tarefas', () => {
     expect(ids({ ate: '2026-11-10' })).toEqual(['t1', 't2']);
     expect(ids({ de: '2026-11-04', ate: '2026-11-19' })).toEqual(['t2']);
     expect(ids({ de: '2026-11-19', ate: '2026-11-04' })).toEqual(['t2']);
+  });
+});
+
+describe('agenda da equipe', () => {
+  const eq = [
+    { id: 'm', nome: 'Marcelo', ativo: true, papeis: ['consultor'] }, { id: 'a', nome: 'Ana', ativo: true, papeis: ['desenvolvedor'] },
+    { id: 'g', nome: 'Gabi GP', ativo: true, papeis: ['gp'] }, { id: 'f', nome: 'Filipe', ativo: true, papeis: ['gp'] },
+    { id: 'x', nome: 'Saiu', ativo: false, papeis: ['consultor'] },
+  ];
+  const cand = candidatosGrade(eq, new Set(['f', 'x']));
+  it('candidatos: ativos que atendem ou têm tarefa, em ordem', () => expect(cand.map(m => m.id)).toEqual(['a', 'f', 'm']));
+  it('sem escolha mostra todos; com escolha só os marcados; o texto soma', () => {
+    expect(pessoasDaGrade(cand, []).map(m => m.id)).toEqual(['a', 'f', 'm']);
+    expect(pessoasDaGrade(cand, ['m', 'a']).map(m => m.id)).toEqual(['a', 'm']);
+    expect(pessoasDaGrade(cand, ['m', 'a'], 'mar').map(m => m.id)).toEqual(['m']);
+  });
+  it('escolhido que saiu da equipe é ignorado (só ele = todos)', () => {
+    expect(pessoasDaGrade(cand, ['x', 'm']).map(m => m.id)).toEqual(['m']);
+    expect(pessoasDaGrade(cand, ['x']).map(m => m.id)).toEqual(['a', 'f', 'm']);
+  });
+  it('a escolha guardada só aceita lista de ids', () => {
+    expect(normalizarFiltro(PADRAO_AGENDA_EQUIPE, { pessoas: ['m', 3] })).toEqual({ pessoas: ['m'] });
+    expect(normalizarFiltro(PADRAO_AGENDA_EQUIPE, { pessoas: 'm' })).toEqual({ pessoas: [] });
   });
 });
 

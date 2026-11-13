@@ -149,6 +149,21 @@ export function filtrarTarefas<T extends TarefaFiltravel>(lista: T[], f: FiltroT
   });
 }
 
+// ---------------------------------------------------------------- agenda da equipe (grade)
+export interface FiltroAgendaEquipe { pessoas: string[] }
+export const PADRAO_AGENDA_EQUIPE: FiltroAgendaEquipe = { pessoas: [] };
+interface MembroGrade { id: string; nome: string; ativo: boolean; papeis: string[] }
+/** Quem pode aparecer na grade: ativo e consultor/desenvolvedor, ou com tarefa no período; em ordem alfabética. */
+export function candidatosGrade<T extends MembroGrade>(lista: T[], comTarefa: Set<string>): T[] {
+  return lista.filter(m => m.ativo && (m.papeis.some(p => p === 'consultor' || p === 'desenvolvedor') || comTarefa.has(m.id)))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+}
+/** Linhas da grade: os escolhidos (nenhum escolhido, ou escolhidos que já não estão na equipe = todos) e o texto do nome. */
+export function pessoasDaGrade<T extends MembroGrade>(candidatos: T[], escolhidos: readonly string[], texto = ''): T[] {
+  const validos = escolhidos.filter(id => candidatos.some(m => m.id === id));
+  return candidatos.filter(m => (validos.length === 0 || validos.includes(m.id)) && temTexto(texto, m.nome));
+}
+
 // ---------------------------------------------------------------- lembrar por tela
 /** Quantos campos do filtro diferem do padrão (o que o "Limpar filtros" desfaz). */
 export function contarAtivos<T extends object>(f: T, padrao: T): number {

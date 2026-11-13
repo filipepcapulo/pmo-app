@@ -62,6 +62,8 @@ export const MODULOS: Modulo[] = [
   { id: 'sync-experience', titulo: 'Sync com o Experience', area: 'sistema', icone: 'seta', permissao: 'sync_experience.gerenciar' },
   // 0076: status do espelho com o ClickUp (modos do sync, filas e itens parados); só leitura
   { id: 'sync-clickup', titulo: 'Sincronização com o ClickUp', area: 'sistema', icone: 'seta', permissao: 'sync_clickup.ver' },
+  // F6 (0081): token pessoal para ligar uma IA ao PMO pelo MCP (só dados operacionais)
+  { id: 'mcp', titulo: 'IA (MCP)', area: 'sistema', icone: 'cadeado', permissao: 'mcp.usar' },
   { id: 'componentes', titulo: 'Componentes', area: 'sistema', icone: 'grade' },
 ];
 

@@ -7,6 +7,11 @@ describe('Atendimento Avulso sem alerta (0073)', () => {
     expect(semAlerta({ totais: { avulso_base: true } })).toBe(true);
     expect(semAlerta({ avulso_base: false, totais: { avulso_base: false } })).toBe(false);
     expect(semAlerta({})).toBe(false);
+    // 0074: o avulso real é a etapa "Atendimento avulso" (demanda ou subdemanda)
+    expect(semAlerta({ etapa: 'Atendimento avulso' })).toBe(true);
+    expect(semAlerta({ etapa: ' atendimento AVULSO ' })).toBe(true);
+    expect(semAlerta({ etapa: 'Homologação' })).toBe(false);
+    expect(semAlerta({ etapa: null })).toBe(false);
     expect(semAlerta(null)).toBe(false);
   });
 });

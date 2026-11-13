@@ -139,6 +139,7 @@ describe('demandas', () => {
       { id: 'a', pai_id: null, nome: 'Comum', status: 'backlog', totais: { atrasada: true } },
       { id: 'b', pai_id: null, nome: 'Avulsa', status: 'backlog', avulso_base: true, totais: { atrasada: true } },
       { id: 'c', pai_id: null, nome: 'Avulsa pelos totais', status: 'backlog', totais: { atrasada: true, avulso_base: true } },
+      { id: 'e', pai_id: null, nome: 'Avulsa pela etapa', status: 'backlog', etapa: 'Atendimento avulso', totais: { atrasada: true } },
     ];
     expect(filtrarDemandas(l, { ...PADRAO_DEMANDAS, atrasadas: true }).map(d => d.id)).toEqual(['a']);
   });

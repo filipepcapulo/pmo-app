@@ -2,6 +2,7 @@
 // montadas a partir do que a lista traz e o filtro escolhido lembrado por tela neste navegador (pmo3:filtros:<tela>).
 // Lista vazia num filtro de vários = todos. SEM = "sem responsável / sem GP / sem etapa".
 import { useCallback, useEffect, useState } from 'react';
+import { semAlerta } from '../api/execucao';
 import { normal } from './filtro';
 
 export const SEM = '-';
@@ -146,7 +147,7 @@ function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string
     && (f.prioridades.length === 0 || f.prioridades.includes(d.prioridade ?? 'normal'))
     && (f.clientes.length === 0 || (!!d.cliente_id && f.clientes.includes(d.cliente_id)))
     && (f.projetos.length === 0 || (!!d.projeto_id && f.projetos.includes(d.projeto_id)))
-    && (!f.atrasadas || (!!d.totais?.atrasada && !d.avulso_base && !d.totais.avulso_base))
+    && (!f.atrasadas || (!!d.totais?.atrasada && !semAlerta(d)))
     && temTexto(f.texto, d.nome, d.cliente, d.projeto);
 }
 /**

@@ -194,12 +194,14 @@ export function mencoesNoTexto(texto: string, escolhidos: { id: string; nome: st
 }
 
 /** Agrupa demandas (com subdemandas logo abaixo da mãe), na ordem recebida. */
+/** Etapa que marca o atendimento avulso (como no banco, 0074: sem diferenciar maiúsculas nem espaços nas pontas). */
+export const etapaAvulsa = (etapa?: string | null) => (etapa ?? '').trim().toLowerCase() === 'atendimento avulso';
 /**
- * Demanda marcada como Atendimento Avulso (balde contínuo de atendimentos, sem cronograma nem teto de horas): não
- * pinta atraso nem estouro de horas. A marca vem na demanda (`avulso_base`) ou nos totais dela (0073).
+ * Atendimento avulso (sem cronograma nem teto de horas): não pinta atraso nem estouro de horas. Vale para demanda e
+ * subdemanda com a etapa "Atendimento avulso" ou com a marcação `avulso_base` (na demanda ou nos totais dela — 0073/0074).
  */
-export const semAlerta = (d?: { avulso_base?: boolean | null; totais?: { avulso_base?: boolean | null } | null } | null) =>
-  !!(d?.avulso_base || d?.totais?.avulso_base);
+export const semAlerta = (d?: { avulso_base?: boolean | null; etapa?: string | null; totais?: { avulso_base?: boolean | null } | null } | null) =>
+  !!(d?.avulso_base || d?.totais?.avulso_base || etapaAvulsa(d?.etapa));
 
 export function arvoreDemandas<T extends { id: string; pai_id: string | null }>(lista: T[]): { item: T; filhas: T[] }[] {
   const ids = new Set(lista.map(d => d.id));

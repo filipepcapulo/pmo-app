@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreDemandas, caminhoAnexo, cascataDemandas, fatiasBarra, mencoesNoTexto, semAlerta } from './execucao';
+import { arvoreDemandas, caminhoAnexo, cascataDemandas, fatiasBarra, horarioInvalido, mencoesNoTexto, semAlerta } from './execucao';
 
 describe('Atendimento Avulso sem alerta (0073)', () => {
   it('a marca vem na demanda ou nos totais dela', () => {
@@ -68,5 +68,16 @@ describe('escolha da demanda em cascata (cliente → demanda → subdemanda)', (
     expect(cascataDemandas(l, '').subdemandas).toEqual([]);
     expect(cascataDemandas(l, 'd1').subdemandas.map(d => d.id)).toEqual(['s1']);
     expect(cascataDemandas(l, 'd2').subdemandas).toEqual([]);
+  });
+});
+
+describe('Horário livre só em hora cheia (0080)', () => {
+  it('recusa minutos, formato errado e fim antes do início; aceita hora cheia e os períodos fixos', () => {
+    expect(horarioInvalido({ periodo: 'livre', ini: '13:00', fim: '17:00' })).toBe(false);
+    expect(horarioInvalido({ periodo: 'livre', ini: '13:00', fim: '17:30' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '08:15', fim: '12:00' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '17:00', fim: '13:00' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '', fim: '' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'manha', ini: '', fim: '' })).toBe(false);
   });
 });

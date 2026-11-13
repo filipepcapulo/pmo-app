@@ -2,7 +2,10 @@
 // padrão e 1º pedido de horas). Clicar abre a ficha (#/projeto/<id>).
 import { useEffect, useMemo, useState } from 'react';
 import { api, FASES, horas, rotuloSituacao, SITUACOES, TIPOS_PEDIDO, type ClienteLinha, type Modelo, type ProjetoLinha } from '../api/cadastros';
+import { BarraFiltros } from '../componentes/BarraFiltros';
 import { Botao } from '../componentes/Botao';
+import { FiltrosSalvos } from '../componentes/FiltrosSalvos';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 import { Campo, Formulario } from '../componentes/Campo';
 import { NomePessoa } from '../componentes/NomePessoa';
 import { Popup } from '../componentes/Popup';
@@ -13,20 +16,21 @@ import { gps, useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
+import { filtrarProjetos, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_PROJETOS, useFiltroLista } from '../estado/filtrosLista';
 
-const semAcento = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 type L = ProjetoLinha & Record<string, unknown>;
 
 export function Projetos({ ir }: { ir: (caminho: string, titulo?: string) => void }) {
   const esc = useSessao().eu!.escritorio_id!;
   const pode = usePode();
-  const [texto, setTexto] = useState('');
-  const [situacao, setSituacao] = useState('abertos');
+  const { f, mudar, limpar, aplicar, ativos } = useFiltroLista('projetos', PADRAO_PROJETOS);
   const [novo, setNovo] = useState(false);
   const c = useCarga(() => api.projetos(esc), [esc]);
-  const linhas = useMemo(() => (c.dados ?? []).filter(l =>
-    (situacao === '' || (situacao === 'abertos' ? ['ativo', 'pausado'].includes(l.situacao) : l.situacao === situacao))
-    && (!texto || semAcento(`${l.cliente} ${l.nome} ${l.fase}`).includes(semAcento(texto)))), [c.dados, texto, situacao]);
+  const todos = c.dados ?? [];
+  const linhas = useMemo(() => filtrarProjetos(c.dados ?? [], f), [c.dados, f]);
+  const opFases = useMemo(() => opcoesTexto((c.dados ?? []).map(l => l.fase), FASES), [c.dados]);
+  const opGps = useMemo(() => opcoesPessoas((c.dados ?? []).map(l => l.gp?.id), id => (c.dados ?? []).find(l => l.gp?.id === id)?.gp?.nome, '(sem GP)'), [c.dados]);
+  const opClientes = useMemo(() => opcoesNomeadas((c.dados ?? []).map(l => [l.cliente_id, l.cliente])), [c.dados]);
   const cols: Coluna<L>[] = [
     { chave: 'cliente', titulo: 'Cliente', render: l => <Resumo tipo="cliente" id={l.cliente_id}>{l.cliente}</Resumo> },
     { chave: 'nome', titulo: 'Projeto', render: l => <Resumo tipo="projeto" id={l.id}>{l.nome}</Resumo> },
@@ -42,17 +46,21 @@ export function Projetos({ ir }: { ir: (caminho: string, titulo?: string) => voi
         <h1>Projetos</h1>
         {pode('projeto.criar') && <Botao variante="primario" onClick={() => setNovo(true)}>+ Novo projeto</Botao>}
       </header>
-      <div className="barra-filtros">
-        <input type="search" aria-label="Buscar projeto" placeholder="Buscar cliente, projeto ou fase" value={texto} onChange={e => setTexto(e.target.value)} />
-        <select aria-label="Situação" value={situacao} onChange={e => setSituacao(e.target.value)}>
+      <BarraFiltros nome="projetos" n={c.dados ? linhas.length : null} total={c.dados ? todos.length : null} ativos={ativos} aoLimpar={limpar}>
+        <input type="search" aria-label="Buscar projeto" placeholder="Buscar cliente, projeto ou fase" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
+        <SelecaoMultipla rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
+        <SelecaoMultipla rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
+        <SelecaoMultipla rotulo="Cliente" opcoes={opClientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
+        <select aria-label="Situação" value={f.situacao} onChange={e => mudar({ situacao: e.target.value })}>
           <option value="abertos">Ativos e suspensos</option>
           {SITUACOES.map(s => <option key={s.valor} value={s.valor}>{s.rotulo}</option>)}
           <option value="">Todos</option>
         </select>
-      </div>
+        <FiltrosSalvos tela="projetos" atuais={f as unknown as Record<string, unknown>} aoAplicar={aplicar} />
+      </BarraFiltros>
       {c.erro ? <p className="msg-erro">{c.erro}</p>
         : <Tabela id="projetos" nome="Projetos" colunas={cols} linhas={linhas as L[]} chave={l => l.id} tamanhoInicial={15}
-            vazio={c.carregando ? 'Carregando…' : 'Nenhum projeto.'}
+            vazio={c.carregando ? 'Carregando…' : ativos ? 'Nenhum projeto com esses filtros.' : 'Nenhum projeto.'}
             aoClicar={l => ir(caminhoEntidade('projeto', l.id), `${l.cliente} · ${l.nome}`)} />}
       <NovoProjeto aberto={novo} aoFechar={() => setNovo(false)}
         aoCriar={(id, titulo) => { setNovo(false); c.recarregar(); ir(caminhoEntidade('projeto', id), titulo); }} />

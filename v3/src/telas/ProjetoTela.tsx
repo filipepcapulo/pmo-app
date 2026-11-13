@@ -11,7 +11,8 @@ import {
   TIPOS_DEPENDENCIA, type DemandaProjeto, type ItemCronograma, type ItemHistorico, type PainelProjeto,
 } from '../api/projeto';
 import { Anexos } from '../componentes/Anexos';
-import { ArvoreDemandas, StatusPilula } from '../componentes/ArvoreDemandas';
+import { StatusPilula } from '../componentes/ArvoreDemandas';
+import { DemandasDoProjeto } from '../componentes/ListasFiltradas';
 import { BarraHoras } from '../componentes/BarraHoras';
 import { Botao } from '../componentes/Botao';
 import { BotaoFavorito } from '../componentes/BotaoFavorito';
@@ -118,7 +119,7 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
               <button type="button" className="link tabela-acao" onClick={() => exportarCsv(titulo ?? p.nome, demandas, painel, x => (x ? porId.get(x)?.nome ?? '' : ''))}><Icone nome="baixar" tam={14} /> CSV</button>
               {pode('demanda.criar') && p.situacao === 'ativo' && <Botao onClick={() => ed.demanda({ projeto_id: p.id })}>+ Demanda</Botao>}
             </span></div>
-          <ArvoreDemandas demandas={demandas} tarefas={painel?.tarefas ?? []} vazio="Nenhuma demanda neste projeto." />
+          <DemandasDoProjeto demandas={demandas} tarefas={painel?.tarefas ?? []} vazio="Nenhuma demanda neste projeto." />
         </section>
       )}
       {aba === 'equipe' && <AbaEquipe demandas={demandas} painel={painel} gp={p.gp_id} />}

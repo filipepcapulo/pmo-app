@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { exec, rotuloPrioridade } from '../api/execucao';
 import { Anexos } from '../componentes/Anexos';
-import { ArvoreDemandas, ListaTarefas, StatusPilula } from '../componentes/ArvoreDemandas';
+import { ArvoreDemandas, StatusPilula } from '../componentes/ArvoreDemandas';
+import { TarefasDaDemanda } from '../componentes/ListasFiltradas';
 import { BarraHoras } from '../componentes/BarraHoras';
 import { Botao } from '../componentes/Botao';
 import { BotaoFavorito } from '../componentes/BotaoFavorito';
@@ -83,7 +84,7 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
         <div className="segmentos" role="tablist" aria-label="Seções da demanda">
           {abas.map(a => <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} className={aba === a.id ? 'ativo' : undefined} onClick={() => setAba(a.id)}>{a.rotulo}</button>)}
         </div>
-        {aba === 'tarefas' && <ListaTarefas tarefas={tarefas} nomeDemanda={i => (i === d.id ? null : nomes.get(i) ?? null)} />}
+        {aba === 'tarefas' && <TarefasDaDemanda tarefas={tarefas} nomeDemanda={i => (i === d.id ? null : nomes.get(i) ?? null)} />}
         {aba === 'checklist' && <Checklist entidade="demanda" id={d.id} itens={c.dados.checklist} aoMudar={c.recarregar} />}
         {aba === 'anexos' && <Anexos entidade="demanda" id={d.id} itens={c.dados.anexos} aoMudar={c.recarregar} />}
         {aba === 'comentarios' && <Comentarios entidade="demanda" id={d.id} aoMudar={setNCom} />}

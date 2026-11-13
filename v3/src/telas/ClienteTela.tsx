@@ -1,8 +1,11 @@
 // Ficha do cliente (#/cliente/<id>): dados e GP, inativar ("Z" na pasta do ClickUp), pessoas do cliente com papel
 // e os projetos (novo projeto já com o cliente).
-import { useEffect, useState } from 'react';
-import { api, horas, PAPEIS_CLIENTE, rotuloSituacao, type PapelCliente, type PessoaCliente, type ProjetoResumo } from '../api/cadastros';
+import { useEffect, useMemo, useState } from 'react';
+import { api, FASES, horas, PAPEIS_CLIENTE, rotuloSituacao, SITUACOES, type PapelCliente, type PessoaCliente, type ProjetoResumo } from '../api/cadastros';
+import { BarraFiltros } from '../componentes/BarraFiltros';
 import { Botao } from '../componentes/Botao';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
+import { filtrarProjetos, opcoesPessoas, opcoesTexto, PADRAO_PROJETOS_CLIENTE, useFiltroLista } from '../estado/filtrosLista';
 import { BotaoFavorito } from '../componentes/BotaoFavorito';
 import { Campo, Formulario } from '../componentes/Campo';
 import { NomePessoa } from '../componentes/NomePessoa';
@@ -29,6 +32,11 @@ export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t
   const [novoProj, setNovoProj] = useState(false);
   const [gravando, setGravando] = useState(false);
   const cli = c.dados?.cliente;
+  const { f, mudar, limpar, ativos } = useFiltroLista('cliente:projetos', PADRAO_PROJETOS_CLIENTE);
+  const projetos = c.dados?.projetos;
+  const projFiltrados = useMemo(() => filtrarProjetos(projetos ?? [], f), [projetos, f]);
+  const opFases = useMemo(() => opcoesTexto((projetos ?? []).map(l => l.fase), FASES.filter(x => (projetos ?? []).some(l => l.fase === x))), [projetos]);
+  const opGps = useMemo(() => opcoesPessoas((projetos ?? []).map(l => l.gp?.id), id => (projetos ?? []).find(l => l.gp?.id === id)?.gp?.nome, '(sem GP)'), [projetos]);
   useEffect(() => { if (cli?.nome) aoRenomear(cli.nome); }, [cli?.nome, aoRenomear]);
   if (c.erro) return <div className="vazio-tela"><h2>Cliente</h2><p>{c.erro}</p></div>;
   if (!cli) return <div className="carregando-tela"><span className="giro" /> Carregando…</div>;
@@ -91,8 +99,20 @@ export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t
       <section className="cartao">
         <div className="pagina-topo"><h2 className="secao">Projetos</h2>
           {pode('projeto.criar') && cli.ativo && <Botao onClick={() => setNovoProj(true)}>+ Projeto</Botao>}</div>
-        <Tabela id="cliente-projetos" nome="Projetos do cliente" colunas={colsProj} linhas={c.dados!.projetos as (ProjetoResumo & Record<string, unknown>)[]} chave={l => l.id}
-          vazio="Nenhum projeto." aoClicar={l => ir(caminhoEntidade('projeto', l.id), `${cli.nome} · ${l.nome}`)} />
+        {c.dados!.projetos.length > 0 && (
+          <BarraFiltros nome="projetos" n={projFiltrados.length} total={c.dados!.projetos.length} ativos={ativos} aoLimpar={limpar}>
+            <input type="search" aria-label="Buscar projeto" placeholder="Buscar projeto" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
+            <SelecaoMultipla rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
+            <SelecaoMultipla rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
+            <select aria-label="Situação" value={f.situacao} onChange={e => mudar({ situacao: e.target.value })}>
+              <option value="">Todas as situações</option>
+              <option value="abertos">Ativos e suspensos</option>
+              {SITUACOES.map(s => <option key={s.valor} value={s.valor}>{s.rotulo}</option>)}
+            </select>
+          </BarraFiltros>
+        )}
+        <Tabela id="cliente-projetos" nome="Projetos do cliente" colunas={colsProj} linhas={projFiltrados as (ProjetoResumo & Record<string, unknown>)[]} chave={l => l.id}
+          vazio={ativos ? 'Nenhum projeto com esses filtros.' : 'Nenhum projeto.'} aoClicar={l => ir(caminhoEntidade('projeto', l.id), `${cli.nome} · ${l.nome}`)} />
       </section>
 
       <Popup aberto={!!edit} titulo="Editar cliente" aoFechar={() => setEdit(null)}

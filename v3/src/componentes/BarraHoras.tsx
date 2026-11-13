@@ -3,10 +3,13 @@
 import { horas } from '../api/cadastros';
 import { fatiasBarra } from '../api/execucao';
 
-export function BarraHoras({ previsto, real, planejado, compacta }: {
+export function BarraHoras({ previsto, real, planejado, compacta, semAlerta }: {
   previsto: number | null | undefined; real: number; planejado: number; compacta?: boolean;
+  /** Atendimento Avulso: passar do previsto não fica vermelho. */
+  semAlerta?: boolean;
 }) {
-  const f = fatiasBarra(previsto, real, planejado);
+  const fatias = fatiasBarra(previsto, real, planejado);
+  const f = semAlerta ? { ...fatias, estouro: false } : fatias;
   const texto = `${horas(real)} reais + ${horas(planejado)} planejadas de ${horas(previsto ?? 0)} previstas`;
   return (
     <div className={`barra-horas${compacta ? ' compacta' : ''}${f.estouro ? ' estouro' : ''}`} title={texto}>

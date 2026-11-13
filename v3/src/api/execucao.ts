@@ -38,6 +38,8 @@ export const rotuloPrioridade = (v: string) => rotulo(PRIORIDADES, v);
 export interface TotaisDemanda {
   demanda_id: string; horas_previstas: number | null; horas_reais: number; horas_planejadas: number; horas_concluidas: number;
   tarefas: number; inicio: string | null; fim: string | null; perc: number | null; atrasada: boolean;
+  /** 0073: demanda marcada como Atendimento Avulso (sem alerta de atraso nem de estouro de horas). */
+  avulso_base?: boolean;
 }
 export interface Demanda {
   id: string; projeto_id: string; pai_id: string | null; tipo: 'entregavel' | 'plano_acao' | 'chamado'; nome: string; descricao: string | null;
@@ -101,7 +103,7 @@ export interface OpcoesExecucao {
 export interface ItemFavoritoHome {
   entidade: 'projeto' | 'demanda' | 'tarefa'; id: string; nome: string; projeto: string; status: string; subdemanda?: boolean;
   data?: string; responsavel_id?: string;
-  totais?: { horas_previstas: number | null; horas_reais: number; horas_planejadas: number; perc: number | null; atrasada?: boolean; fim?: string | null; horas_contratadas?: number } | null;
+  totais?: { horas_previstas: number | null; horas_reais: number; horas_planejadas: number; perc: number | null; atrasada?: boolean; fim?: string | null; horas_contratadas?: number; avulso_base?: boolean } | null;
 }
 export interface GrupoFavoritos { cliente: { id: string; nome: string }; itens: ItemFavoritoHome[] }
 export interface Notificacao { id: string; tipo: string; titulo: string; link: string | null; criado_em: string; lida: boolean }
@@ -192,6 +194,13 @@ export function mencoesNoTexto(texto: string, escolhidos: { id: string; nome: st
 }
 
 /** Agrupa demandas (com subdemandas logo abaixo da mãe), na ordem recebida. */
+/**
+ * Demanda marcada como Atendimento Avulso (balde contínuo de atendimentos, sem cronograma nem teto de horas): não
+ * pinta atraso nem estouro de horas. A marca vem na demanda (`avulso_base`) ou nos totais dela (0073).
+ */
+export const semAlerta = (d?: { avulso_base?: boolean | null; totais?: { avulso_base?: boolean | null } | null } | null) =>
+  !!(d?.avulso_base || d?.totais?.avulso_base);
+
 export function arvoreDemandas<T extends { id: string; pai_id: string | null }>(lista: T[]): { item: T; filhas: T[] }[] {
   const ids = new Set(lista.map(d => d.id));
   const filhas = new Map<string, T[]>();

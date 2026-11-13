@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreDemandas, caminhoAnexo, cascataDemandas, fatiasBarra, mencoesNoTexto } from './execucao';
+import { arvoreDemandas, caminhoAnexo, cascataDemandas, fatiasBarra, mencoesNoTexto, semAlerta } from './execucao';
+
+describe('Atendimento Avulso sem alerta (0073)', () => {
+  it('a marca vem na demanda ou nos totais dela', () => {
+    expect(semAlerta({ avulso_base: true })).toBe(true);
+    expect(semAlerta({ totais: { avulso_base: true } })).toBe(true);
+    expect(semAlerta({ avulso_base: false, totais: { avulso_base: false } })).toBe(false);
+    expect(semAlerta({})).toBe(false);
+    expect(semAlerta(null)).toBe(false);
+  });
+});
 
 describe('barra de pílula de horas', () => {
   it('real e planejado sobre o previsto, em fatias separadas', () => {

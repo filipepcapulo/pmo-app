@@ -3,7 +3,7 @@
 // (drilldown demanda → subdemanda → tarefa da Tela de Projeto); clicar na tarefa abre o formulário.
 import { useState } from 'react';
 import { data, horas } from '../api/cadastros';
-import { arvoreDemandas, rotuloModalidade, rotuloPeriodo, rotuloStatusDemanda, rotuloStatusTarefa, type Tarefa, type TotaisDemanda } from '../api/execucao';
+import { arvoreDemandas, semAlerta, rotuloModalidade, rotuloPeriodo, rotuloStatusDemanda, rotuloStatusTarefa, type Tarefa, type TotaisDemanda } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
 import { useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
@@ -13,7 +13,7 @@ import { NomePessoa } from './NomePessoa';
 import { Tabela, type Coluna } from './Tabela';
 import { Resumo } from './Resumo';
 
-type ComTotais = { id: string; nome: string; pai_id: string | null; status: string; projeto_id: string; totais?: Partial<TotaisDemanda> | null; extra?: string };
+type ComTotais = { id: string; nome: string; pai_id: string | null; status: string; projeto_id: string; totais?: Partial<TotaisDemanda> | null; extra?: string; avulso_base?: boolean };
 
 export function StatusPilula({ status, tipo = 'demanda' }: { status: string; tipo?: 'demanda' | 'tarefa' }) {
   return <span className={`pilula st-${status}`}>{tipo === 'demanda' ? rotuloStatusDemanda(status) : rotuloStatusTarefa(status)}</span>;
@@ -35,7 +35,7 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
         <Resumo tipo="demanda" id={d.id}><a href={href} className="linha-exec-nome">{d.nome}</a></Resumo>
         {d.extra && <small className="ajuda">{d.extra}</small>}
         <StatusPilula status={d.status} />
-        {t?.atrasada && <span className="pilula st-atrasada">Atrasada</span>}
+        {t?.atrasada && !semAlerta(d) && <span className="pilula st-atrasada">Atrasada</span>}
         <small className="ajuda">{t?.inicio || t?.fim ? `${data(t?.inicio)} → ${data(t?.fim)}` : ''}{t?.perc != null ? ` · ${t.perc}%` : ''}</small>
         <span className="linha-exec-bts">
           {!sub && pode('demanda.criar') && <button type="button" className="link" onClick={() => ed.demanda({ projeto_id: d.projeto_id, pai_id: d.id })}>+ Sub</button>}
@@ -45,7 +45,7 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
           <button type="button" className="link" onClick={() => ed.demanda({ id: d.id })}>Editar</button>
         </span>
       </div>
-      <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} compacta={!!sub} />
+      <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} compacta={!!sub} semAlerta={semAlerta(d)} />
       {verTarefas && tarefas && <TarefasDrill tarefas={tarefas} />}
     </div>
   );

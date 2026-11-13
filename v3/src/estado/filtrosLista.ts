@@ -101,7 +101,7 @@ export const PADRAO_DEMANDAS: FiltroDemandas = {
 export interface DemandaFiltravel {
   id: string; pai_id: string | null; nome: string; status: string; projeto_id?: string; tipo?: string; prioridade?: string;
   responsavel_id?: string | null; etapa?: string | null; fase?: string; cliente_id?: string; cliente?: string; projeto?: string;
-  totais?: { atrasada?: boolean } | null;
+  totais?: { atrasada?: boolean; avulso_base?: boolean } | null; avulso_base?: boolean;
 }
 export const TIPOS_DEMANDA: Opcao[] = [
   { valor: 'entregavel', rotulo: 'Entregável' }, { valor: 'plano_acao', rotulo: 'Plano de ação' }, { valor: 'chamado', rotulo: 'Chamado' },
@@ -146,7 +146,7 @@ function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string
     && (f.prioridades.length === 0 || f.prioridades.includes(d.prioridade ?? 'normal'))
     && (f.clientes.length === 0 || (!!d.cliente_id && f.clientes.includes(d.cliente_id)))
     && (f.projetos.length === 0 || (!!d.projeto_id && f.projetos.includes(d.projeto_id)))
-    && (!f.atrasadas || !!d.totais?.atrasada)
+    && (!f.atrasadas || (!!d.totais?.atrasada && !d.avulso_base && !d.totais.avulso_base))
     && temTexto(f.texto, d.nome, d.cliente, d.projeto);
 }
 /**

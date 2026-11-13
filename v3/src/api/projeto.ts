@@ -23,7 +23,7 @@ export interface ItemHistorico {
 export interface W5H2 { what?: string; why?: string; where?: string; when?: string; who?: string; how?: string; how_much?: string }
 /** Demanda como vem na ficha do projeto (v1_projeto). */
 export type DemandaProjeto = Pick<Demanda, 'id' | 'projeto_id' | 'pai_id' | 'nome' | 'status' | 'horas_previstas' | 'etapa'>
-  & Partial<Pick<Demanda, 'tipo' | 'inicio' | 'fim' | 'prioridade' | 'responsavel_id' | 'versao'>>
+  & Partial<Pick<Demanda, 'tipo' | 'inicio' | 'fim' | 'prioridade' | 'responsavel_id' | 'versao' | 'avulso_base'>>
   & { w5h2?: W5H2 | null; totais?: Partial<TotaisDemanda> | null };
 export interface ItemCronograma { id: string; versao: number; inicio: string; fim: string }
 

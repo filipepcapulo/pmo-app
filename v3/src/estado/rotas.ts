@@ -11,6 +11,7 @@ export interface Modulo {
   permissao?: string;      // funcionalidade exigida (app.funcionalidades); sem ela o item some do menu
   parametro?: boolean;     // aceita um item no caminho (#/manuais/<id>): cada um abre a própria aba
   cofre?: boolean;         // só para quem está nos autorizados do cofre financeiro (fin.autorizados; Admin não herda)
+  papeisCofre?: string[];  // além de estar no cofre, precisa de um destes papéis (F4: dono, fechamento)
 }
 
 export const AREAS: { id: Area; titulo: string }[] = [
@@ -52,7 +53,11 @@ export const MODULOS: Modulo[] = [
   // todos entram; sem produtividade.ver_todos o banco devolve só o próprio (0045)
   { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: 'grafico' },
   // F3 (0071): cofre financeiro; só os autorizados nominais veem (os demais: "Sem acesso")
+  // F4 (0075): cada pessoa vê só o próprio fechamento de produtividade (não precisa de papel no cofre)
+  { id: 'meu-fechamento', titulo: 'Meu fechamento', area: 'relatorios', icone: 'relogio' },
   { id: 'financeiro', titulo: 'Acessos e Remuneração', area: 'financeiro', icone: 'cadeado', cofre: true },
+  // F4 (0075): fechamento do período 21–20 de todos; só os papéis dono e fechamento do cofre
+  { id: 'fechamento', titulo: 'Fechamento de produtividade', area: 'financeiro', icone: 'grafico', cofre: true, papeisCofre: ['dono', 'fechamento'] },
   // V13d-2: lançamentos do Experience pelas tarefas (módulo 02 da Central); começa em simulação
   { id: 'sync-experience', titulo: 'Sync com o Experience', area: 'sistema', icone: 'seta', permissao: 'sync_experience.gerenciar' },
   { id: 'componentes', titulo: 'Componentes', area: 'sistema', icone: 'grade' },
@@ -104,5 +109,6 @@ export const caminhoEntidade = (e: Entidade, id: string) => `${e}/${id}`;
 
 /** Módulos que o usuário vê (sem permissão exigida, ou com ela liberada). */
 export function modulosVisiveis(permissoes: string[], fin: string[] = []): Modulo[] {
-  return MODULOS.filter(m => (!m.permissao || permissoes.includes(m.permissao)) && (!m.cofre || fin.length > 0));
+  return MODULOS.filter(m => (!m.permissao || permissoes.includes(m.permissao)) && (!m.cofre || fin.length > 0)
+    && (!m.papeisCofre || m.papeisCofre.some(p => fin.includes(p))));
 }

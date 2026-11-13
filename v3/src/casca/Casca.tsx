@@ -19,6 +19,7 @@ import { ClienteTela } from '../telas/ClienteTela';
 import { Clientes } from '../telas/Clientes';
 import { Componentes } from '../telas/Componentes';
 import { SyncExperience } from '../telas/SyncExperience';
+import { Fechamento, MeuFechamento } from '../telas/Fechamento';
 import { Financeiro } from '../telas/Financeiro';
 import { Sugestoes } from '../telas/Sugestoes';
 import { AceiteOs } from '../telas/AceiteOs';
@@ -154,6 +155,8 @@ export function Casca() {
     if (r.modulo.id === 'notificacoes') return <NotificacoesAparelho />;
     if (r.modulo.id === 'sugestoes') return <Sugestoes />;
     if (r.modulo.id === 'financeiro') return <Financeiro />;
+    if (r.modulo.id === 'fechamento') return <Fechamento />;
+    if (r.modulo.id === 'meu-fechamento') return <MeuFechamento />;
     if (r.modulo.id === 'componentes') return <Componentes />;
     if (r.modulo.id === 'sync-experience') return <SyncExperience />;
     if (r.modulo.id === 'aceite-os') return <AceiteOs parametro={r.parametro} />;

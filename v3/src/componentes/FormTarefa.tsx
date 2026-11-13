@@ -8,7 +8,7 @@
 // Antes de gravar, os choques de horário (agenda, ausência, o próprio lote) aparecem para confirmar ou voltar ao lançamento.
 import { useEffect, useState } from 'react';
 import { horas } from '../api/cadastros';
-import { exec, MODALIDADES, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
+import { AVISO_HORARIO, exec, horarioInvalido, MODALIDADES, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
 import type { AlvoTarefa } from '../estado/edicao';
 import { usePode, useEquipe } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
@@ -27,8 +27,6 @@ interface Combinacao { resp: string; data: string; periodo: string; ini: string;
 const horarioCurto = (c: Combinacao) => /\(([^)]+)\)/.exec(rotuloPeriodo(c.periodo, c.ini, c.fim))?.[1] ?? rotuloPeriodo(c.periodo, c.ini, c.fim);
 const chave = (c: Combinacao) => [c.resp, c.data, c.periodo, c.ini, c.fim, c.modalidade].join('|');
 const AGENDAS = MODALIDADES.filter(m => m.valor);
-const horarioInvalido = (c: { periodo: string; ini: string; fim: string }) =>
-  c.periodo === 'livre' && (!/^\d\d:\d\d$/.test(c.ini) || !/^\d\d:\d\d$/.test(c.fim) || c.fim <= c.ini);
 
 export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTarefa; opcoes: OpcoesExecucao | null; aoFechar: () => void; aoGravar: () => void }) {
   const esc = useSessao().eu!.escritorio_id!;
@@ -72,7 +70,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
   const adicionar = (c: Combinacao = mont) => {
     setErro(null);
     if (!c.resp || !c.data) { setErro('Escolha o consultor e a data da combinação.'); return; }
-    if (horarioInvalido(c)) { setErro('No horário livre, informe início e fim (hh:mm, fim depois do início).'); return; }
+    if (horarioInvalido(c)) { setErro(AVISO_HORARIO); return; }
     if (combos.some(x => chave(x) === chave(c))) { setErro('Essa combinação já está na lista.'); return; }
     if (combos.length >= 100) { setErro('No máximo 100 tarefas por vez.'); return; }
     setCombos([...combos, c]);
@@ -101,7 +99,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
     if (!excluir) {
       if (!f.demanda || !f.nome.trim()) { setErro('Cliente, demanda e título são obrigatórios.'); return; }
       if (novo && !lista.length) { setErro('Monte ao menos uma combinação de consultor, data e período.'); return; }
-      if (!novo && horarioInvalido(f)) { setErro('No horário livre, informe início e fim (hh:mm, fim depois do início).'); return; }
+      if (!novo && horarioInvalido(f)) { setErro(AVISO_HORARIO); return; }
     }
     // editar sem mexer em consultor, data ou horário não pergunta de novo por um choque que já existia
     const mesmoHorario = !novo && orig && orig.responsavel_id === f.resp && orig.data === f.data && orig.periodo === f.periodo
@@ -147,7 +145,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoTar
     if (!orig || !mais) return;
     setErro(null);
     if (!mais.data) { setErro('Informe a data da nova agenda.'); return; }
-    if (horarioInvalido(mais)) { setErro('No horário livre, informe início e fim (hh:mm, fim depois do início).'); return; }
+    if (horarioInvalido(mais)) { setErro(AVISO_HORARIO); return; }
     return conferir([item(orig.responsavel_id, mais.data, mais)], ign => gravarMais(ign));
   };
   const gravarMais = async (ignorarAusencia: boolean) => {

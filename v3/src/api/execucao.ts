@@ -228,3 +228,9 @@ export async function juntarPaginas<T extends { id: string }>(buscar: (pagina: n
 /** Todas as demandas/subdemandas visíveis com esses status (todas as páginas). */
 export const todasDemandas = (esc: string, status: string[] | null) =>
   juntarPaginas(pagina => exec.demandas(esc, { status, limite: 500, pagina }));
+
+// Horário livre: início e fim em hora cheia (hh:00) e fim depois do início. Enquanto o espelho com o ClickUp está ativo
+// o campo Período de lá só tem hora cheia e o banco recusa minutos (0080).
+export const horarioInvalido = (c: { periodo: string; ini: string; fim: string }) =>
+  c.periodo === 'livre' && (!/^\d\d:00$/.test(c.ini) || !/^\d\d:00$/.test(c.fim) || c.fim <= c.ini);
+export const AVISO_HORARIO = 'No horário livre, informe início e fim em hora cheia (ex.: 13:00 às 17:00, fim depois do início).';

@@ -1,5 +1,6 @@
 // Ficha do cliente (#/cliente/<id>): dados e GP, inativar ("Z" na pasta do ClickUp), pessoas do cliente com papel
-// e os projetos (novo projeto já com o cliente).
+// e os projetos (novo projeto já com o cliente). F5: quem tem o papel Dono ou Rentabilidade do cofre ganha as abas
+// Dados | Rentabilidade (receita × custo × margem dos projetos do cliente); para os demais a ficha segue sem abas.
 import { useEffect, useMemo, useState } from 'react';
 import { api, FASES, horas, PAPEIS_CLIENTE, rotuloSituacao, SITUACOES, type PapelCliente, type PessoaCliente, type ProjetoResumo } from '../api/cadastros';
 import { BarraFiltros } from '../componentes/BarraFiltros';
@@ -18,11 +19,16 @@ import { caminhoEntidade } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { NovoProjeto } from './Projetos';
 import { Resumo } from '../componentes/Resumo';
+import { podeRentabilidade } from '../api/rentabilidade';
+import { Rentabilidade } from '../componentes/Rentabilidade';
 
 const rotuloPapel = (p: string) => PAPEIS_CLIENTE.find(x => x.valor === p)?.rotulo ?? p;
 
 export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t: string) => void; ir: (c: string, t?: string) => void }) {
-  const esc = useSessao().eu!.escritorio_id!;
+  const { eu } = useSessao();
+  const esc = eu!.escritorio_id!;
+  const veRenta = podeRentabilidade(eu!.fin);
+  const [aba, setAba] = useState<'dados' | 'rentabilidade'>('dados');
   const pode = usePode();
   const avisar = useToast();
   const { lista } = useEquipe();
@@ -80,6 +86,15 @@ export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t
         </div>
       </header>
 
+      {veRenta && (
+        <div className="segmentos" role="tablist" aria-label="Seções do cliente">
+          <button type="button" role="tab" aria-selected={aba === 'dados'} onClick={() => setAba('dados')}>Dados</button>
+          <button type="button" role="tab" aria-selected={aba === 'rentabilidade'} onClick={() => setAba('rentabilidade')}>Rentabilidade</button>
+        </div>
+      )}
+      {veRenta && aba === 'rentabilidade' && <Rentabilidade tipo="cliente" id={cli.id} />}
+
+      {aba === 'dados' && <>
       <section className="cartao">
         <h2 className="secao">Dados</h2>
         <dl className="dados">
@@ -114,6 +129,7 @@ export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t
         <Tabela id="cliente-projetos" nome="Projetos do cliente" colunas={colsProj} linhas={projFiltrados as (ProjetoResumo & Record<string, unknown>)[]} chave={l => l.id}
           vazio={ativos ? 'Nenhum projeto com esses filtros.' : 'Nenhum projeto.'} aoClicar={l => ir(caminhoEntidade('projeto', l.id), `${cli.nome} · ${l.nome}`)} />
       </section>
+      </>}
 
       <Popup aberto={!!edit} titulo="Editar cliente" aoFechar={() => setEdit(null)}
         rodape={<><Botao onClick={() => setEdit(null)}>Cancelar</Botao>

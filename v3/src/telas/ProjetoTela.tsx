@@ -31,6 +31,8 @@ import { useEdicao } from '../estado/edicao';
 import { gps, useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
+import { podeRentabilidade, renta, textoValorHora, valorHoraDe } from '../api/rentabilidade';
+import { Rentabilidade } from '../componentes/Rentabilidade';
 import { baixarCsv, nomeArquivo } from '../util/csv';
 import { Resumo } from '../componentes/Resumo';
 import { SaldoPedidos } from '../componentes/SaldoPedidos';
@@ -38,13 +40,15 @@ import { fapDoNome } from '../api/aceiteOs';
 
 const rotuloTipo = (t: string) => TIPOS_PEDIDO.find(x => x.valor === t)?.rotulo ?? t;
 type Proj = ProjetoFicha['projeto'];
-type Aba = 'indicadores' | 'horas' | 'cronograma' | 'w5h2' | 'demandas' | 'equipe' | 'anexos' | 'comentarios' | 'historico';
+type Aba = 'indicadores' | 'horas' | 'cronograma' | 'w5h2' | 'demandas' | 'equipe' | 'anexos' | 'comentarios' | 'historico' | 'rentabilidade';
 const CHAVE_ABA = 'pmo3:projeto:aba';
 const lerAba = (): Aba => { try { return (localStorage.getItem(CHAVE_ABA) as Aba) || 'indicadores'; } catch { return 'indicadores'; } };
 const irDemanda = (id: string) => { location.hash = hashDe(caminhoEntidade('demanda', id)); };
 
 export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: string) => void }) {
-  const esc = useSessao().eu!.escritorio_id!;
+  const { eu } = useSessao();
+  const esc = eu!.escritorio_id!;
+  const veRenta = podeRentabilidade(eu!.fin);   // F5: papel Dono ou Rentabilidade do cofre (Admin e GP não herdam)
   const pode = usePode();
   const ed = useEdicao();
   const avisar = useToast();
@@ -52,7 +56,9 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   const c = useCarga(() => api.projeto(esc, id), [esc, id, ed.geracao]);
   const pn = useCarga(() => proj.painel(esc, id), [esc, id, ed.geracao]);
   const ax = useCarga(() => exec.anexos(esc, 'projeto', id), [esc, id]);
-  const [aba, setAbaEstado] = useState<Aba>(lerAba);
+  const [abaLida, setAbaEstado] = useState<Aba>(lerAba);
+  const aba: Aba = abaLida === 'rentabilidade' && !veRenta ? 'indicadores' : abaLida;
+  const [nPedidos, setNPedidos] = useState(0);   // muda a cada pedido gravado: a aba Rentabilidade recalcula
   const [edit, setEdit] = useState(false);
   const [pedido, setPedido] = useState<Partial<PedidoHoras> | null>(null);
   const [plano, setPlano] = useState<Partial<DemandaProjeto> | null>(null);
@@ -79,6 +85,7 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
     { id: 'w5h2', rotulo: `5W2H (${planos.length})` }, { id: 'demandas', rotulo: `Demandas (${demandas.filter(d => !d.pai_id).length})` },
     { id: 'equipe', rotulo: 'Equipe' }, { id: 'anexos', rotulo: `Anexos${ax.dados ? ` (${ax.dados.length})` : ''}` },
     { id: 'comentarios', rotulo: `Comentários${nCom != null ? ` (${nCom})` : ''}` }, { id: 'historico', rotulo: 'Histórico' },
+    ...(veRenta ? [{ id: 'rentabilidade' as Aba, rotulo: 'Rentabilidade' }] : []),
   ];
   return (
     <div className="pagina">
@@ -131,9 +138,10 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
       )}
       {aba === 'comentarios' && <section className="cartao"><Comentarios entidade="projeto" id={p.id} aoMudar={setNCom} /></section>}
       {aba === 'historico' && <Historico projeto={p.id} />}
+      {aba === 'rentabilidade' && veRenta && <Rentabilidade tipo="projeto" id={p.id} geracao={`${ed.geracao}:${nPedidos}`} />}
 
       <EditarProjeto aberto={edit} projeto={p} aoFechar={() => setEdit(false)} aoGravar={() => { setEdit(false); c.recarregar(); }} />
-      <PedidoPopup pedido={pedido} aoFechar={() => setPedido(null)} aoGravar={() => { setPedido(null); c.recarregar(); }} />
+      <PedidoPopup pedido={pedido} aoFechar={() => setPedido(null)} aoGravar={() => { setPedido(null); setNPedidos(n => n + 1); c.recarregar(); }} />
       <Popup5W2H plano={plano} aoFechar={() => setPlano(null)} aoGravar={() => { setPlano(null); ed.mudou(); }} />
     </div>
   );
@@ -210,6 +218,7 @@ type LinhaConsumo = { id: string; nome: string; previsto: number | null; real: n
 type LinhaPessoa = { id: string; real: number; planejado: number; tarefas: number } & Record<string, unknown>;
 function AbaHoras({ ficha, painel, aoPedido }: { ficha: ProjetoFicha; painel: PainelProjeto | null; aoPedido: (p: Partial<PedidoHoras>) => void }) {
   const pode = usePode();
+  const veRenta = podeRentabilidade(useSessao().eu!.fin);   // F5: abre o pedido para informar o valor/hora
   const { porId } = useEquipe();
   const cols: Coluna<PedidoHoras & Record<string, unknown>>[] = [
     { chave: 'numero', titulo: 'Nº do pedido' },
@@ -247,7 +256,7 @@ function AbaHoras({ ficha, painel, aoPedido }: { ficha: ProjetoFicha; painel: Pa
         <div className="pagina-topo"><h2 className="secao">Pedidos de horas</h2>
           {pode('pedido_horas.gravar') && <Botao onClick={() => aoPedido({ projeto_id: ficha.projeto.id, tipo: 'empreito' })}>+ Pedido</Botao>}</div>
         <Tabela id="pedidos-horas" nome="Pedidos de horas" colunas={cols} linhas={ficha.pedidos_horas as (PedidoHoras & Record<string, unknown>)[]} chave={l => l.id}
-          vazio="Nenhum pedido de horas." aoClicar={pode('pedido_horas.gravar') ? l => aoPedido(l) : undefined} />
+          vazio="Nenhum pedido de horas." aoClicar={pode('pedido_horas.gravar') || veRenta ? l => aoPedido(l) : undefined} />
         {!!ficha.liberacoes_horas?.length && (
           <>
             <h3 className="secao">Liberações acima do contratado</h3>
@@ -555,47 +564,86 @@ function EditarProjeto({ aberto, projeto, aoFechar, aoGravar }: { aberto: boolea
 }
 
 function PedidoPopup({ pedido, aoFechar, aoGravar }: { pedido: Partial<PedidoHoras> | null; aoFechar: () => void; aoGravar: () => void }) {
-  const esc = useSessao().eu!.escritorio_id!;
+  const { eu } = useSessao();
+  const esc = eu!.escritorio_id!;
+  const pode = usePode();
   const avisar = useToast();
+  const veRenta = podeRentabilidade(eu!.fin);   // F5: valor/hora vendido, só para Dono e Rentabilidade do cofre
   const [f, setF] = useState({ numero: '', tipo: 'empreito', horas: '', data: '', vigencia: '', observacao: '' });
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
+  // valor/hora: `atual` = o que está no cofre (undefined = carregando); `texto` só existe depois de "Mostrar"/"Informar"
+  const [vh, setVh] = useState<{ atual?: { valor_hora: number | null; versao?: number; ilegivel?: boolean }; texto: string | null; erro?: string }>({ texto: null });
+  const pedidoId = pedido?.id, projetoId = pedido?.projeto_id;
   useEffect(() => {
     if (pedido) setF({ numero: pedido.numero ?? '', tipo: pedido.tipo ?? 'empreito', horas: pedido.horas != null ? String(pedido.horas) : '',
       data: pedido.data ?? new Date().toISOString().slice(0, 10), vigencia: pedido.vigencia_ate ?? '', observacao: pedido.observacao ?? '' });
     setErro(null);
   }, [pedido]);
+  useEffect(() => {
+    if (!pedido || !veRenta) return;
+    if (!pedidoId || !projetoId) { setVh({ atual: { valor_hora: null }, texto: null }); return; }
+    let vivo = true;
+    setVh({ texto: null });
+    renta.valores(esc, projetoId).then(v => { if (vivo) setVh({ atual: v[pedidoId] ?? { valor_hora: null }, texto: null }); })
+      .catch(e => { if (vivo) setVh({ atual: { valor_hora: null }, texto: null, erro: (e as Error).message }); });
+    return () => { vivo = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedido, veRenta, esc]);
+  const soLeitura = pedido?.origem === 'sankhya_om';
+  const gravaPedido = pode('pedido_horas.gravar') && !soLeitura;
   const enviar = async (excluir = false) => {
-    if (!excluir && (!f.numero.trim() || !(Number(f.horas) > 0))) { setErro('Informe o número do pedido e as horas (> 0).'); return; }
-    if (!excluir && f.vigencia && f.vigencia < f.data) { setErro('A vigência não pode terminar antes da data do pedido.'); return; }
+    if (gravaPedido && !excluir && (!f.numero.trim() || !(Number(f.horas) > 0))) { setErro('Informe o número do pedido e as horas (> 0).'); return; }
+    if (gravaPedido && !excluir && f.vigencia && f.vigencia < f.data) { setErro('A vigência não pode terminar antes da data do pedido.'); return; }
+    const novoVh = !excluir && veRenta && vh.texto !== null ? valorHoraDe(vh.texto) : undefined;   // undefined = não mexeu
+    if (novoVh !== undefined && Number.isNaN(novoVh)) { setErro('Valor/hora: use um número (ex.: 185,50) ou deixe vazio.'); return; }
     setGravando(true);
     try {
-      const campos = { numero: f.numero.trim(), tipo: f.tipo, horas: Number(f.horas), data: f.data, vigencia_ate: f.vigencia || null, observacao: f.observacao.trim() || null };
-      await api.pedidoSalvar(esc, pedido?.id ? { id: pedido.id, versao: pedido.versao, ...(excluir ? { excluir: true } : campos) }
-        : { projeto_id: pedido!.projeto_id, ...campos });
+      let id = pedido?.id;
+      if (gravaPedido) {
+        const campos = { numero: f.numero.trim(), tipo: f.tipo, horas: Number(f.horas), data: f.data, vigencia_ate: f.vigencia || null, observacao: f.observacao.trim() || null };
+        const r = await api.pedidoSalvar(esc, pedido?.id ? { id: pedido.id, versao: pedido.versao, ...(excluir ? { excluir: true } : campos) }
+          : { projeto_id: pedido!.projeto_id, ...campos });
+        id = id ?? (r as { id?: string }).id;
+      }
+      if (novoVh !== undefined && id && novoVh !== (vh.atual?.valor_hora ?? null)) {
+        await renta.valorSalvar(esc, { pedido_id: id, valor_hora: novoVh, ...(vh.atual?.versao ? { versao: vh.atual.versao } : {}) });
+      }
       avisar(excluir ? 'Pedido excluído' : 'Pedido gravado', 'ok');
       aoGravar();
     } catch (e) { avisar((e as Error).message, 'erro'); }
     setGravando(false);
   };
-  const soLeitura = pedido?.origem === 'sankhya_om';
+  const temVh = vh.atual?.valor_hora != null;
   return (
     <Popup aberto={!!pedido} titulo={pedido?.id ? 'Pedido de horas' : 'Novo pedido de horas'} aoFechar={aoFechar} largura={600}
       rodape={<>
-        {pedido?.id && !soLeitura && <Botao variante="perigo" className="a-esquerda" carregando={gravando}
+        {pedido?.id && gravaPedido && <Botao variante="perigo" className="a-esquerda" carregando={gravando}
           onClick={() => { if (confirm('Excluir este pedido de horas?')) enviar(true); }}>Excluir</Botao>}
         <Botao onClick={aoFechar}>Cancelar</Botao>
-        {!soLeitura && <Botao variante="primario" carregando={gravando} onClick={() => enviar()}>Gravar</Botao>}</>}>
-      {soLeitura && <p className="ajuda">Pedido vindo do Sankhya OM: só leitura.</p>}
+        {(gravaPedido || (veRenta && !!pedido?.id)) && <Botao variante="primario" carregando={gravando} onClick={() => enviar()}>Gravar</Botao>}</>}>
+      {soLeitura && <p className="ajuda">Pedido vindo do Sankhya OM: só leitura{veRenta ? ' (o valor/hora pode ser informado)' : ''}.</p>}
       <Formulario aoEnviar={() => enviar()}>
         <div className="grade-campos">
-          <Campo rotulo="Nº do pedido" valor={f.numero} aoMudar={v => setF({ ...f, numero: v })} obrigatorio maxLength={40} />
-          <Campo rotulo="Tipo" tipo="select" valor={f.tipo} aoMudar={v => setF({ ...f, tipo: v })} opcoes={TIPOS_PEDIDO.map(t => ({ valor: t.valor, rotulo: t.rotulo }))} />
-          <Campo rotulo="Horas contratadas" tipo="number" valor={f.horas} aoMudar={v => setF({ ...f, horas: v })} obrigatorio inputMode="numeric" />
-          <Campo rotulo="Data" tipo="date" valor={f.data} aoMudar={v => setF({ ...f, data: v })} />
-          <Campo rotulo="Vigência até" tipo="date" valor={f.vigencia} aoMudar={v => setF({ ...f, vigencia: v })} />
+          <Campo rotulo="Nº do pedido" valor={f.numero} aoMudar={v => setF({ ...f, numero: v })} obrigatorio maxLength={40} somenteLeitura={!gravaPedido} />
+          <Campo rotulo="Tipo" tipo="select" valor={f.tipo} aoMudar={v => gravaPedido && setF({ ...f, tipo: v })} opcoes={TIPOS_PEDIDO.map(t => ({ valor: t.valor, rotulo: t.rotulo }))} />
+          <Campo rotulo="Horas contratadas" tipo="number" valor={f.horas} aoMudar={v => setF({ ...f, horas: v })} obrigatorio inputMode="numeric" somenteLeitura={!gravaPedido} />
+          <Campo rotulo="Data" tipo="date" valor={f.data} aoMudar={v => setF({ ...f, data: v })} somenteLeitura={!gravaPedido} />
+          <Campo rotulo="Vigência até" tipo="date" valor={f.vigencia} aoMudar={v => setF({ ...f, vigencia: v })} somenteLeitura={!gravaPedido} />
+          {veRenta && (vh.texto !== null
+            ? <Campo rotulo="Valor/hora vendido (R$)" valor={vh.texto} aoMudar={v => setVh({ ...vh, texto: v })} placeholder="ex.: 185,50" autoComplete="off"
+                ajuda="Fica cifrado no cofre financeiro; só Dono e Rentabilidade veem. Vazio = sem valor." />
+            : <div className="campo">
+                <label>Valor/hora vendido (R$)</label>
+                <div className="renta-valor" data-testid="pedido-valor-hora">
+                  {vh.atual === undefined ? <span className="ajuda">Carregando…</span>
+                    : <><span>{vh.atual.ilegivel ? 'não foi possível abrir' : temVh ? 'R$ •••' : 'não informado'}</span>
+                      <button type="button" className="link" onClick={() => setVh({ ...vh, texto: textoValorHora(vh.atual?.valor_hora) })}>{temVh ? 'Mostrar e editar' : 'Informar'}</button></>}
+                </div>
+                {vh.erro && <small className="msg-erro">{vh.erro}</small>}
+              </div>)}
         </div>
-        <Campo rotulo="Observação" tipo="textarea" valor={f.observacao} aoMudar={v => setF({ ...f, observacao: v })} maxLength={1000} />
+        <Campo rotulo="Observação" tipo="textarea" valor={f.observacao} aoMudar={v => setF({ ...f, observacao: v })} maxLength={1000} somenteLeitura={!gravaPedido} />
         {erro && <p className="msg-erro">{erro}</p>}
       </Formulario>
     </Popup>

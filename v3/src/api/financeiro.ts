@@ -9,7 +9,7 @@ export type PapelFin = 'dono' | 'fechamento' | 'rentabilidade';
 export const PAPEIS_FIN: { valor: PapelFin; rotulo: string; ajuda: string }[] = [
   { valor: 'dono', rotulo: 'Dono', ajuda: 'Vê e edita tudo e decide quem entra' },
   { valor: 'fechamento', rotulo: 'Fechamento', ajuda: 'Vê a remuneração e fecha a produtividade do período' },
-  { valor: 'rentabilidade', rotulo: 'Rentabilidade', ajuda: 'Verá receita, custo e margem dos projetos' },
+  { valor: 'rentabilidade', rotulo: 'Rentabilidade', ajuda: 'Vê receita, custo e margem de clientes, projetos e demandas e informa o valor/hora dos pedidos' },
 ];
 export const rotuloPapel = (p: string) => PAPEIS_FIN.find(x => x.valor === p)?.rotulo ?? p;
 
@@ -73,12 +73,16 @@ const ACOES: Record<string, string> = {
   'remuneracao.excluir': 'Excluiu período', 'remuneracao.importar': 'Importou período', 'cofre.iniciar': 'Abriu o cofre pela primeira vez',
   'fechamento.ver': 'Viu o fechamento', 'fechamento.ver_meu': 'Viu o próprio fechamento', 'fechamento.fechar': 'Fechou o período', 'fechamento.reabrir': 'Reabriu o período',
   'fechamento.importar': 'Importou fechamento', 'ajuste.salvar': 'Ajustou horas', 'ajuste.remover': 'Removeu ajuste de horas',
+  'rentabilidade.ver': 'Viu a rentabilidade', 'pedido_valor.ver': 'Viu o valor dos pedidos', 'pedido_valor.salvar': 'Gravou o valor/hora de um pedido',
+  'pedido_valor.remover': 'Removeu o valor/hora de um pedido',
 };
+const ALVOS_RENTA: Record<string, string> = { cliente: 'de um cliente', projeto: 'de um projeto', demanda: 'de uma demanda' };
 /** Texto do log: "Viu a remuneração de Ana", "Concedeu acesso a Ana (Fechamento)". */
 export function textoLog(l: RegistroLog): string {
   const base = ACOES[l.acao] ?? l.acao;
   if (l.acao.startsWith('acesso.')) return `${base} ${l.acao === 'acesso.revogar' ? 'de' : 'a'} ${l.alvo ?? '—'}${l.registro ? ` (${rotuloPapel(l.registro)})` : ''}`;
   if (l.acao === 'remuneracao.ver') return `${base} ${l.alvo ? `de ${l.alvo}` : 'de todos'}`;
+  if (l.acao === 'rentabilidade.ver' || l.acao === 'pedido_valor.ver') return `${base} ${ALVOS_RENTA[(l.registro ?? '').split(':')[0]] ?? ''}`.trim();
   if (l.acao.startsWith('remuneracao.') || l.acao.startsWith('ajuste.')) return `${base} de ${l.alvo ?? '—'}`;
   if (l.acao.startsWith('fechamento.')) return `${base}${l.registro && /^\d{6}$/.test(l.registro) ? ` ${l.registro.slice(4)}/${l.registro.slice(0, 4)}` : ''}`;
   return base;

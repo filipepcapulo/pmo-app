@@ -170,6 +170,19 @@ body.redimensionando, body.redimensionando * { cursor: col-resize !important; us
 .barra-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
 .barra-filtros input[type=search] { flex: 1 1 200px; }
 .filtros-salvos { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+/* filtros das listas (3.36.0): contador + limpar no fim da barra; no celular cada campo ocupa a linha que precisar */
+.barra-filtros input[type=date] { width: auto; min-width: 0; }
+.barra-filtros .check { margin-top: 0; white-space: nowrap; font-size: 13px; color: var(--texto-2); font-weight: 600; }
+.barra-filtros .periodo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--texto-2); font-weight: 600; }
+.filtros-resumo { margin-left: auto; display: inline-flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 13px; color: var(--texto-2); font-weight: 600; }
+.cartao > .barra-filtros { margin-top: 2px; }
+@media (max-width: 767px) {
+  .barra-filtros .pf-multi { position: static; }
+  .barra-filtros { position: relative; }
+  .barra-filtros .pf-multi-lista { left: 0; right: 0; top: auto; margin-top: 4px; max-height: 50vh; }
+  .barra-filtros .pf-multi summary { max-width: 70vw; overflow: hidden; text-overflow: ellipsis; }
+  .filtros-resumo { margin-left: 0; flex: 1 1 100%; justify-content: space-between; }
+}
 .pilula { display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; padding: 2px 6px; border-radius: 6px; background: var(--verde-claro); color: var(--verde-texto); white-space: nowrap; }
 .amostra { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--texto-2); }
 .amostra span { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--linha); display: inline-block; }

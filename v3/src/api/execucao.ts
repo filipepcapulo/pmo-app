@@ -198,3 +198,22 @@ export function arvoreDemandas<T extends { id: string; pai_id: string | null }>(
   for (const d of lista) if (d.pai_id && ids.has(d.pai_id)) filhas.set(d.pai_id, [...(filhas.get(d.pai_id) ?? []), d]);
   return lista.filter(d => !d.pai_id || !ids.has(d.pai_id)).map(d => ({ item: d, filhas: filhas.get(d.id) ?? [] }));
 }
+
+/**
+ * Junta as páginas de uma lista paginada no banco (página 0, 1, …) até chegar ao total; sem repetir id.
+ * Para as telas que filtram no navegador sobre a lista inteira (v1_demandas devolve no máximo 500 por página).
+ */
+export async function juntarPaginas<T extends { id: string }>(buscar: (pagina: number) => Promise<{ total: number; itens: T[] }>, maxPaginas = 20): Promise<{ total: number; itens: T[] }> {
+  const vistos = new Map<string, T>();
+  let total = 0;
+  for (let p = 0; p < maxPaginas; p++) {
+    const r = await buscar(p);
+    if (p === 0) total = r.total;
+    for (const i of r.itens) if (!vistos.has(i.id)) vistos.set(i.id, i);
+    if (!r.itens.length || vistos.size >= total) break;
+  }
+  return { total, itens: [...vistos.values()] };
+}
+/** Todas as demandas/subdemandas visíveis com esses status (todas as páginas). */
+export const todasDemandas = (esc: string, status: string[] | null) =>
+  juntarPaginas(pagina => exec.demandas(esc, { status, limite: 500, pagina }));

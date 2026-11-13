@@ -5,13 +5,13 @@ import { PRIORIDADES, STATUS_DEMANDA, STATUS_TAREFA, type Tarefa } from '../api/
 import type { DemandaProjeto } from '../api/projeto';
 import { useEquipe } from '../estado/equipe';
 import {
-  consultoresPorDemanda, filtrarDemandas, filtrarTarefas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS, PADRAO_TAREFAS, TIPOS_DEMANDA, useFiltroLista,
+  consultoresPorDemanda, filtrarDemandas, NIVEIS_RESPONSAVEL, NIVEL_TAREFA, filtrarTarefas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS, PADRAO_TAREFAS, TIPOS_DEMANDA, useFiltroLista,
 } from '../estado/filtrosLista';
 import { ArvoreDemandas, ListaTarefas } from './ArvoreDemandas';
 import { BarraFiltros } from './BarraFiltros';
 import { SelecaoMultipla } from './SelecaoMultipla';
 
-/** Aba Demandas do projeto: responsável = o da demanda ou quem tem tarefa nela. */
+/** Aba Demandas do projeto: responsável por nível (demanda com as subdemandas, subdemanda, tarefa) ou em todos. */
 export function DemandasDoProjeto({ demandas, tarefas, vazio }: { demandas: DemandaProjeto[]; tarefas: Tarefa[]; vazio?: string }) {
   const { porId } = useEquipe();
   const { f, mudar, limpar, ativos } = useFiltroLista('projeto:demandas', PADRAO_DEMANDAS);
@@ -28,7 +28,12 @@ export function DemandasDoProjeto({ demandas, tarefas, vazio }: { demandas: Dema
       <BarraFiltros nome="demandas" n={itens.length} total={demandas.length} ativos={ativos} aoLimpar={limpar}>
         <input type="search" aria-label="Buscar demanda" placeholder="Buscar demanda" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
         <SelecaoMultipla rotulo="Status" opcoes={STATUS_DEMANDA} sel={f.status} aoMudar={v => mudar({ status: v })} />
-        <SelecaoMultipla rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
+        <SelecaoMultipla rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v, ...(v.length ? {} : { nivel: '' }) })} />
+        {f.responsaveis.length > 0 && (
+          <select aria-label="Nível do responsável" value={f.nivel} onChange={e => mudar({ nivel: e.target.value })}>
+            {[...NIVEIS_RESPONSAVEL, NIVEL_TAREFA].map(n => <option key={n.valor} value={n.valor}>{n.rotulo}</option>)}
+          </select>
+        )}
         <SelecaoMultipla rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
         {ops.tipos.length > 1 && <SelecaoMultipla rotulo="Tipo" opcoes={ops.tipos} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />}
         <SelecaoMultipla rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />

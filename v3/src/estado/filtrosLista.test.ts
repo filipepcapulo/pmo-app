@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { juntarPaginas } from '../api/execucao';
 import {
-  candidatosGrade, consultoresPorDemanda, contarAtivos, fasesPorCliente, filtrarClientes, filtrarDemandas, filtrarProjetos, filtrarTarefas, normalizarFiltro,
+  candidatosGrade, consultoresPorDemanda, contarAtivos, idsDoResponsavel, fasesPorCliente, filtrarClientes, filtrarDemandas, filtrarProjetos, filtrarTarefas, normalizarFiltro,
   opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_AGENDA_EQUIPE, PADRAO_CLIENTES, PADRAO_DEMANDAS, PADRAO_PROJETOS, PADRAO_TAREFAS, pessoasDaGrade, SEM, temTexto,
 } from './filtrosLista';
 
@@ -103,14 +103,30 @@ describe('demandas', () => {
     expect(ids({ fases: ['P1'], prioridades: ['urgente'] })).toEqual([]);
   });
   it('responsável: o da demanda; a mãe acompanha a subdemanda que passa; "(sem responsável)"', () => {
-    expect(ids({ responsaveis: ['ana'] })).toEqual(['d1', 'd4']);
+    expect(ids({ responsaveis: ['ana'] })).toEqual(['d1', 'd2', 'd4']);   // d2 é subdemanda da d1 (da Ana), delegada à Bia
     expect(ids({ responsaveis: ['bia'] })).toEqual(['d1', 'd2']);
     expect(ids({ responsaveis: [SEM] })).toEqual(['d3']);
+  });
+  it('nível do responsável: demanda traz todas as subdemandas (o que foi delegado); subdemanda só as dele', () => {
+    expect(ids({ responsaveis: ['ana'], nivel: 'demanda' })).toEqual(['d1', 'd2', 'd4']);
+    expect(ids({ responsaveis: ['ana'], nivel: 'subdemanda' })).toEqual([]);
+    expect(ids({ responsaveis: ['bia'], nivel: 'demanda' })).toEqual([]);
+    expect(ids({ responsaveis: ['bia'], nivel: 'subdemanda' })).toEqual(['d1', 'd2']);   // d1 só como mãe
+    // somado ao projeto e aos outros filtros: a subdemanda delegada ainda precisa passar neles
+    expect(ids({ responsaveis: ['ana'], nivel: 'demanda', projetos: ['p1'] })).toEqual(['d1', 'd2']);
+    expect(ids({ responsaveis: ['ana'], nivel: 'demanda', status: ['em_andamento'] })).toEqual(['d1']);
+    expect(ids({ responsaveis: ['ana'], nivel: 'demanda', status: ['backlog'] })).toEqual(['d1', 'd2']);
+    expect(idsDoResponsavel([], { responsaveis: [], nivel: 'demanda' })).toBeNull();
+  });
+  it('nível tarefa: só onde a pessoa tem tarefa (com as tarefas à mão); sem elas, nada', () => {
+    const cons = consultoresPorDemanda([{ demanda_id: 'd3', responsavel_id: 'ana' }]);
+    expect(ids({ responsaveis: ['ana'], nivel: 'tarefa' }, cons)).toEqual(['d3']);
+    expect(ids({ responsaveis: ['ana'], nivel: 'tarefa' })).toEqual([]);
   });
   it('responsável também por quem tem tarefa na demanda (ficha do projeto)', () => {
     const cons = consultoresPorDemanda([{ demanda_id: 'd3', responsavel_id: 'bia' }, { demanda_id: 'd3', responsavel_id: null }, { demanda_id: 'd4', responsavel_id: 'bia' }]);
     expect(ids({ responsaveis: ['bia'] }, cons)).toEqual(['d1', 'd2', 'd3', 'd4']);
-    expect(ids({ responsaveis: ['ana'] }, cons)).toEqual(['d1', 'd4']);
+    expect(ids({ responsaveis: ['ana'] }, cons)).toEqual(['d1', 'd2', 'd4']);
   });
   it('só atrasadas e texto (demanda, cliente ou projeto)', () => {
     expect(ids({ atrasadas: true })).toEqual(['d1']);

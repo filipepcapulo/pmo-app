@@ -44,4 +44,10 @@ describe('rotas', () => {
     expect(modulosVisiveis(['projeto.criar']).some(m => m.id === 'modelos')).toBe(true);
     expect(lerRota('cliente/0f8fad5b-d9cb-469f-a165-70867728950e')).toMatchObject({ tipo: 'entidade', entidade: 'cliente' });
   });
+  it('Financeiro (cofre): só com papel nominal no cofre; permissão do app (até Admin) não basta', () => {
+    expect(modulosVisiveis(['portfolio.ver', 'permissao.editar']).some(m => m.id === 'financeiro')).toBe(false);
+    expect(modulosVisiveis([], []).some(m => m.id === 'financeiro')).toBe(false);
+    expect(modulosVisiveis([], ['fechamento']).some(m => m.id === 'financeiro')).toBe(true);
+    expect(lerRota('financeiro')).toMatchObject({ tipo: 'modulo', modulo: { id: 'financeiro', cofre: true } });
+  });
 });

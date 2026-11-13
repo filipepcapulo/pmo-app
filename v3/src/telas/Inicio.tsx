@@ -25,7 +25,7 @@ export function Inicio() {
   const soltos = fav.lista.filter(f => f.entidade === 'cliente' || f.entidade === 'chamado');
   const esc = eu.escritorios.find(e => e.id === eu.escritorio_id);
   const hora = new Date().getHours();
-  const mods = modulosVisiveis(eu.permissoes).filter(m => m.id !== 'inicio');
+  const mods = modulosVisiveis(eu.permissoes, eu.fin).filter(m => m.id !== 'inicio');
   return (
     <div className="pagina">
       <header className="pagina-topo">

@@ -1,6 +1,6 @@
 // Rotas por hash (link profundo): #/inicio, #/demandas, #/projeto/<id>. Cada rota aberta vira uma aba.
 
-export type Area = 'geral' | 'cadastros' | 'execucao' | 'relatorios' | 'sistema';
+export type Area = 'geral' | 'cadastros' | 'execucao' | 'relatorios' | 'financeiro' | 'sistema';
 
 export interface Modulo {
   id: string;
@@ -10,6 +10,7 @@ export interface Modulo {
   etapa?: string;          // etapa do plano v3 que entrega a tela (enquanto não chega: "em construção")
   permissao?: string;      // funcionalidade exigida (app.funcionalidades); sem ela o item some do menu
   parametro?: boolean;     // aceita um item no caminho (#/manuais/<id>): cada um abre a própria aba
+  cofre?: boolean;         // só para quem está nos autorizados do cofre financeiro (fin.autorizados; Admin não herda)
 }
 
 export const AREAS: { id: Area; titulo: string }[] = [
@@ -17,6 +18,7 @@ export const AREAS: { id: Area; titulo: string }[] = [
   { id: 'cadastros', titulo: 'Cadastros' },
   { id: 'execucao', titulo: 'Execução' },
   { id: 'relatorios', titulo: 'Relatórios' },
+  { id: 'financeiro', titulo: 'Financeiro' },
   { id: 'sistema', titulo: 'Sistema' },
 ];
 
@@ -49,6 +51,8 @@ export const MODULOS: Modulo[] = [
   { id: 'portfolio', titulo: 'Portfólio', area: 'relatorios', icone: 'grade', permissao: 'portfolio.ver' },
   // todos entram; sem produtividade.ver_todos o banco devolve só o próprio (0045)
   { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: 'grafico' },
+  // F3 (0071): cofre financeiro; só os autorizados nominais veem (os demais: "Sem acesso")
+  { id: 'financeiro', titulo: 'Acessos e Remuneração', area: 'financeiro', icone: 'cadeado', cofre: true },
   // V13d-2: lançamentos do Experience pelas tarefas (módulo 02 da Central); começa em simulação
   { id: 'sync-experience', titulo: 'Sync com o Experience', area: 'sistema', icone: 'seta', permissao: 'sync_experience.gerenciar' },
   { id: 'componentes', titulo: 'Componentes', area: 'sistema', icone: 'grade' },
@@ -99,6 +103,6 @@ export const hashDe = (caminho: string) => '#/' + caminho;
 export const caminhoEntidade = (e: Entidade, id: string) => `${e}/${id}`;
 
 /** Módulos que o usuário vê (sem permissão exigida, ou com ela liberada). */
-export function modulosVisiveis(permissoes: string[]): Modulo[] {
-  return MODULOS.filter(m => !m.permissao || permissoes.includes(m.permissao));
+export function modulosVisiveis(permissoes: string[], fin: string[] = []): Modulo[] {
+  return MODULOS.filter(m => (!m.permissao || permissoes.includes(m.permissao)) && (!m.cofre || fin.length > 0));
 }

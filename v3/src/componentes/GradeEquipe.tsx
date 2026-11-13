@@ -16,6 +16,8 @@ import { Icone } from './Icone';
 import { NomePessoa } from './NomePessoa';
 import { useToast } from './Toasts';
 import { Resumo } from './Resumo';
+import { SelecaoMultipla } from './SelecaoMultipla';
+import { candidatosGrade, PADRAO_AGENDA_EQUIPE, pessoasDaGrade, useFiltroLista } from '../estado/filtrosLista';
 
 const COL = 150;       // largura do dia (igual à grade aberta do 2.x)
 const BORDA = 240;     // a esta distância da borda busca mais uma semana
@@ -71,14 +73,11 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
   const arrastada = useRef<string | null>(null);
 
   const dias = useMemo(() => diasEntre(faixa.de, faixa.ate), [faixa]);
-  const pessoas = useMemo(() => {
-    const t = texto.trim().toLowerCase();
-    const comTarefa = new Set(tarefas.map(x => x.consultor_id));
-    // V13a-1: inativo some da Agenda da equipe (as tarefas dele continuam no histórico)
-    return lista.filter(m => m.ativo
-      && (m.papeis.some(p => p === 'consultor' || p === 'desenvolvedor') || comTarefa.has(m.id))
-      && (!t || m.nome.toLowerCase().includes(t))).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [lista, tarefas, texto]);
+  // V13a-1: inativo some da Agenda da equipe (as tarefas dele continuam no histórico)
+  const candidatos = useMemo(() => candidatosGrade(lista, new Set(tarefas.map(x => x.consultor_id))), [lista, tarefas]);
+  // 3.37.0: quem aparece na grade é escolhido numa seleção múltipla, lembrada neste navegador (pmo3:filtros:agenda:equipe)
+  const { f: escolha, mudar: mudarEscolha } = useFiltroLista('agenda:equipe', PADRAO_AGENDA_EQUIPE);
+  const pessoas = useMemo(() => pessoasDaGrade(candidatos, escolha.pessoas, texto), [candidatos, escolha.pessoas, texto]);
 
   const juntar = useCallback((g: { tarefas: TarefaGrade[]; ausencias: Ausencia[] }, deData: string, ateData: string) => {
     setTarefas(l => [...l.filter(t => t.data < deData || t.data > ateData), ...g.tarefas]);
@@ -211,6 +210,7 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
   return (
     <section className="eq-grade-caixa" aria-label="Grade da equipe">
       <div className="barra-filtros">
+        <SelecaoMultipla rotulo="Equipe" opcoes={candidatos.map(m => ({ valor: m.id, rotulo: m.nome }))} sel={escolha.pessoas} aoMudar={v => mudarEscolha({ pessoas: v })} />
         <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Consultor…" aria-label="Filtrar consultor" />
         <input type="date" value={de} onChange={e => setDe(e.target.value)} aria-label="De" />
         <input type="date" value={ate} onChange={e => setAte(e.target.value)} aria-label="Até" />

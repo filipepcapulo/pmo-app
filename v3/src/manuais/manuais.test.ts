@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { imagemManual, MANUAIS, manuaisVisiveis, type Manual } from './index';
-import { blocos, buscarNoDocumento, documento, trechos } from './markdown';
+import { blocos, buscarNoDocumento, documento, normalizar, trechos } from './markdown';
+import { MODULOS } from '../estado/rotas';
 
 describe('manuais: catálogo', () => {
-  it('consultor vê só o manual do consultor; GP, Admin e as demais funções veem todos', () => {
-    expect(manuaisVisiveis('consultor').map(m => m.id)).toEqual(['consultor']);
-    for (const p of ['gp', 'admin', 'lider_tech', 'triagem']) expect(manuaisVisiveis(p).map(m => m.id)).toEqual(['consultor', 'gp']);
+  const funcao = (l: Manual[]) => l.filter(m => m.para !== 'modulo').map(m => m.id);
+  const ids = (perfil: string | null, permissoes: string[] = [], fin: string[] = []) =>
+    manuaisVisiveis(perfil, MANUAIS, { permissoes, fin }).map(m => m.id);
+
+  it('da função: consultor vê só o do consultor; GP, Admin e as demais funções veem os dois', () => {
+    expect(funcao(manuaisVisiveis('consultor'))).toEqual(['consultor']);
+    for (const p of ['gp', 'admin', 'lider_tech', 'triagem']) expect(funcao(manuaisVisiveis(p))).toEqual(['consultor', 'gp']);
     expect(manuaisVisiveis(null).map(m => m.id)).toEqual(['consultor']);
   });
   it('manual novo entra só com uma linha no catálogo (e respeita o público)', () => {
@@ -13,13 +18,58 @@ describe('manuais: catálogo', () => {
     expect(manuaisVisiveis('gp', [...MANUAIS, novo]).map(m => m.id)).toContain('triagem');
     expect(manuaisVisiveis('consultor', [...MANUAIS, novo]).map(m => m.id)).not.toContain('triagem');
   });
-  it('ids únicos e todo manual com título e 9 seções', () => {
+  it('por módulo: o manual aparece só para quem enxerga o módulo no menu (permissão)', () => {
+    const semNada = ids('consultor');
+    // módulos sem permissão exigida: todos veem
+    for (const id of ['primeiros-passos', 'sugestoes', 'clientes', 'projetos', 'equipe', 'demandas', 'agenda', 'chamados', 'produtividade']) expect(semNada, id).toContain(id);
+    // módulos com permissão: só com ela
+    const porPermissao: Record<string, string> = {
+      'envio-agendas': 'agenda.enviar', 'aceite-os': 'aceite_os.gerenciar', ferias: 'ferias.ver', reembolso: 'reembolso.usar',
+      portfolio: 'portfolio.ver', 'sync-experience': 'sync_experience.gerenciar', 'sync-clickup': 'sync_clickup.ver', mcp: 'mcp.usar',
+    };
+    for (const [id, perm] of Object.entries(porPermissao)) {
+      expect(semNada, id).not.toContain(id);
+      expect(ids('admin'), id).not.toContain(id);          // a função sozinha não libera: vale a permissão
+      expect(ids('consultor', [perm]), id).toContain(id);
+    }
+  });
+  it('cofre financeiro: manuais só para os autorizados e, quando o módulo pede, para o papel certo', () => {
+    const cofre = ['financeiro', 'fechamento', 'rentabilidade'];
+    for (const id of cofre) expect(ids('admin', ['mcp.usar']), id).not.toContain(id);   // Admin não herda o cofre
+    expect(ids('gp', [], ['rentabilidade'])).toEqual(expect.arrayContaining(['financeiro', 'rentabilidade']));
+    expect(ids('gp', [], ['rentabilidade'])).not.toContain('fechamento');
+    expect(ids('gp', [], ['fechamento'])).toEqual(expect.arrayContaining(['financeiro', 'fechamento']));
+    expect(ids('gp', [], ['fechamento'])).not.toContain('rentabilidade');
+    expect(ids('admin', [], ['dono'])).toEqual(expect.arrayContaining(cofre));
+  });
+  it('todo módulo do menu tem manual, e todo módulo citado existe no menu', () => {
+    const menu = MODULOS.map(m => m.id);
+    const cobertos = new Set(MANUAIS.flatMap(m => m.modulos ?? []));
+    for (const id of cobertos) expect(menu, id).toContain(id);
+    // Componentes é a vitrine de componentes para quem desenvolve: não tem manual
+    expect(menu.filter(id => !cobertos.has(id))).toEqual(['componentes']);
+    for (const m of MANUAIS.filter(x => x.para === 'modulo')) expect((m.modulos?.length ?? 0) + (m.papeisCofre?.length ?? 0), m.id).toBeGreaterThan(0);
+  });
+  it('ids únicos; todo manual com título, resumo e seções numeradas em ordem; só o Markdown que a tela entende', () => {
     expect(new Set(MANUAIS.map(m => m.id)).size).toBe(MANUAIS.length);
     for (const m of MANUAIS) {
       const d = documento(m.texto);
-      expect(d.titulo).toBeTruthy();
-      expect(d.secoes.length).toBe(9);
+      expect(d.titulo, m.id).toBeTruthy();
+      expect(m.resumo, m.id).toBeTruthy();
+      expect(d.secoes.length, m.id).toBeGreaterThanOrEqual(3);
+      d.secoes.forEach((s, i) => expect(s.titulo, m.id).toMatch(new RegExp(`^${i + 1}\\. `)));
+      expect(m.texto, m.id).not.toMatch(/^```|^>|^[ \t]+[-*] |<\/?(div|span|br|p|b|i|u|a|img|table|details|summary)\b/m);   // sem bloco de código, citação, lista aninhada ou HTML
     }
+    for (const id of ['consultor', 'gp']) expect(documento(MANUAIS.find(m => m.id === id)!.texto).secoes.length).toBe(9);
+  });
+  it('sigilo: nenhum manual traz token, chave ou endereço do projeto', () => {
+    for (const m of MANUAIS) {
+      expect(m.texto, m.id).not.toMatch(/pmo_mcp_[A-Za-z0-9]{8,}|eyJ[A-Za-z0-9_-]{20,}|sb_(publishable|secret)_|[a-z]{20}\.supabase\.co/);
+    }
+  });
+  it('manual do MCP: token, ligação, alcance, dois passos, limite e revogação', () => {
+    const t = normalizar(MANUAIS.find(m => m.id === 'mcp')!.texto);
+    for (const p of ['token', 'claude', 'functions/v1/mcp', 'previa', 'confirm', 'revog', 'financeiro', 'por minuto']) expect(t, p).toContain(p);
   });
   it('imagem: relativa vai para public/manuais/<id>/; URL completa fica', () => {
     expect(imagemManual('gp', 'g01-avisos.png', '/pmo-app/v3/')).toBe('/pmo-app/v3/manuais/gp/g01-avisos.png');

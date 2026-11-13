@@ -94,12 +94,16 @@ export function Inicio() {
       <section>
         <h2 className="secao">Manuais</h2>
         <div className="grade-atalhos">
-          {manuaisVisiveis(eu.perfil).map(m => (
+          {manuaisVisiveis(eu.perfil).filter(m => m.para !== 'modulo').map(m => (
             <a key={m.id} className="atalho" href={hashDe(`manuais/${m.id}`)}>
               <span className="atalho-icone"><Icone nome="livro" tam={24} /></span><span className="atalho-nome">{m.titulo}</span>
               <Icone nome="seta" tam={18} className="atalho-seta" />
             </a>
           ))}
+          <a className="atalho" href={hashDe('manuais')}>
+            <span className="atalho-icone"><Icone nome="livro" tam={24} /></span><span className="atalho-nome">Manuais por módulo</span>
+            <Icone nome="seta" tam={18} className="atalho-seta" />
+          </a>
         </div>
       </section>
     </div>

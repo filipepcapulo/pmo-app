@@ -2,6 +2,7 @@
 // subdemandas é barra-resumo. Arrastar a barra muda as datas (a resumo leva as filhas junto), as pontas mudam início
 // ou fim; ← → no teclado desloca 1 dia (Shift = só o fim). Clique abre a demanda. Setas = dependências (vermelha =
 // descumprida). Exporta PNG/PDF do que está na tela (nomes + cronograma), sem biblioteca.
+import { semAlerta } from '../api/execucao';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as PE } from 'react';
 import { data } from '../api/cadastros';
 import {
@@ -171,7 +172,7 @@ export function Gantt({ titulo, demandas, dependencias, podeEditar, aoGravar, ao
               if (!f) return null;
               const bx = x(f.inicio), bw = (diaNum(f.fim) - diaNum(f.inicio) + 1) * px, y = HDR + i * ROW;
               const perc = Math.max(0, Math.min(100, Number(l.d.totais?.perc ?? 0)));
-              const cls = `g-barra${l.resumo ? ' resumo' : ''}${l.d.tipo === 'plano_acao' ? ' plano' : ''}${l.d.totais?.atrasada ? ' atrasada' : ''}${l.d.status === 'concluida' ? ' concluida' : ''}${arr?.id === l.d.id ? ' arrastando' : ''}`;
+              const cls = `g-barra${l.resumo ? ' resumo' : ''}${l.d.tipo === 'plano_acao' ? ' plano' : ''}${l.d.totais?.atrasada && !semAlerta(l.d) ? ' atrasada' : ''}${l.d.status === 'concluida' ? ' concluida' : ''}${arr?.id === l.d.id ? ' arrastando' : ''}`;
               const rot = `${l.d.nome}: ${data(f.inicio)} → ${data(f.fim)}${perc ? ` · ${perc}%` : ''}`;
               return (
                 <g key={l.d.id} className={cls} tabIndex={0} role="button" aria-label={rot} data-id={l.d.id}

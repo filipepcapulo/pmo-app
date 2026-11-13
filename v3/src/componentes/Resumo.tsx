@@ -18,7 +18,7 @@ function Dica({ tipo, r, gp, local, rodape, id, ancora }: { tipo: TipoResumo; r:
     <DicaFlutuante id={id} className="res-dica" ancora={ancora}>
       <small>{local ?? (r.sub ? 'Subdemanda' : ROTULO[tipo])}</small>
       <strong>{r.nome}</strong>
-      <BarraHoras previsto={r.horas_previstas} real={r.horas_reais} planejado={r.horas_planejadas} compacta />
+      <BarraHoras previsto={r.horas_previstas} real={r.horas_reais} planejado={r.horas_planejadas} compacta semAlerta={!!r.avulso} />
       <span className="res-campos">
         <span>GP</span><b>{gp ?? '—'}</b>
         {!!r.horas_contratadas && <><span>Contratadas</span><b>{horas(r.horas_contratadas)}</b></>}
@@ -28,8 +28,8 @@ function Dica({ tipo, r, gp, local, rodape, id, ancora }: { tipo: TipoResumo; r:
         <span>Início</span><b>{r.inicio ? data(r.inicio) : '—'}</b>
         <span>Fim</span><b>{r.fim ? data(r.fim) : '—'}</b>
       </span>
-      {r.fora_prazo && <em>Fora do prazo</em>}
-      {r.fora_horas && <em>Fora das horas</em>}
+      {r.fora_prazo && !r.avulso && <em>Fora do prazo</em>}
+      {r.fora_horas && !r.avulso && <em>Fora das horas</em>}
       {r.planos_abertos > 0 && <em>⚠ {planos(r.planos_abertos)}</em>}
       {rodape && <small className="res-rodape">{rodape}</small>}
     </DicaFlutuante>
@@ -57,7 +57,7 @@ export function Resumo({ tipo, id, comGp, local, rodape, children }: { tipo: Tip
   };
   const gp = r.gp_id ? porId.get(r.gp_id)?.nome ?? null : null;
   return (
-    <span ref={ref} className={`res${r.fora_prazo || r.fora_horas ? ' res-fora' : ''}`} tabIndex={typeof children === 'string' ? 0 : undefined}
+    <span ref={ref} className={`res${(r.fora_prazo || r.fora_horas) && !r.avulso ? ' res-fora' : ''}`} tabIndex={typeof children === 'string' ? 0 : undefined}
       aria-describedby={pos ? dica : undefined} onMouseEnter={abrir} onMouseLeave={() => setPos(null)} onFocus={abrir} onBlur={() => setPos(null)}>
       {comGp && gp && <span className="pilula pilula-gp">{gp.split(' ')[0]}</span>}
       {children}

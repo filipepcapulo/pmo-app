@@ -4,6 +4,8 @@ export type TipoResumo = 'cliente' | 'projeto' | 'demanda';
 export interface Resumo {
   nome: string; gp_id: string | null; sub?: boolean; horas_previstas: number | null; horas_reais: number; horas_planejadas: number;
   horas_contratadas?: number; inicio: string | null; fim: string | null; fora_prazo: boolean; fora_horas: boolean; planos_abertos: number;
+  /** 0073: demanda marcada como Atendimento Avulso — sem alerta de prazo nem de horas. */
+  avulso?: boolean;
 }
 export type Pedido = Record<TipoResumo, string[]>;
 export type Respostas = { clientes: Record<string, Resumo>; projetos: Record<string, Resumo>; demandas: Record<string, Resumo> };

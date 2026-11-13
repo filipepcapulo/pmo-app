@@ -2,7 +2,7 @@
 // checklist, anexos e comentários. Editar/criar sempre pelo popup único (useEdicao).
 import { useEffect, useState } from 'react';
 import { data, horas } from '../api/cadastros';
-import { exec, rotuloPrioridade } from '../api/execucao';
+import { exec, rotuloPrioridade, semAlerta } from '../api/execucao';
 import { Anexos } from '../componentes/Anexos';
 import { ArvoreDemandas, StatusPilula } from '../componentes/ArvoreDemandas';
 import { TarefasDaDemanda } from '../componentes/ListasFiltradas';
@@ -47,8 +47,8 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
             <Resumo tipo="projeto" id={projeto.id}><a href={hashDe(caminhoEntidade('projeto', projeto.id))}>{projeto.nome}</a></Resumo>
             {pai && <> · <Resumo tipo="demanda" id={pai.id}><a href={hashDe(caminhoEntidade('demanda', pai.id))}>{pai.nome}</a></Resumo></>} · {pai ? 'Subdemanda' : 'Demanda'}
           </small>
-          <h1><Resumo tipo="demanda" id={d.id}>{d.nome}</Resumo> <StatusPilula status={d.status} />{t?.atrasada && <span className="pilula st-atrasada">Atrasada</span>}</h1>
-          <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} />
+          <h1><Resumo tipo="demanda" id={d.id}>{d.nome}</Resumo> <StatusPilula status={d.status} />{t?.atrasada && !semAlerta(d) && <span className="pilula st-atrasada">Atrasada</span>}</h1>
+          <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} semAlerta={semAlerta(d)} />
         </div>
         <div className="linha">
           <BotaoFavorito entidade="demanda" id={d.id} />

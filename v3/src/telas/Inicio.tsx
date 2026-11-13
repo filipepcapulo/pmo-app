@@ -49,10 +49,10 @@ export function Inicio() {
                         {i.entidade === 'tarefa' ? <a href={hashDe(caminhoEntidade(i.entidade, i.id))}>{i.nome}</a>
                           : <Resumo tipo={i.entidade} id={i.id}><a href={hashDe(caminhoEntidade(i.entidade, i.id))}>{i.nome}</a></Resumo>}
                         {i.entidade !== 'projeto' && <StatusPilula status={i.status} tipo={i.entidade === 'tarefa' ? 'tarefa' : 'demanda'} />}
-                        {i.totais?.atrasada && <span className="pilula st-atrasada">Atrasada</span>}
+                        {i.totais?.atrasada && !i.totais.avulso_base && <span className="pilula st-atrasada">Atrasada</span>}
                       </div>
                       {i.entidade !== 'projeto' && <small className="ajuda">{i.projeto}{i.entidade === 'tarefa' && <> · {data(i.data)} · <NomePessoa id={i.responsavel_id} /></>}</small>}
-                      {i.totais && <BarraHoras previsto={i.totais.horas_previstas} real={i.totais.horas_reais} planejado={i.totais.horas_planejadas} compacta />}
+                      {i.totais && <BarraHoras previsto={i.totais.horas_previstas} real={i.totais.horas_reais} planejado={i.totais.horas_planejadas} compacta semAlerta={!!i.totais.avulso_base} />}
                     </li>
                   ))}
                 </ul>

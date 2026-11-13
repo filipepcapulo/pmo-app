@@ -5,7 +5,7 @@
 // pelo popup único (useEdicao); cadastro do projeto e pedidos de horas só aqui.
 import { useCallback, useEffect, useState } from 'react';
 import { api, data, FASES, horas, rotuloSituacao, SITUACOES, TIPOS_PEDIDO, type PedidoHoras, type ProjetoFicha } from '../api/cadastros';
-import { exec, rotuloPeriodo, rotuloStatusDemanda, rotuloStatusTarefa } from '../api/execucao';
+import { exec, rotuloPeriodo, rotuloStatusDemanda, rotuloStatusTarefa, semAlerta } from '../api/execucao';
 import {
   dependenciaViolada, diaNum, hojeIso, linhasGantt, porConsultor, proj, proximosMarcos, riscos, rotuloCampo, rotuloTabela,
   TIPOS_DEPENDENCIA, type DemandaProjeto, type ItemCronograma, type ItemHistorico, type PainelProjeto,
@@ -206,7 +206,7 @@ function AbaIndicadores({ ficha }: { ficha: ProjetoFicha }) {
 }
 
 // ---------------------------------------------------------------- Horas
-type LinhaConsumo = { id: string; nome: string; previsto: number | null; real: number; planejado: number; saldo: number | null; perc: number | null } & Record<string, unknown>;
+type LinhaConsumo = { id: string; nome: string; previsto: number | null; real: number; planejado: number; saldo: number | null; perc: number | null; avulso: boolean } & Record<string, unknown>;
 type LinhaPessoa = { id: string; real: number; planejado: number; tarefas: number } & Record<string, unknown>;
 function AbaHoras({ ficha, painel, aoPedido }: { ficha: ProjetoFicha; painel: PainelProjeto | null; aoPedido: (p: Partial<PedidoHoras>) => void }) {
   const pode = usePode();
@@ -222,14 +222,14 @@ function AbaHoras({ ficha, painel, aoPedido }: { ficha: ProjetoFicha; painel: Pa
   ];
   const consumo: LinhaConsumo[] = ficha.demandas.filter(d => !d.pai_id).map(d => {
     const tt = d.totais, prev = tt?.horas_previstas ?? d.horas_previstas ?? null, real = tt?.horas_reais ?? 0, plan = tt?.horas_planejadas ?? 0;
-    return { id: d.id, nome: d.nome, previsto: prev, real, planejado: plan, saldo: prev != null ? prev - real - plan : null, perc: tt?.perc ?? null };
+    return { id: d.id, nome: d.nome, previsto: prev, real, planejado: plan, saldo: prev != null ? prev - real - plan : null, perc: tt?.perc ?? null, avulso: semAlerta(d) };
   });
   const colsCons: Coluna<LinhaConsumo>[] = [
     { chave: 'nome', titulo: 'Demanda', render: l => <Resumo tipo="demanda" id={l.id}><a href={hashDe(caminhoEntidade('demanda', l.id))}>{l.nome}</a></Resumo> },
     { chave: 'previsto', titulo: 'Previstas', alinhar: 'dir', render: l => horas(l.previsto) },
     { chave: 'real', titulo: 'Reais', alinhar: 'dir', render: l => horas(l.real) },
     { chave: 'planejado', titulo: 'Planejadas', alinhar: 'dir', render: l => horas(l.planejado) },
-    { chave: 'saldo', titulo: 'Saldo', alinhar: 'dir', render: l => <span className={(l.saldo ?? 0) < 0 ? 'negativo' : undefined}>{horas(l.saldo)}</span> },
+    { chave: 'saldo', titulo: 'Saldo', alinhar: 'dir', render: l => <span className={(l.saldo ?? 0) < 0 && !l.avulso ? 'negativo' : undefined}>{horas(l.saldo)}</span> },
     { chave: 'perc', titulo: '%', alinhar: 'dir', render: l => (l.perc != null ? `${l.perc}%` : '—') },
   ];
   const pessoas: LinhaPessoa[] = porConsultor(painel?.tarefas ?? []).map(x => ({ id: x.id, real: x.real, planejado: x.planejado, tarefas: x.tarefas }));

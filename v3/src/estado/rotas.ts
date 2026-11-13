@@ -60,6 +60,8 @@ export const MODULOS: Modulo[] = [
   { id: 'fechamento', titulo: 'Fechamento de produtividade', area: 'financeiro', icone: 'grafico', cofre: true, papeisCofre: ['dono', 'fechamento'] },
   // V13d-2: lançamentos do Experience pelas tarefas (módulo 02 da Central); começa em simulação
   { id: 'sync-experience', titulo: 'Sync com o Experience', area: 'sistema', icone: 'seta', permissao: 'sync_experience.gerenciar' },
+  // 0076: status do espelho com o ClickUp (modos do sync, filas e itens parados); só leitura
+  { id: 'sync-clickup', titulo: 'Sincronização com o ClickUp', area: 'sistema', icone: 'seta', permissao: 'sync_clickup.ver' },
   { id: 'componentes', titulo: 'Componentes', area: 'sistema', icone: 'grade' },
 ];
 

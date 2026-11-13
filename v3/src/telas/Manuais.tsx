@@ -1,5 +1,6 @@
-// Manuais (#/manuais e #/manuais/<id>): lista dos manuais da função (consultor vê os do consultor; as demais funções,
-// todos), busca nos manuais e leitura com índice, destaque do que foi buscado e impressão. O catálogo é src/manuais.
+// Manuais (#/manuais e #/manuais/<id>): os manuais da função (consultor vê os do consultor; as demais funções, todos) e
+// os dos módulos que a pessoa enxerga no menu; busca nos manuais e leitura com índice, destaque do que foi buscado e
+// impressão. O catálogo é src/manuais.
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { Botao } from '../componentes/Botao';
 import { Icone } from '../componentes/Icone';
@@ -108,12 +109,12 @@ function Leitura({ manual, doc, termoInicial }: { manual: Manual; doc: Documento
 
 export function Manuais({ id }: { id?: string }) {
   const { eu } = useSessao();
-  const lista = useMemo(() => manuaisVisiveis(eu?.perfil), [eu?.perfil]);
+  const lista = useMemo(() => manuaisVisiveis(eu?.perfil, undefined, { permissoes: eu?.permissoes, fin: eu?.fin }), [eu?.perfil, eu?.permissoes, eu?.fin]);
   const docs = useMemo(() => new Map(lista.map(m => [m.id, documento(m.texto)])), [lista]);
   const [termo, setTermo] = useState('');
   if (id) {
     const m = lista.find(x => x.id === id);
-    if (!m) return <div className="vazio-tela"><h2>Manual não encontrado</h2><p>Este manual não existe ou não é da sua função. <a href={hashDe('manuais')}>Ver os manuais</a></p></div>;
+    if (!m) return <div className="vazio-tela"><h2>Manual não encontrado</h2><p>Este manual não existe ou é de um módulo que você não acessa. <a href={hashDe('manuais')}>Ver os manuais</a></p></div>;
     return <Leitura manual={m} doc={docs.get(m.id)!} termoInicial="" />;
   }
   const achados = termo.trim().length > 1
@@ -140,15 +141,23 @@ export function Manuais({ id }: { id?: string }) {
           )}
         </section>
       ) : (
-        <div className="grade-atalhos">
-          {lista.map(m => (
-            <a key={m.id} className="atalho manual-atalho" href={hashDe(`manuais/${m.id}`)}>
-              <span className="atalho-icone"><Icone nome="livro" tam={24} /></span>
-              <span className="atalho-nome">{m.titulo}<small className="ajuda">{m.resumo}</small></span>
-              <Icone nome="seta" tam={18} className="atalho-seta" />
-            </a>
-          ))}
-        </div>
+        <>
+          {[{ t: 'Da sua função', l: lista.filter(m => m.para !== 'modulo') }, { t: 'Por módulo', l: lista.filter(m => m.para === 'modulo') }]
+            .filter(g => g.l.length > 0).map(g => (
+              <section key={g.t} aria-label={g.t}>
+                <h2 className="secao">{g.t}</h2>
+                <div className="grade-atalhos">
+                  {g.l.map(m => (
+                    <a key={m.id} className="atalho manual-atalho" href={hashDe(`manuais/${m.id}`)}>
+                      <span className="atalho-icone"><Icone nome="livro" tam={24} /></span>
+                      <span className="atalho-nome">{m.titulo}<small className="ajuda">{m.resumo}</small></span>
+                      <Icone nome="seta" tam={18} className="atalho-seta" />
+                    </a>
+                  ))}
+                </div>
+              </section>
+            ))}
+        </>
       )}
     </div>
   );

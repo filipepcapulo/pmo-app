@@ -36,6 +36,8 @@ export interface Eu {
   escritorios: Escritorio[];
   perfil: string | null;
   permissoes: string[];
+  /** papéis no cofre financeiro (F3): vem de api.v1_fin_papeis, à parte do v1_eu; [] = sem acesso */
+  fin?: string[];
 }
 export interface Favorito { entidade: 'cliente' | 'projeto' | 'demanda' | 'tarefa' | 'chamado'; entidade_id: string; nome: string }
 export interface FiltroSalvo { id: string; tela: string; nome: string; filtros: Record<string, unknown>; padrao: boolean }

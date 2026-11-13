@@ -19,6 +19,7 @@ import { ClienteTela } from '../telas/ClienteTela';
 import { Clientes } from '../telas/Clientes';
 import { Componentes } from '../telas/Componentes';
 import { SyncExperience } from '../telas/SyncExperience';
+import { Financeiro } from '../telas/Financeiro';
 import { Sugestoes } from '../telas/Sugestoes';
 import { AceiteOs } from '../telas/AceiteOs';
 import { DemandaTela } from '../telas/DemandaTela';
@@ -135,7 +136,7 @@ export function Casca() {
     history.replaceState(null, '', hashDe(INICIO));
   };
 
-  const mods = useMemo(() => modulosVisiveis(eu!.permissoes), [eu]);
+  const mods = useMemo(() => modulosVisiveis(eu!.permissoes, eu!.fin), [eu]);
   const conteudo = (caminho: string): ReactNode => {
     const r = lerRota(caminho);
     if (r.tipo === 'desconhecida') return <NaoEncontrada caminho={caminho} />;
@@ -152,6 +153,7 @@ export function Casca() {
     if (r.modulo.id === 'manuais') return <Manuais id={r.parametro} />;
     if (r.modulo.id === 'notificacoes') return <NotificacoesAparelho />;
     if (r.modulo.id === 'sugestoes') return <Sugestoes />;
+    if (r.modulo.id === 'financeiro') return <Financeiro />;
     if (r.modulo.id === 'componentes') return <Componentes />;
     if (r.modulo.id === 'sync-experience') return <SyncExperience />;
     if (r.modulo.id === 'aceite-os') return <AceiteOs parametro={r.parametro} />;

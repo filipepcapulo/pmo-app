@@ -42,6 +42,8 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
         if (esc && (e as { codigo?: string }).codigo === 'ESCRITORIO') r = await rpc<Eu>('v1_eu', { p_escritorio: null });
         else throw e;
       }
+      // F3: papéis no cofre financeiro (nominais; não vêm do perfil). Sem a função no banco = sem acesso.
+      if (r.escritorio_id) r.fin = await rpc<string[]>('v1_fin_papeis', { p_escritorio: r.escritorio_id }).then(p => (Array.isArray(p) ? p : [])).catch(() => []);
       setEu(r);
       setErro(null);
       if (r.escritorio_id) gravar(CHAVE_ESC, r.escritorio_id);

@@ -50,4 +50,15 @@ describe('rotas', () => {
     expect(modulosVisiveis([], ['fechamento']).some(m => m.id === 'financeiro')).toBe(true);
     expect(lerRota('financeiro')).toMatchObject({ tipo: 'modulo', modulo: { id: 'financeiro', cofre: true } });
   });
+  it('Fechamento (F4): o do período só com papel dono ou fechamento; o Meu fechamento é de todos', () => {
+    const ve = (fin: string[]) => modulosVisiveis([], fin).map(m => m.id);
+    expect(ve([])).not.toContain('fechamento');
+    expect(ve(['rentabilidade'])).not.toContain('fechamento');
+    expect(ve(['rentabilidade'])).toContain('financeiro');
+    expect(ve(['fechamento'])).toContain('fechamento');
+    expect(ve(['dono'])).toContain('fechamento');
+    expect(modulosVisiveis(['portfolio.ver', 'permissao.editar']).some(m => m.id === 'fechamento')).toBe(false);
+    expect(ve([])).toContain('meu-fechamento');
+    expect(lerRota('meu-fechamento')).toMatchObject({ tipo: 'modulo', modulo: { id: 'meu-fechamento' } });
+  });
 });

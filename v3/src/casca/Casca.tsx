@@ -18,6 +18,7 @@ import { Chamados } from '../telas/Chamados';
 import { ClienteTela } from '../telas/ClienteTela';
 import { Clientes } from '../telas/Clientes';
 import { Componentes } from '../telas/Componentes';
+import { SyncClickup } from '../telas/SyncClickup';
 import { SyncExperience } from '../telas/SyncExperience';
 import { Fechamento, MeuFechamento } from '../telas/Fechamento';
 import { Financeiro } from '../telas/Financeiro';
@@ -159,6 +160,7 @@ export function Casca() {
     if (r.modulo.id === 'meu-fechamento') return <MeuFechamento />;
     if (r.modulo.id === 'componentes') return <Componentes />;
     if (r.modulo.id === 'sync-experience') return <SyncExperience />;
+    if (r.modulo.id === 'sync-clickup') return <SyncClickup />;
     if (r.modulo.id === 'aceite-os') return <AceiteOs parametro={r.parametro} />;
     if (r.modulo.id === 'clientes') return <Clientes ir={ir} />;
     if (r.modulo.id === 'projetos') return <Projetos ir={ir} />;

@@ -88,9 +88,15 @@ export function filtrarProjetos<T extends ProjetoFiltravel>(linhas: T[], f: Filt
 export interface FiltroDemandas {
   texto: string; fases: string[]; etapas: string[]; responsaveis: string[]; status: string[]; tipos: string[]; prioridades: string[];
   clientes: string[]; projetos: string[]; atrasadas: boolean;
+  /** Em que nível o responsável é procurado: '' (todos), 'demanda', 'subdemanda' ou 'tarefa' (onde as tarefas estão à mão). */
+  nivel: string;
 }
+export const NIVEIS_RESPONSAVEL: Opcao[] = [
+  { valor: '', rotulo: 'Todos os níveis' }, { valor: 'demanda', rotulo: 'Só demandas (com as subdemandas)' }, { valor: 'subdemanda', rotulo: 'Só subdemandas' },
+];
+export const NIVEL_TAREFA: Opcao = { valor: 'tarefa', rotulo: 'Só tarefas' };
 export const PADRAO_DEMANDAS: FiltroDemandas = {
-  texto: '', fases: [], etapas: [], responsaveis: [], status: [], tipos: [], prioridades: [], clientes: [], projetos: [], atrasadas: false,
+  texto: '', fases: [], etapas: [], responsaveis: [], status: [], tipos: [], prioridades: [], clientes: [], projetos: [], atrasadas: false, nivel: '',
 };
 export interface DemandaFiltravel {
   id: string; pai_id: string | null; nome: string; status: string; projeto_id?: string; tipo?: string; prioridade?: string;
@@ -113,10 +119,29 @@ export function consultoresPorDemanda(tarefas: { demanda_id: string; responsavel
   return m;
 }
 
-function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, consultores?: Map<string, Set<string>>): boolean {
-  const resp = f.responsaveis.length === 0 || f.responsaveis.includes(d.responsavel_id || SEM)
-    || [...(consultores?.get(d.id) ?? [])].some(c => f.responsaveis.includes(c));
-  return resp && em(f.status, d.status) && em(f.fases, d.fase) && em(f.etapas, d.etapa)
+/**
+ * Ids que passam no filtro de responsável (null = sem filtro), conforme o nível:
+ * - demanda: a demanda do responsável e TODAS as subdemandas dela (o que ele delegou também aparece);
+ * - subdemanda: só as subdemandas atribuídas a ele;
+ * - tarefa: demandas/subdemandas onde ele tem tarefa (precisa de `consultores`);
+ * - todos (''): a soma dos três.
+ */
+export function idsDoResponsavel(lista: DemandaFiltravel[], f: Pick<FiltroDemandas, 'responsaveis' | 'nivel'>, consultores?: Map<string, Set<string>>): Set<string> | null {
+  if (f.responsaveis.length === 0) return null;
+  const dele = (d: DemandaFiltravel) => f.responsaveis.includes(d.responsavel_id || SEM);
+  const nivel = (n: string) => f.nivel === '' || f.nivel === n;
+  const ids = new Set<string>();
+  if (nivel('demanda')) {
+    const maes = new Set(lista.filter(d => !d.pai_id && dele(d)).map(d => d.id));
+    for (const d of lista) if (maes.has(d.id) || (d.pai_id && maes.has(d.pai_id))) ids.add(d.id);
+  }
+  if (nivel('subdemanda')) for (const d of lista) if (d.pai_id && dele(d)) ids.add(d.id);
+  if (nivel('tarefa') && consultores) for (const d of lista) if ([...(consultores.get(d.id) ?? [])].some(c => f.responsaveis.includes(c))) ids.add(d.id);
+  return ids;
+}
+
+function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string> | null): boolean {
+  return (!doResp || doResp.has(d.id)) && em(f.status, d.status) && em(f.fases, d.fase) && em(f.etapas, d.etapa)
     && (f.tipos.length === 0 || f.tipos.includes(d.tipo ?? 'entregavel'))
     && (f.prioridades.length === 0 || f.prioridades.includes(d.prioridade ?? 'normal'))
     && (f.clientes.length === 0 || (!!d.cliente_id && f.clientes.includes(d.cliente_id)))
@@ -126,10 +151,11 @@ function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, consultores?: Map<
 }
 /**
  * Demandas e subdemandas que passam no filtro, na ordem recebida. A mãe de uma subdemanda que passa vem junto
- * (para a árvore mostrar a subdemanda no lugar), mesmo sem passar ela mesma.
+ * (para a árvore mostrar a subdemanda no lugar), mesmo sem passar ela mesma. Responsável: ver idsDoResponsavel.
  */
 export function filtrarDemandas<T extends DemandaFiltravel>(lista: T[], f: FiltroDemandas, consultores?: Map<string, Set<string>>): T[] {
-  const passam = new Set(lista.filter(d => demandaPassa(d, f, consultores)).map(d => d.id));
+  const doResp = idsDoResponsavel(lista, f, consultores);
+  const passam = new Set(lista.filter(d => demandaPassa(d, f, doResp)).map(d => d.id));
   const maes = new Set(lista.filter(d => d.pai_id && passam.has(d.id)).map(d => d.pai_id!));
   return lista.filter(d => passam.has(d.id) || maes.has(d.id));
 }

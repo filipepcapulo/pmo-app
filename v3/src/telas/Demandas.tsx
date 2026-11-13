@@ -14,7 +14,7 @@ import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { useEquipe, usePode } from '../estado/equipe';
-import { filtrarDemandas, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
+import { filtrarDemandas, NIVEIS_RESPONSAVEL, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
@@ -61,7 +61,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
   const limparTudo = () => { limpar(); setStatus(ABERTAS); };
   const descricao = [`Status: ${rotuloStatus(status)}`,
     f.fases.length ? `Fase: ${f.fases.join(', ')}` : '', f.etapas.length ? `Etapa: ${f.etapas.map(e => ops.etapas.find(o => o.valor === e)?.rotulo ?? e).join(', ')}` : '',
-    f.responsaveis.length ? `Responsável: ${f.responsaveis.map(r => ops.responsaveis.find(o => o.valor === r)?.rotulo ?? r).join(', ')}` : '',
+    f.responsaveis.length ? `Responsável: ${f.responsaveis.map(r => ops.responsaveis.find(o => o.valor === r)?.rotulo ?? r).join(', ')}${f.nivel ? ` (${NIVEIS_RESPONSAVEL.find(n => n.valor === f.nivel)?.rotulo.toLowerCase() ?? f.nivel})` : ''}` : '',
     f.tipos.length ? `Tipo: ${f.tipos.map(t => TIPOS_DEMANDA.find(o => o.valor === t)?.rotulo ?? t).join(', ')}` : '',
     f.prioridades.length ? `Prioridade: ${f.prioridades.map(t => PRIORIDADES.find(o => o.valor === t)?.rotulo ?? t).join(', ')}` : '',
     f.clientes.length ? `Cliente: ${f.clientes.map(t => ops.clientes.find(o => o.valor === t)?.rotulo ?? t).join(', ')}` : '',
@@ -89,7 +89,12 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
           </div>
         </details>
         <SelecaoMultipla rotulo="Fase" opcoes={ops.fases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
-        <SelecaoMultipla rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
+        <SelecaoMultipla rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v, ...(v.length ? {} : { nivel: '' }) })} />
+        {f.responsaveis.length > 0 && (
+          <select aria-label="Nível do responsável" value={f.nivel} onChange={e => mudar({ nivel: e.target.value })}>
+            {NIVEIS_RESPONSAVEL.map(n => <option key={n.valor} value={n.valor}>{n.rotulo}</option>)}
+          </select>
+        )}
         <SelecaoMultipla rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
         <SelecaoMultipla rotulo="Cliente" opcoes={ops.clientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
         <SelecaoMultipla rotulo="Projeto" opcoes={ops.projetos} sel={f.projetos} aoMudar={v => mudar({ projetos: v })} />

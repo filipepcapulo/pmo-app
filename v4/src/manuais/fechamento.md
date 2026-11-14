@@ -40,7 +40,9 @@ Exemplo fictício: um consultor PJ com valor hora de R$ 100,00 e 150:00 horas no
 
 ## 4. Totais e tabela por consultor
 
-No alto ficam os totais: **Horas no período**, **Horas extras**, **Valor total**, **Meta da equipe** e **Ajustes** (quantidade e saldo de horas ajustadas).
+A tela tem três abas: **Fechamento** (esta seção), **Histórico** (seção 10) e **Indicadores** (seção 11).
+
+No alto ficam os totais: **Horas no período**, **Horas extras**, **Planilha / app** (com o percentual do total), **OS (Sankhya)**, **Valor total**, **Meta da equipe** e **Ajustes** (quantidade e saldo de horas ajustadas; **ver ajustes** abre o Histórico só com os ajustados).
 
 A tabela tem uma linha por consultor e o total no rodapé:
 
@@ -48,11 +50,13 @@ A tabela tem uma linha por consultor e o total no rodapé:
 | --- | --- |
 | **Modalidade** | CLT, PJ ou COOP. **sem período** = não há remuneração que alcance o período |
 | **Valor hora** | Os valores hora aplicados nas horas normais ("int." marca o valor interno) |
-| **Planilha**, **OS** | Horas de cada origem |
+| **Planilha / app** | Horas normais, extras, total e o percentual que a planilha (ou o apontamento do app) representa no total do consultor |
+| **OS (Sankhya)** | Horas normais, extras e total das OS |
 | **Ajustes** | Saldo de horas ajustadas manualmente |
 | **Normais**, **Extras**, **Total h** | Horas consideradas |
 | **Valor normais**, **Valor extras**, **Valor total** | Valores em reais |
 | **Meta** | Percentual da meta de horas |
+| **OBS** | Observação de bonificação / meta do consultor naquele período. **+ OBS** grava; **✎ OBS** mostra que já existe (o texto aparece ao passar o mouse e sai no Excel). Fica guardada cifrada no cofre; texto vazio apaga |
 
 Toque na linha de um consultor para abrir o detalhe.
 
@@ -103,11 +107,13 @@ Depois de fechado:
 
 O que é gravado é sempre o cálculo do servidor naquele momento, nunca o que está na tela.
 
+No formulário do ajuste há dois atalhos: **Descontar 50% (apontamento retroativo)**, que preenche metade das horas apontadas e a observação padrão, e **Não considerar (zerar)**, que zera as horas e pede o motivo. **Voltar às horas apontadas** remove o ajuste.
+
 ## 8. Exportar e períodos importados
 
 **Excel** e **PDF** só ficam liberados depois de **Mostrar valores**. Os dois saem com os consultores que estão na lista (respeitam **Mostrar sem horas**) e a linha de total.
 
-- **Excel**: horas em número decimal, valor hora, valor hora interno, fixo, meta, valores e a coluna "Pago pelo mínimo".
+- **Excel**: horas em número decimal (planilha e OS separadas em normais e extras), valor hora, valor hora interno, fixo, meta, valores, a coluna "Pago pelo mínimo" e a OBS.
 - **PDF**: a mesma tabela da tela, com o período, a situação e a data em que foi gerado.
 
 Períodos antigos podem trazer a marca **histórico importado**: os atendimentos vieram do Produtividade SK. Nesses períodos o detalhe do consultor é só para consulta e não há **Ajustar**. A tela não tem botão de importação.
@@ -126,3 +132,25 @@ Períodos antigos podem trazer a marca **histórico importado**: os atendimentos
 | "Nenhum consultor com horas neste período." | Não há apontamentos no período; confira o período ou marque **Mostrar sem horas** |
 | Excel e PDF apagados | Toque em **Mostrar valores** |
 | "Sem conexão com o servidor. Confira a internet e tente de novo." | Problema de rede; tente novamente |
+
+## 10. Histórico de atendimentos
+
+A aba **Histórico** lista todos os atendimentos do período, de todos os consultores, com o que foi **apontado** e o que está sendo **considerado**.
+
+- Filtros: consultor, origem (OS ou Planilha), busca por cliente, número da OS, atividade ou observação, e **Só ajustados**.
+- Totais: horas consideradas (com o apontado e a diferença), OS, Planilha, valor antes do mínimo e quantidade de ajustes.
+- **Ajustar** abre o mesmo formulário do detalhe do consultor, com os atalhos. Se o período já estiver fechado, a tela avisa que a alteração vai aparecer como diferença.
+- **Excel** sai com as linhas filtradas (precisa de **Mostrar valores**).
+
+## 11. Indicadores
+
+A aba **Indicadores** mostra as horas consideradas por categoria, em vários períodos de fechamento (padrão: os 12 últimos encerrados; no máximo 24).
+
+- **Horas produtivas**, **de apoio comercial** e **internas**: total, percentual e barras por consultor.
+- **Ranking de produtividade**: ordenado pelas horas produtivas, com a composição de cada consultor.
+- **Total de horas por período** e **Custo por período** (valor hora do consultor, sem o mínimo; só com **Mostrar valores**). As caixas da legenda ligam e desligam cada categoria.
+- Filtros: de/até, consultor e os atalhos Último, Últimos 3, 6 e 12. **Excel** exporta período × consultor × categoria × origem.
+
+## 12. Intervalo personalizado
+
+No seletor de período, **Intervalo personalizado…** troca o período 21–20 por duas datas (até um ano). Serve para consulta nas abas Fechamento e Histórico: não tem situação, **Fechar período**, **Reabrir** nem OBS.

@@ -1,18 +1,22 @@
 // Fechamento de produtividade (F4, 0075 + Edge Function `financeiro`):
 //   * #/fechamento      Financeiro › Fechamento de produtividade — o período 21–20 de todos os consultores (papéis dono e
-//                       fechamento do cofre): horas, valores, ajustes com observação, fechar/reabrir e diferença depois de fechado;
+//                       fechamento do cofre): horas, valores, ajustes com observação, OBS de bonificação, fechar/reabrir e
+//                       diferença depois de fechado; abas Histórico (todos os atendimentos) e Indicadores; intervalo personalizado;
 //   * #/meu-fechamento  Meu fechamento — cada pessoa vê só o próprio (não precisa de papel no cofre; ninguém mais vê).
 // O cálculo vem pronto da função (remuneração decifrada lá). Os valores começam ocultos (botão Mostrar valores) e a
 // exportação PDF/Excel só sai com eles à mostra.
 import { useMemo, useState } from 'react';
 import { data } from '../api/cadastros';
 import {
-  fech, hm, minutosDe, pct, periodoEncerrado, planilhaFechamento, planilhaMeu, ROTULO_CAT, rotuloStatus, tabelaFechamento, textoTaxas, ultimosPeriodos, visiveis,
-  type FechamentoPeriodo, type LinhaFech, type Periodo, type ResumoFech, type ResumoFechado,
+  erroIntervalo, fech, hm, pct, periodoEncerrado, planilhaFechamento, planilhaMeu, ROTULO_CAT, rotuloStatus, tabelaFechamento, textoTaxas, ultimosPeriodos, visiveis,
+  type FechamentoPeriodo, type FiltroHistorico, type LinhaFech, type Periodo, type Recorte, type ResumoFech, type ResumoFechado,
 } from '../api/fechamentoFin';
 import { reais } from '../api/financeiro';
+import { AjusteHoras } from '../componentes/AjusteHoras';
 import { Botao } from '../componentes/Botao';
 import { Campo, Formulario } from '../componentes/Campo';
+import { FechamentoHistorico } from '../componentes/FechamentoHistorico';
+import { FechamentoIndicadores } from '../componentes/FechamentoIndicadores';
 import { Popup } from '../componentes/Popup';
 import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
@@ -25,11 +29,13 @@ const quando = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-
 const intervalo = (p: Periodo) => `${data(p.ini)} a ${data(p.fim)}`;
 const semAcesso = (erro: string | null) => !!erro && /autorizados do Financeiro/.test(erro);
 
-function EscolhaPeriodo({ periodos, valor, aoMudar }: { periodos: Periodo[]; valor: number; aoMudar: (k: number) => void }) {
+/** `comIntervalo`: acrescenta "Intervalo personalizado…" (valor 0). */
+function EscolhaPeriodo({ periodos, valor, aoMudar, comIntervalo }: { periodos: Periodo[]; valor: number; aoMudar: (k: number) => void; comIntervalo?: boolean }) {
   return (
     <label className="periodo">Período
       <select aria-label="Período" value={valor} onChange={e => aoMudar(Number(e.target.value))}>
         {periodos.map(p => <option key={p.key} value={p.key}>{p.label} · {intervalo(p)}</option>)}
+        {comIntervalo && <option value={0}>Intervalo personalizado…</option>}
       </select>
     </label>
   );
@@ -80,19 +86,32 @@ export function Fechamento() {
   const [semHoras, setSemHoras] = useState(false);
   const [aberto, setAberto] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
-  const c = useCarga(() => (pode ? fech.ler(esc, per) : Promise.resolve(null)), [esc, per, pode]);
+  const [aba, setAba] = useState<'fechamento' | 'historico' | 'indicadores'>('fechamento');
+  const [histInicial, setHistInicial] = useState<Partial<FiltroHistorico>>({});
+  const [obsDe, setObsDe] = useState<{ id: string; nome: string; texto: string } | null>(null);
+  // intervalo personalizado (per = 0): só consulta — sem fechar, reabrir nem OBS
+  const [ini, setIni] = useState(() => periodoEncerrado(periodos, dia).ini);
+  const [fim, setFim] = useState(() => periodoEncerrado(periodos, dia).fim);
+  const erroInt = per === 0 ? erroIntervalo(ini, fim) : null;
+  const recorte: Recorte | null = per !== 0 ? { periodo: per } : erroInt ? null : { ini, fim };
+  const c = useCarga(() => (pode && recorte ? fech.recorte(esc, recorte) : Promise.resolve(null)), [esc, per, ini, fim, pode]);
   if (!pode || semAcesso(c.erro)) {
     return <div className="pagina"><div className="vazio-tela"><h2>Sem acesso</h2><p>O fechamento de produtividade é só para quem tem o papel Dono ou Fechamento no cofre financeiro. Para ver o seu, use <a href="#/meu-fechamento">Meu fechamento</a>.</p></div></div>;
   }
   const d = c.dados;
   const lista = d ? visiveis(d.lista, semHoras) : [];
   const fechado = d?.fechamento?.status === 'fechado';
-  const nome = d ? `Fechamento ${d.periodo.label}` : 'Fechamento';
   const acao = async (f: () => Promise<unknown>, ok: string) => {
     setGravando(true);
     try { await f(); avisar(ok, 'ok'); await c.recarregar(); } catch (e) { avisar((e as Error).message, 'erro'); }
     setGravando(false);
   };
+  const personalizado = per === 0;
+  const obs = d?.obs ?? {};
+  const rotulo = d ? (d.intervalo ? intervalo(d.periodo) : d.periodo.label) : '';
+  const nome = d ? `Fechamento ${rotulo}` : 'Fechamento';
+  const gravarObs = () => obsDe && acao(async () => { await fech.obs(esc, { periodo: per, usuario_id: obsDe.id, texto: obsDe.texto }); setObsDe(null); }, 'OBS gravada');
+  const verAjustes = () => { setHistInicial({ soAjustados: true }); setAba('historico'); };
   const fechar = () => d && confirm(`${fechado ? 'Atualizar' : 'Gravar'} o fechamento de ${d.periodo.label} com ${hm(d.T.t_tot)} horas${oculto ? '' : ` e ${reais(d.T.total)}`}?\n\nOs valores ficam guardados. Se alguém alterar horas depois, a tela mostra a diferença.`)
     && acao(() => fech.fechar(esc, per), `Período ${d.periodo.label} fechado`);
   const reabrir = () => d && confirm(`Reabrir ${d.periodo.label}? O último fechamento gravado continua guardado para comparação.`)
@@ -104,29 +123,43 @@ export function Fechamento() {
           <p className="ajuda">Período de 21 a 20. Horas dos apontamentos do PMO × remuneração vigente na data de cada atendimento. Cada consulta fica registrada no cofre.</p></div>
         <div className="fech-acoes">
           <Botao onClick={() => setOculto(!oculto)} aria-pressed={!oculto}>{oculto ? 'Mostrar valores' : 'Ocultar valores'}</Botao>
-          <Botao disabled={oculto || !d} title={oculto ? 'Mostre os valores para exportar' : undefined} onClick={() => d && baixarXlsx(nome, planilhaFechamento(lista, d.T))}>Excel</Botao>
-          <Botao disabled={oculto || !d} title={oculto ? 'Mostre os valores para exportar' : undefined}
-            onClick={() => d && baixarTabelaPdf(nome, { titulo: `Fechamento de produtividade · ${d.periodo.label}`, subtitulo: `${intervalo(d.periodo)} · ${rotuloStatus(d.fechamento?.status ?? 'aberto')} · gerado em ${quando(new Date().toISOString())}`, ...tabelaFechamento(lista, d.T), destacarUltima: true })}>PDF</Botao>
+          {aba === 'fechamento' && <Botao disabled={oculto || !d} title={oculto ? 'Mostre os valores para exportar' : undefined} onClick={() => d && baixarXlsx(nome, planilhaFechamento(lista, d.T, obs))}>Excel</Botao>}
+          {aba === 'fechamento' && <Botao disabled={oculto || !d} title={oculto ? 'Mostre os valores para exportar' : undefined}
+            onClick={() => d && baixarTabelaPdf(nome, { titulo: `Fechamento de produtividade · ${rotulo}`, subtitulo: `${intervalo(d.periodo)} · ${d.intervalo ? 'Intervalo personalizado' : rotuloStatus(d.fechamento?.status ?? 'aberto')} · gerado em ${quando(new Date().toISOString())}`, ...tabelaFechamento(lista, d.T), destacarUltima: true })}>PDF</Botao>}
         </div>
       </header>
-      <div className="barra-filtros">
-        <EscolhaPeriodo periodos={periodos} valor={per} aoMudar={setPer} />
-        {d && <Situacao status={d.fechamento?.status ?? 'aberto'} fechadoEm={d.fechamento?.fechado_em} por={d.fechamento?.fechado_por} />}
-        {d?.fonte === 'historico' && <span className="pilula pilula-neutra" title="Atendimentos importados do Produtividade SK">histórico importado</span>}
-        <label className="ajuda fin-marcar"><input type="checkbox" checked={semHoras} onChange={e => setSemHoras(e.target.checked)} /> Mostrar sem horas</label>
-        <span className="a-esquerda" />
-        {fechado && <Botao carregando={gravando} onClick={reabrir}>Reabrir</Botao>}
-        {d && <Botao variante="primario" carregando={gravando} onClick={fechar}>{fechado ? 'Atualizar fechamento' : 'Fechar período'}</Botao>}
+      <div className="segmentos" role="tablist" aria-label="Seções do fechamento">
+        <button type="button" role="tab" aria-selected={aba === 'fechamento'} onClick={() => setAba('fechamento')}>Fechamento</button>
+        <button type="button" role="tab" aria-selected={aba === 'historico'} onClick={() => { setHistInicial({}); setAba('historico'); }}>Histórico</button>
+        <button type="button" role="tab" aria-selected={aba === 'indicadores'} onClick={() => setAba('indicadores')}>Indicadores</button>
       </div>
-      {c.erro && <p className="msg-erro" role="alert">{c.erro}</p>}
-      {!d && !c.erro && <div className="carregando-tela"><span className="giro" /> Calculando…</div>}
-      {d && <>
+      {aba !== 'indicadores' && <div className="barra-filtros">
+        <EscolhaPeriodo periodos={periodos} valor={per} aoMudar={setPer} comIntervalo />
+        {personalizado && <>
+          <label className="periodo">De <input type="date" aria-label="De" value={ini} max={fim || undefined} onChange={e => setIni(e.target.value)} /></label>
+          <label className="periodo">Até <input type="date" aria-label="Até" value={fim} min={ini || undefined} onChange={e => setFim(e.target.value)} /></label>
+        </>}
+        {d && !personalizado && <Situacao status={d.fechamento?.status ?? 'aberto'} fechadoEm={d.fechamento?.fechado_em} por={d.fechamento?.fechado_por} />}
+        {d?.fonte === 'historico' && <span className="pilula pilula-neutra" title="Atendimentos importados do Produtividade SK">histórico importado</span>}
+        {aba === 'fechamento' && <label className="ajuda fin-marcar"><input type="checkbox" checked={semHoras} onChange={e => setSemHoras(e.target.checked)} /> Mostrar sem horas</label>}
+        <span className="a-esquerda" />
+        {aba === 'fechamento' && fechado && !personalizado && <Botao carregando={gravando} onClick={reabrir}>Reabrir</Botao>}
+        {aba === 'fechamento' && d && !personalizado && <Botao variante="primario" carregando={gravando} onClick={fechar}>{fechado ? 'Atualizar fechamento' : 'Fechar período'}</Botao>}
+      </div>}
+      {aba !== 'indicadores' && erroInt && <p className="msg-erro" role="alert">{erroInt}</p>}
+      {aba === 'indicadores' && <FechamentoIndicadores esc={esc} periodos={periodos} oculto={oculto} />}
+      {aba === 'historico' && recorte && <FechamentoHistorico key={JSON.stringify(histInicial)} esc={esc} recorte={recorte} oculto={oculto} inicial={histInicial} aoMudar={c.recarregar} />}
+      {aba === 'fechamento' && c.erro && <p className="msg-erro" role="alert">{c.erro}</p>}
+      {aba === 'fechamento' && recorte && !d && !c.erro && <div className="carregando-tela"><span className="giro" /> Calculando…</div>}
+      {aba === 'fechamento' && d && <>
         <section className="indicadores" aria-label="Totais do período">
           <div className="indicador"><small>Horas no período</small><strong data-testid="fech-horas">{hm(d.T.t_tot)}</strong></div>
           <div className="indicador"><small>Horas extras</small><strong>{hm(d.T.t_he)}</strong></div>
+          <div className="indicador"><small>Planilha / app · {pct(d.T.pPlan)} do total</small><strong>{hm(d.T.p_tot)}</strong></div>
+          <div className="indicador"><small>OS (Sankhya){d.T.outras ? ` · BP-MS ${hm(d.T.bp ?? 0)} · outras unidades ${hm(d.T.outras)}` : ''}</small><strong>{hm(d.T.o_tot)}</strong></div>
           <div className="indicador"><small>Valor total</small><strong data-testid="fech-valor">{reais(d.T.total, oculto)}</strong></div>
           <div className="indicador"><small>Meta da equipe</small><strong>{pct(d.T.meta)}</strong></div>
-          <div className="indicador"><small>Ajustes</small><strong>{d.T.ajN}{d.T.aj ? <small> {d.T.aj > 0 ? '+' : ''}{hm(d.T.aj)}</small> : null}</strong></div>
+          <div className="indicador"><small>Ajustes{d.T.ajN ? <> · <button type="button" className="link" onClick={verAjustes}>ver ajustes</button></> : null}</small><strong>{d.T.ajN}{d.T.aj ? <small> {d.T.aj > 0 ? '+' : ''}{hm(d.T.aj)}</small> : null}</strong></div>
         </section>
         {oculto && <p className="ajuda">Os valores estão ocultos. Use <strong>Mostrar valores</strong> quando estiver em um lugar reservado.</p>}
         {d.fechamento?.ilegivel && <p className="msg-erro" role="alert">O fechamento gravado deste período não pôde ser decifrado; feche de novo para regravar.</p>}
@@ -137,82 +170,73 @@ export function Fechamento() {
           </div>)}
         {d.pendencias.length > 0 && <div className="fech-alerta" role="status"><strong>Pendências</strong><ul>{d.pendencias.map(p => <li key={p}>{p}</li>)}</ul></div>}
         <div className="tabela-caixa fech-rolagem"><table className="tabela fech-tabela" aria-label="Fechamento por consultor">
-          <thead><tr><th>Consultor</th><th>Modalidade</th><th className="dir">Valor hora</th><th className="dir">Planilha</th><th className="dir">OS</th><th className="dir">Ajustes</th>
-            <th className="dir">Normais</th><th className="dir">Extras</th><th className="dir">Total h</th><th className="dir">Valor normais</th><th className="dir">Valor extras</th>
-            <th className="dir">Valor total</th><th className="dir">Meta</th></tr></thead>
+          <thead>
+            <tr className="fech-grupos"><th colSpan={3} /><th colSpan={4}>Planilha / app</th><th colSpan={3}>OS (Sankhya)</th><th />
+              <th colSpan={3}>Totais</th><th colSpan={3}>Valores</th><th colSpan={personalizado ? 1 : 2} /></tr>
+            <tr><th>Consultor</th><th>Modalidade</th><th className="dir">Valor hora</th>
+              <th className="dir">Normais</th><th className="dir">Extras</th><th className="dir">Total</th><th className="dir">%</th>
+              <th className="dir">Normais</th><th className="dir">Extras</th><th className="dir">Total</th><th className="dir">Ajustes</th>
+              <th className="dir">Normais</th><th className="dir">Extras</th><th className="dir">Total h</th><th className="dir">Normais</th><th className="dir">Extras</th>
+              <th className="dir">Valor total</th><th className="dir">Meta</th>{!personalizado && <th>OBS</th>}</tr></thead>
           <tbody>
             {lista.map(o => (
               <tr key={o.usuario_id} className="clicavel" tabIndex={0} onClick={() => setAberto(o.usuario_id)} onKeyDown={e => { if (e.key === 'Enter') setAberto(o.usuario_id); }}>
                 <td><strong>{o.nome}</strong></td>
                 <td>{o.reg === '—' ? <span className="pilula pilula-neutra">sem período</span> : <span className="pilula">{o.reg}</span>}</td>
                 <td className="dir">{textoTaxas(o, oculto)}</td>
-                <td className="dir">{hm(o.p_tot)}</td><td className="dir">{hm(o.o_tot)}</td>
+                <td className="dir">{o.p_hn ? hm(o.p_hn) : ''}</td><td className="dir">{o.p_he ? hm(o.p_he) : ''}</td><td className="dir">{hm(o.p_tot)}</td><td className="dir">{o.p_tot ? pct(o.pPlan) : ''}</td>
+                <td className="dir">{o.o_hn ? hm(o.o_hn) : ''}</td><td className="dir">{o.o_he ? hm(o.o_he) : ''}</td><td className="dir">{hm(o.o_tot)}</td>
                 <td className="dir">{o.ajN ? <span className="pilula pilula-neutra" title={`${o.ajN} ajuste(s)`}>{o.aj > 0 ? '+' : ''}{hm(o.aj)}</span> : ''}</td>
                 <td className="dir">{hm(o.t_hn)}</td><td className="dir">{o.t_he ? hm(o.t_he) : ''}</td><td className="dir"><strong>{hm(o.t_tot)}</strong></td>
                 <td className="dir">{reais(o.v_hn, oculto)}</td><td className="dir">{o.v_he ? reais(o.v_he, oculto) : ''}</td>
                 <td className="dir"><strong>{reais(o.total, oculto)}</strong>{o.minimo && <> <span className="pilula pilula-neutra" title="A soma do período não passou do valor mínimo / fixo">mínimo</span></>}</td>
                 <td className="dir">{pct(o.meta)}</td>
+                {!personalizado && <td className="fech-obs" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+                  <button type="button" className={`link${obs[o.usuario_id] ? ' fech-obs-tem' : ''}`} title={obs[o.usuario_id] || 'Sem OBS de bonificação / meta'}
+                    aria-label={`OBS de ${o.nome}`} onClick={() => setObsDe({ id: o.usuario_id, nome: o.nome, texto: obs[o.usuario_id] ?? '' })}>{obs[o.usuario_id] ? '✎ OBS' : '+ OBS'}</button></td>}
               </tr>))}
-            {lista.length === 0 && <tr><td colSpan={13} className="ajuda">Nenhum consultor com horas neste período.</td></tr>}
+            {lista.length === 0 && <tr><td colSpan={19} className="ajuda">Nenhum consultor com horas neste período.</td></tr>}
           </tbody>
-          {lista.length > 0 && <tfoot><tr><td colSpan={3}><strong>Total</strong></td><td className="dir">{hm(d.T.p_tot)}</td><td className="dir">{hm(d.T.o_tot)}</td>
+          {lista.length > 0 && <tfoot><tr><td colSpan={3}><strong>Total</strong></td>
+            <td className="dir">{hm(d.T.p_hn ?? 0)}</td><td className="dir">{hm(d.T.p_he ?? 0)}</td><td className="dir">{hm(d.T.p_tot)}</td><td className="dir">{pct(d.T.pPlan)}</td>
+            <td className="dir">{hm(d.T.o_hn ?? 0)}</td><td className="dir">{hm(d.T.o_he ?? 0)}</td><td className="dir">{hm(d.T.o_tot)}</td>
             <td className="dir">{d.T.ajN ? hm(d.T.aj) : ''}</td><td className="dir">{hm(d.T.t_hn)}</td><td className="dir">{hm(d.T.t_he)}</td><td className="dir"><strong>{hm(d.T.t_tot)}</strong></td>
-            <td className="dir">{reais(d.T.v_hn, oculto)}</td><td className="dir">{reais(d.T.v_he, oculto)}</td><td className="dir"><strong>{reais(d.T.total, oculto)}</strong></td><td className="dir">{pct(d.T.meta)}</td></tr></tfoot>}
+            <td className="dir">{reais(d.T.v_hn, oculto)}</td><td className="dir">{reais(d.T.v_he, oculto)}</td><td className="dir"><strong>{reais(d.T.total, oculto)}</strong></td><td className="dir">{pct(d.T.meta)}</td>{!personalizado && <td />}</tr></tfoot>}
         </table></div>
-        {aberto && <DetalheConsultor esc={esc} dados={d} consultor={aberto} oculto={oculto} aoFechar={() => setAberto(null)} aoMudar={c.recarregar} />}
+        <p className="ajuda">Valor = horas normais × valor hora (planilha e app no valor hora interno, quando houver) + extras × 2 × valor hora. CLT: extra é o que passa das 18h; PJ e COOP não têm extra.
+          O total nunca fica abaixo do mínimo (fixo). Meta = horas ÷ meta de horas de cada consultor.</p>
+        {aberto && recorte && <DetalheConsultor esc={esc} dados={d} recorte={recorte} consultor={aberto} oculto={oculto} aoFechar={() => setAberto(null)} aoMudar={c.recarregar} />}
+        {obsDe && (
+          <Popup aberto titulo={`OBS bonificação / meta · ${obsDe.nome} · ${d.periodo.label}`} aoFechar={() => setObsDe(null)} largura={560}
+            rodape={<><Botao onClick={() => setObsDe(null)}>Cancelar</Botao><Botao variante="primario" carregando={gravando} onClick={gravarObs}>Gravar</Botao></>}>
+            <Formulario aoEnviar={gravarObs}>
+              <Campo rotulo="Observação" tipo="textarea" valor={obsDe.texto} aoMudar={v => setObsDe({ ...obsDe, texto: v })} maxLength={2000}
+                ajuda="Fica guardada no cofre, junto do período. Deixe vazio para apagar." placeholder="Ex.: bonificação por meta batida, acerto combinado…" />
+            </Formulario>
+          </Popup>)}
       </>}
     </div>
   );
 }
 
-type Ajuste = { linha: LinhaFech; hn: string; he: string; obs: string };
-
-function DetalheConsultor({ esc, dados, consultor, oculto, aoFechar, aoMudar }: { esc: string; dados: FechamentoPeriodo; consultor: string; oculto: boolean; aoFechar: () => void; aoMudar: () => Promise<void> }) {
-  const avisar = useToast();
-  const c = useCarga(() => fech.ler(esc, dados.periodo.key, consultor), [esc, dados.periodo.key, consultor]);
-  const [aj, setAj] = useState<Ajuste | null>(null);
-  const [gravando, setGravando] = useState(false);
+function DetalheConsultor({ esc, dados, recorte, consultor, oculto, aoFechar, aoMudar }: {
+  esc: string; dados: FechamentoPeriodo; recorte: Recorte; consultor: string; oculto: boolean; aoFechar: () => void; aoMudar: () => Promise<void>;
+}) {
+  const c = useCarga(() => fech.recorte(esc, recorte, { consultor }), [esc, dados.periodo.key, dados.periodo.ini, dados.periodo.fim, consultor]);
+  const [aj, setAj] = useState<LinhaFech | null>(null);
   const o = (c.dados ?? dados).lista.find(x => x.usuario_id === consultor);
-  const mandar = async (d: Parameters<typeof fech.ajustar>[1], ok: string) => {
-    setGravando(true);
-    try { await fech.ajustar(esc, d); avisar(ok, 'ok'); setAj(null); await c.recarregar(); await aoMudar(); } catch (e) { avisar((e as Error).message, 'erro'); }
-    setGravando(false);
-  };
-  const gravar = () => {
-    if (!aj) return;
-    const hn = minutosDe(aj.hn), he = minutosDe(aj.he || '0');
-    if (hn === null || he === null) { avisar('Informe as horas como 2:30 ou 2,5.', 'erro'); return; }
-    if (aj.obs.trim().length < 3) { avisar('A observação é obrigatória para alterar as horas consideradas.', 'erro'); return; }
-    mandar({ apontamento_id: aj.linha.id, hn, he, obs: aj.obs.trim() }, 'Ajuste gravado');
-  };
   const podeAjustar = dados.fonte === 'pmo';
   return (
-    <Popup aberto titulo={`${o?.nome ?? 'Consultor'} · ${dados.periodo.label}`} aoFechar={aoFechar} largura={1080}
-      rodape={aj ? <>
-        {aj.linha.aj && <Botao variante="perigo" className="a-esquerda" carregando={gravando} onClick={() => mandar({ apontamento_id: aj.linha.id, remover: true }, 'Ajuste removido')}>Remover ajuste</Botao>}
-        <Botao onClick={() => setAj(null)}>Cancelar</Botao>
-        <Botao variante="primario" carregando={gravando} onClick={gravar}>Gravar ajuste</Botao>
-      </> : <Botao onClick={aoFechar}>Fechar</Botao>}>
+    <Popup aberto titulo={`${o?.nome ?? 'Consultor'} · ${dados.intervalo ? intervalo(dados.periodo) : dados.periodo.label}`} aoFechar={aoFechar} largura={1080}
+      rodape={aj ? undefined : <Botao onClick={aoFechar}>Fechar</Botao>}>
       {!aj && <>
         {o && <ResumoConsultor o={o} oculto={oculto} />}
         {c.erro && <p className="msg-erro" role="alert">{c.erro}</p>}
         {!c.dados && !c.erro && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}
         {!podeAjustar && <p className="ajuda">Período importado do Produtividade SK: os atendimentos são só para consulta.</p>}
-        {c.dados && <Atendimentos linhas={c.dados.detalhe ?? []} oculto={oculto}
-          aoAjustar={podeAjustar ? l => setAj({ linha: l, hn: hm(l.hn), he: l.he ? hm(l.he) : '', obs: l.aj ? l.ajobs : '' }) : undefined} />}
+        {c.dados && <Atendimentos linhas={c.dados.detalhe ?? []} oculto={oculto} aoAjustar={podeAjustar ? setAj : undefined} />}
       </>}
-      {aj && (
-        <Formulario aoEnviar={gravar}>
-          <p className="ajuda fin-aviso">{data(aj.linha.data)} · {aj.linha.cli} · {aj.linha.desc || aj.linha.serv} — apontado: {hm(aj.linha.hn0)} normais{aj.linha.he0 ? ` + ${hm(aj.linha.he0)} extras` : ''}.
-            O ajuste muda só as horas consideradas no fechamento; o apontamento não é alterado.</p>
-          <div className="grade-campos">
-            <Campo rotulo="Horas normais consideradas" valor={aj.hn} aoMudar={v => setAj({ ...aj, hn: v })} obrigatorio ajuda="Ex.: 2:30" autoComplete="off" />
-            <Campo rotulo="Horas extras consideradas" valor={aj.he} aoMudar={v => setAj({ ...aj, he: v })} ajuda="Vazio = nenhuma" autoComplete="off" />
-          </div>
-          <Campo rotulo="Observação (obrigatória)" valor={aj.obs} aoMudar={v => setAj({ ...aj, obs: v })} obrigatorio maxLength={500} placeholder="Ex.: glosa do cliente, horas faturadas por empreito…" />
-          {aj.linha.aj && <p className="ajuda">Ajuste atual por {aj.linha.ajpor || '—'}{aj.linha.ajem ? ` em ${quando(aj.linha.ajem)}` : ''}.</p>}
-        </Formulario>
-      )}
+      {aj && <AjusteHoras esc={esc} linha={aj} aoCancelar={() => setAj(null)} aoGravado={async () => { setAj(null); await c.recarregar(); await aoMudar(); }} />}
     </Popup>
   );
 }

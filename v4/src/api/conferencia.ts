@@ -64,6 +64,14 @@ export function periodoPadrao(hoje: string): { de: string; ate: string } {
   const [aa, mm] = d >= 21 ? [a, m] : m === 1 ? [a - 1, 12] : [a, m - 1];
   return { de: `${aa}-${String(mm).padStart(2, '0')}-21`, ate: hoje };
 }
+/** Período do FECHAMENTO: o último ciclo 21–20 já encerrado (é o que se fecha na produtividade). */
+export function periodoFechamento(hoje: string): { de: string; ate: string } {
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  let a = +hoje.slice(0, 4), m = +hoje.slice(5, 7);
+  if (+hoje.slice(8, 10) <= 20) { m--; if (m < 1) { m = 12; a--; } }   // até o dia 20 o ciclo do mês ainda está correndo
+  const [ai, mi] = m === 1 ? [a - 1, 12] : [a, m - 1];
+  return { de: `${ai}-${p2(mi)}-21`, ate: `${a}-${p2(m)}-20` };
+}
 /** Mesma regra da Edge Function: de ≤ até ≤ hoje e no máximo 63 dias. */
 export function erroPeriodo(de: string, ate: string, hoje: string): string | null {
   if (!de || !ate) return 'Informe o período.';

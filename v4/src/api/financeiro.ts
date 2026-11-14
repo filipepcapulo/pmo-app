@@ -74,7 +74,7 @@ const ACOES: Record<string, string> = {
   'fechamento.ver': 'Viu o fechamento', 'fechamento.ver_meu': 'Viu o próprio fechamento', 'fechamento.fechar': 'Fechou o período', 'fechamento.reabrir': 'Reabriu o período',
   'fechamento.importar': 'Importou fechamento', 'ajuste.salvar': 'Ajustou horas', 'ajuste.remover': 'Removeu ajuste de horas',
   'rentabilidade.ver': 'Viu a rentabilidade', 'pedido_valor.ver': 'Viu o valor dos pedidos', 'pedido_valor.salvar': 'Gravou o valor/hora de um pedido',
-  'pedido_valor.remover': 'Removeu o valor/hora de um pedido',
+  'pedido_valor.remover': 'Removeu o valor/hora de um pedido', 'fechamento.obs': 'Gravou OBS no fechamento',
 };
 const ALVOS_RENTA: Record<string, string> = { cliente: 'de um cliente', projeto: 'de um projeto', demanda: 'de uma demanda' };
 /** Texto do log: "Viu a remuneração de Ana", "Concedeu acesso a Ana (Fechamento)". */

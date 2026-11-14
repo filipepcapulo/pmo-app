@@ -5,9 +5,11 @@ import type { Gravado, Pessoa } from './cadastros';
 
 // ---------------------------------------------------------------- rótulos
 type Op<T extends string = string> = { valor: T; rotulo: string };
-export type StatusDemanda = 'backlog' | 'planejada' | 'em_andamento' | 'pausada' | 'concluida' | 'cancelada';
+export type StatusDemanda = 'backlog' | 'planejada' | 'em_andamento' | 'em_validacao' | 'pausada' | 'concluida' | 'cancelada';
 export const STATUS_DEMANDA: Op<StatusDemanda>[] = [
   { valor: 'backlog', rotulo: 'Backlog' }, { valor: 'planejada', rotulo: 'Planejada' }, { valor: 'em_andamento', rotulo: 'Em andamento' },
+  // 0084 (V4): a demanda pode estar "Em validação" (status novo gravado pela V4 e pelo espelho do ClickUp)
+  { valor: 'em_validacao', rotulo: 'Em validação' },
   { valor: 'pausada', rotulo: 'Pausada' }, { valor: 'concluida', rotulo: 'Concluída' }, { valor: 'cancelada', rotulo: 'Cancelada' },
 ];
 export type StatusTarefa = 'planejada' | 'em_andamento' | 'concluida' | 'cancelada' | 'nao_executada';

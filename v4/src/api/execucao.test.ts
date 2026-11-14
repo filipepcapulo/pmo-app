@@ -1,0 +1,83 @@
+import { describe, expect, it } from 'vitest';
+import { arvoreDemandas, caminhoAnexo, cascataDemandas, fatiasBarra, horarioInvalido, mencoesNoTexto, semAlerta } from './execucao';
+
+describe('Atendimento Avulso sem alerta (0073)', () => {
+  it('a marca vem na demanda ou nos totais dela', () => {
+    expect(semAlerta({ avulso_base: true })).toBe(true);
+    expect(semAlerta({ totais: { avulso_base: true } })).toBe(true);
+    expect(semAlerta({ avulso_base: false, totais: { avulso_base: false } })).toBe(false);
+    expect(semAlerta({})).toBe(false);
+    // 0074: o avulso real é a etapa "Atendimento avulso" (demanda ou subdemanda)
+    expect(semAlerta({ etapa: 'Atendimento avulso' })).toBe(true);
+    expect(semAlerta({ etapa: ' atendimento AVULSO ' })).toBe(true);
+    expect(semAlerta({ etapa: 'Homologação' })).toBe(false);
+    expect(semAlerta({ etapa: null })).toBe(false);
+    expect(semAlerta(null)).toBe(false);
+  });
+});
+
+describe('barra de pílula de horas', () => {
+  it('real e planejado sobre o previsto, em fatias separadas', () => {
+    const f = fatiasBarra(20, 5, 5);
+    expect(f.real).toBe(25);
+    expect(f.planejado).toBe(25);
+    expect(f.estouro).toBe(false);
+    expect(f.saldo).toBe(10);
+  });
+  it('acima do previsto: escala pelo executado e marca estouro', () => {
+    const f = fatiasBarra(10, 8, 7);
+    expect(f.real + f.planejado).toBeCloseTo(100);
+    expect(f.estouro).toBe(true);
+  });
+  it('sem previsto nem horas: barra vazia', () => {
+    expect(fatiasBarra(null, 0, 0)).toEqual({ real: 0, planejado: 0, estouro: false, saldo: 0 });
+  });
+});
+
+describe('menções', () => {
+  const pessoas = [{ id: 'a', nome: 'Ana Souza' }, { id: 'b', nome: 'Bruno' }];
+  it('só notifica quem continua citado no texto', () => {
+    expect(mencoesNoTexto('@Ana Souza veja isto', pessoas)).toEqual(['a']);
+    expect(mencoesNoTexto('@Ana Souza e @Bruno', [...pessoas, pessoas[0]])).toEqual(['a', 'b']);
+  });
+});
+
+describe('árvore de demandas', () => {
+  it('subdemanda fica sob a mãe; sem a mãe na lista, vira raiz', () => {
+    const arv = arvoreDemandas([{ id: 'd1', pai_id: null }, { id: 's1', pai_id: 'd1' }, { id: 's2', pai_id: 'outra' }]);
+    expect(arv.map(x => x.item.id)).toEqual(['d1', 's2']);
+    expect(arv[0].filhas.map(x => x.id)).toEqual(['s1']);
+  });
+});
+
+describe('caminho do anexo', () => {
+  it('começa pela pasta do escritório e limpa o nome', () => {
+    expect(caminhoAnexo('esc1', 'demanda', 'Ata reunião (final).pdf', 'u1')).toBe('esc1/demanda/u1-Ata_reuniao_final_.pdf');
+  });
+});
+
+describe('escolha da demanda em cascata (cliente → demanda → subdemanda)', () => {
+  const l = [
+    { id: 'd1', nome: 'Almoxarifado', pai_id: null, status: 'em_andamento', projeto_id: 'p1', projeto: 'P1' },
+    { id: 's1', nome: 'Requisições', pai_id: 'd1', status: 'planejada', projeto_id: 'p1', projeto: 'P1' },
+    { id: 'd2', nome: 'Financeiro', pai_id: null, status: 'backlog', projeto_id: 'p1', projeto: 'P1' },
+    { id: 's9', nome: 'Órfã', pai_id: 'fechada', status: 'planejada', projeto_id: 'p1', projeto: 'P1' },
+  ];
+  it('lista só as demandas; as subdemandas aparecem depois de escolher a demanda', () => {
+    expect(cascataDemandas(l, '').demandas.map(d => d.id)).toEqual(['d1', 'd2', 's9']);
+    expect(cascataDemandas(l, '').subdemandas).toEqual([]);
+    expect(cascataDemandas(l, 'd1').subdemandas.map(d => d.id)).toEqual(['s1']);
+    expect(cascataDemandas(l, 'd2').subdemandas).toEqual([]);
+  });
+});
+
+describe('Horário livre só em hora cheia (0080)', () => {
+  it('recusa minutos, formato errado e fim antes do início; aceita hora cheia e os períodos fixos', () => {
+    expect(horarioInvalido({ periodo: 'livre', ini: '13:00', fim: '17:00' })).toBe(false);
+    expect(horarioInvalido({ periodo: 'livre', ini: '13:00', fim: '17:30' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '08:15', fim: '12:00' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '17:00', fim: '13:00' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '', fim: '' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'manha', ini: '', fim: '' })).toBe(false);
+  });
+});

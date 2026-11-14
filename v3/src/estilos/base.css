@@ -400,6 +400,7 @@ body.redimensionando, body.redimensionando * { cursor: col-resize !important; us
 .st-backlog, .st-planejada { background: var(--superficie-2); color: var(--texto-2); border: 1px solid var(--linha); }
 .st-em_andamento { background: #dbe7fb; color: var(--azul); }
 .st-pausada { background: #fde9cf; color: var(--laranja); }
+.st-em_validacao { background: #ede9fe; color: #6d28d9; }
 .st-concluida { background: var(--verde-claro); color: var(--verde-texto); }
 .st-cancelada, .st-nao_executada { background: var(--superficie-2); color: var(--texto-2); text-decoration: line-through; }
 .st-atrasada { background: var(--vermelho); color: #fff; }

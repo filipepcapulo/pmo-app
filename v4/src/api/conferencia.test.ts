@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  erroPeriodo, mensagemConsultor, pendente, periodoPadrao, porConsultor, textoExecucao, textoResultado, textoVinculo, totaisConferencia,
+  erroPeriodo, mensagemConsultor, pendente, periodoFechamento, periodoPadrao, porConsultor, textoExecucao, textoResultado, textoVinculo, totaisConferencia,
   vinculavel, type LinhaConferencia,
 } from './conferencia';
 
@@ -16,6 +16,14 @@ describe('conferência de OS (V13c-3)', () => {
     expect(periodoPadrao('2026-11-11')).toEqual({ de: '2026-10-21', ate: '2026-11-11' });
     expect(periodoPadrao('2026-11-25')).toEqual({ de: '2026-11-21', ate: '2026-11-25' });
     expect(periodoPadrao('2027-01-05')).toEqual({ de: '2026-12-21', ate: '2027-01-05' });
+    // período do fechamento: o último 21–20 já encerrado (no dia 20 o ciclo ainda está correndo)
+    expect(periodoFechamento('2026-11-14')).toEqual({ de: '2026-09-21', ate: '2026-10-20' });
+    expect(periodoFechamento('2026-11-20')).toEqual({ de: '2026-09-21', ate: '2026-10-20' });
+    expect(periodoFechamento('2026-11-21')).toEqual({ de: '2026-10-21', ate: '2026-11-20' });
+    expect(periodoFechamento('2026-12-02')).toEqual({ de: '2026-10-21', ate: '2026-11-20' });
+    expect(periodoFechamento('2027-01-21')).toEqual({ de: '2026-12-21', ate: '2027-01-20' });
+    expect(periodoFechamento('2027-01-10')).toEqual({ de: '2026-11-21', ate: '2026-12-20' });
+    expect(erroPeriodo(periodoFechamento('2026-12-02').de, periodoFechamento('2026-12-02').ate, '2026-12-02')).toBeNull();
     expect(erroPeriodo('2026-10-21', '2026-11-11', '2026-11-11')).toBeNull();
     expect(erroPeriodo('2026-11-12', '2026-11-11', '2026-11-20')).toMatch(/antes/);
     expect(erroPeriodo('2026-11-01', '2026-11-12', '2026-11-11')).toMatch(/hoje/);

@@ -4,7 +4,7 @@
 // imprimir/PDF, com a mensagem de cada um pronta para copiar; Excel pela tabela.
 import { useMemo, useState } from 'react';
 import {
-  conferencia, dataBr, erroPeriodo, mensagemConsultor, pendente, periodoPadrao, porConsultor, ROTULO, ROTULO_FASE, textoExecucao,
+  conferencia, dataBr, erroPeriodo, mensagemConsultor, pendente, periodoFechamento, periodoPadrao, porConsultor, ROTULO, ROTULO_FASE, textoExecucao,
   textoResultado, textoVinculo, totaisConferencia, vinculavel, type Conferencia, type LinhaConferencia, type Situacao,
 } from '../api/conferencia';
 import { horas as fmtHoras } from '../api/cadastros';
@@ -144,6 +144,11 @@ export function ConferenciaOS() {
         <div className="barra-filtros" aria-label="Rodar a conferência">
           <label className="ajuda">De <input type="date" aria-label="Data inicial" value={periodo.de} max={hoje} onChange={e => setPeriodo(p => ({ ...p, de: e.target.value }))} /></label>
           <label className="ajuda">Até <input type="date" aria-label="Data final" value={periodo.ate} max={hoje} onChange={e => setPeriodo(p => ({ ...p, ate: e.target.value }))} /></label>
+          <span className="chips" role="group" aria-label="Atalhos de período">
+            {([['Período do fechamento', periodoFechamento(hoje)], ['Ciclo atual', periodoPadrao(hoje)]] as const).map(([rot, p]) => (
+              <button key={rot} type="button" className={`chip${periodo.de === p.de && periodo.ate === p.ate ? ' sel' : ''}`} aria-pressed={periodo.de === p.de && periodo.ate === p.ate}
+                title={`${dataBr(p.de)} a ${dataBr(p.ate)}`} onClick={() => setPeriodo(p)}>{rot} <small>{dataBr(p.de).slice(0, 5)} a {dataBr(p.ate).slice(0, 5)}</small></button>))}
+          </span>
           <Botao variante="primario" onClick={conferir} carregando={rodando} disabled={rodando || !!erroP}>Conferir com o Experience</Botao>
           {erroP && <small className="msg-erro">{erroP}</small>}
         </div>

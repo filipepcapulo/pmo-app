@@ -47,7 +47,7 @@ export function relatorioDemandas(itens: DemandaLinha[], filtros: string[]): Rel
 }
 
 // ---------------------------------------------------------------- filtro de vários status (tela Demandas)
-export const ABERTAS = ['backlog', 'planejada', 'em_andamento', 'pausada'];
+export const ABERTAS = ['backlog', 'planejada', 'em_andamento', 'em_validacao', 'pausada'];
 export const TODOS: string[] = STATUS_DEMANDA.map(s => s.valor);
 /** Status escolhidos guardados no aparelho, na ordem do fluxo; o que não for status conhecido é ignorado; vazio = abertas. */
 export function lerStatus(txt: string | null): string[] {

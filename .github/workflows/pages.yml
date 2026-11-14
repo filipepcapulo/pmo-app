@@ -1,8 +1,8 @@
 # Publica o GitHub Pages: o app 2.x (arquivos da raiz, sem build, iguais ao que o Pages servia) + a PWA v3 em /v3/
-# (Vite + React, build aqui). Em PR só testa e faz o build; o deploy é só na main.
+# (Vite + React, build aqui) + a V4 paralela em /v4/ (mesmo banco; não mexe na v3). Em PR só testa e faz o build; o deploy é só na main.
 # Pré-requisitos (uma vez): Settings → Pages → Source = "GitHub Actions"; Variables do repositório
 # SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY (a chave publicável do Supabase já é pública no navegador; nada de secret aqui).
-name: Pages (app 2.x + v3)
+name: Pages (app 2.x + v3 + v4)
 
 on:
   push:
@@ -26,7 +26,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: v3/package-lock.json
+          cache-dependency-path: |
+            v3/package-lock.json
+            v4/package-lock.json
       - name: Instalar e testar a v3 (Vitest)
         working-directory: v3
         run: npm ci && npm test
@@ -38,13 +40,25 @@ jobs:
         run: |
           export VITE_SUPABASE_WS="${VITE_SUPABASE_URL/https:\/\//wss://}"
           npm run build
-      - name: Montar o site (2.x na raiz + v3/)
+      - name: Instalar e testar a v4 (Vitest)
+        working-directory: v4
+        run: npm ci && npm test
+      - name: Build da v4
+        working-directory: v4
+        env:
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          export VITE_SUPABASE_WS="${VITE_SUPABASE_URL/https:\/\//wss://}"
+          npm run build
+      - name: Montar o site (2.x na raiz + v3/ + v4/)
         run: |
           mkdir -p _site
-          rsync -a --exclude '.git' --exclude '.github' --exclude 'v3' --exclude '_site' ./ _site/
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'v3' --exclude 'v4' --exclude '_site' ./ _site/
           cp -R v3/dist _site/v3
-          test -f _site/index.html && test -f _site/app.js && test -f _site/sw.js && test -f _site/v3/index.html
-          ls -la _site _site/v3
+          cp -R v4/dist _site/v4
+          test -f _site/index.html && test -f _site/app.js && test -f _site/sw.js && test -f _site/v3/index.html && test -f _site/v4/index.html
+          ls -la _site _site/v3 _site/v4
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:

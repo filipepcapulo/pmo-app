@@ -1,0 +1,129 @@
+/* PMO V4 — estilos novos (carregado depois do base.css). */
+
+/* ---------------------------------------------------------------- menu: outra aba e nome no recolhido */
+.menu-linha { position: relative; }
+.menu-outra { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border: 0; border-radius: 8px;
+  background: var(--superficie); color: var(--texto-2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  opacity: 0; box-shadow: var(--sombra); }
+.menu-linha:hover .menu-outra, .menu-outra:focus-visible { opacity: 1; }
+.menu-outra:hover { color: var(--verde); }
+.recolhido .menu-outra { display: none; }
+.menu-dica { position: fixed; left: calc(var(--menu-recolhido) + 6px); transform: translateY(-50%); z-index: 60; pointer-events: none;
+  background: var(--texto); color: var(--fundo); font-size: 13px; font-weight: 600; padding: 6px 10px; border-radius: 8px; white-space: nowrap;
+  box-shadow: var(--sombra-alta); }
+.menu-dica::before { content: ''; position: absolute; left: -5px; top: 50%; transform: translateY(-50%); border: 5px solid transparent; border-left: 0; border-right-color: var(--texto); }
+@media (max-width: 767px) { .menu-dica, .menu-outra { display: none; } }
+
+/* ---------------------------------------------------------------- trilha (caminho dentro da aba) */
+.trilha { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; font-size: 13px; color: var(--texto-2); margin: 0 0 10px; padding: 6px 10px;
+  background: var(--superficie); border-radius: 10px; box-shadow: var(--sombra); }
+.trilha-voltar { display: inline-flex; align-items: center; gap: 2px; margin-right: 10px; padding: 2px 8px 2px 4px; border-radius: 8px; background: var(--superficie-2); color: var(--texto); font-weight: 600; }
+.trilha-voltar:hover { text-decoration: none; background: var(--verde-claro); color: var(--verde-texto); }
+.trilha-item { display: inline-flex; align-items: center; max-width: 260px; min-width: 0; }
+.trilha-item a, .trilha-item.atual { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trilha-item a { font-weight: 500; }
+.trilha-item.atual { color: var(--texto); font-weight: 700; }
+
+/* ---------------------------------------------------------------- pílulas */
+.pil { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 1;
+  white-space: nowrap; letter-spacing: .01em; }
+a.pil:hover { text-decoration: none; filter: brightness(.95); }
+.pil-etapa { max-width: 220px; overflow: hidden; text-overflow: ellipsis; display: inline-block; line-height: 20px; }
+.pil-sem { background: var(--superficie-2); color: var(--texto-2); border: 1px dashed var(--linha); font-weight: 600; }
+.pil-resp { min-width: 26px; justify-content: center; padding: 0 6px; }
+.pst-nao_iniciado { background: #e5e7eb; color: #374151; }
+.pst-em_andamento { background: #dbeafe; color: #1d4ed8; }
+.pst-em_validacao { background: #ede9fe; color: #6d28d9; }
+.pst-concluida { background: #dcfce7; color: #166534; }
+.pst-cancelada { background: #f3f4f6; color: #6b7280; text-decoration: line-through; }
+.pst-pausada { background: #ffedd5; color: #c2410c; }
+.pst-atrasada { background: var(--vermelho); color: #fff; }
+.pil-chamado { background: #e0f2fe; color: #075985; }
+.pil-alocar { background: #fef9c3; color: #854d0e; border: 1px solid #eab308; }
+.loc-triagem { background: #e5e7eb; color: #374151; }
+.loc-aguardando_cliente { background: #fce7f3; color: #9d174d; }
+.loc-backlog_consultores { background: #fef08a; color: #713f12; }
+.loc-backlog_personalizacao { background: #fecaca; color: #991b1b; }
+.loc-atribuido { background: #dbeafe; color: #1d4ed8; }
+.loc-service_desk { background: #cffafe; color: #155e75; }
+.loc-em_validacao { background: #ede9fe; color: #6d28d9; }
+.loc-concluido { background: #dcfce7; color: #166534; }
+.loc-encerrado { background: #f3f4f6; color: #6b7280; }
+
+/* ---------------------------------------------------------------- árvore de demandas: cartão por demanda, subdemandas ligadas por conectores */
+.arvore > li { border: 1px solid var(--linha); border-radius: 12px; background: var(--superficie); margin: 0 0 8px; padding: 2px 6px 4px; }
+.arvore ul { padding-left: 22px; border-left: 0; margin: 0 0 2px 14px; }
+.arvore ul > li { position: relative; }
+.arvore ul > li::before { content: ''; position: absolute; left: -22px; top: 0; width: 16px; height: 21px; border-left: 2px solid var(--linha);
+  border-bottom: 2px solid var(--linha); border-bottom-left-radius: 9px; }
+.arvore ul > li:not(:last-child)::after { content: ''; position: absolute; left: -22px; top: 0; bottom: 0; border-left: 2px solid var(--linha); }
+.linha-exec, .arvore li:last-child > .linha-exec { margin: 0; border-bottom: 0; padding: 7px 8px; }
+.linha-exec:not(.sub) { box-shadow: none; padding-left: 8px; background: none; }
+@media (hover: hover) { .linha-exec:hover, .linha-exec:not(.sub):hover { background: var(--superficie-2); } }
+.linha-exec:not(.sub):active { background: var(--superficie-2); }
+.linha-exec-nome { font-size: 15px; }
+.linha-exec.sub .linha-exec-nome { font-size: 14px; font-weight: 600; }
+.linha-exec.sub .linha-exec-nome::before { content: none; }
+.dem-pilulas { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.dem-datas { white-space: nowrap; }
+
+/* ---------------------------------------------------------------- nível do filtro (vale para todos os filtros) */
+.filtro-nivel { display: inline-flex; align-items: center; gap: 8px; margin-left: 6px; padding: 4px 6px 4px 12px; border-left: 3px solid var(--verde);
+  background: var(--verde-claro); border-radius: 10px; font-size: 12px; font-weight: 700; color: var(--verde-texto); }
+.filtro-nivel-ops { display: inline-flex; background: var(--superficie); border-radius: 8px; padding: 2px; gap: 2px; }
+.filtro-nivel-ops button { border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--texto-2); padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+.filtro-nivel-ops button[aria-pressed="true"] { background: var(--verde); color: #fff; }
+
+/* ---------------------------------------------------------------- cadastro de etapas */
+.etapa-cartao { border-left: 6px solid var(--cor-etapa, var(--linha)); }
+.etapa-cartao h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 16px; margin: 0; }
+.etapa-vinculos { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+.etapa-vinculos li { font-size: 12px; background: var(--superficie-2); border-radius: 6px; padding: 2px 8px; }
+.etapa-opcoes { max-height: 280px; overflow: auto; border: 1px solid var(--linha); border-radius: 10px; padding: 6px 10px; display: grid; gap: 2px; }
+.etapa-opcoes .check { margin: 0; font-size: 13px; }
+.etapa-opcoes .check small { color: var(--texto-2); }
+.cor-campo { display: inline-flex; align-items: center; gap: 8px; }
+.cor-campo input[type=color] { width: 44px; height: 36px; padding: 2px; }
+
+/* ---------------------------------------------------------------- chamados: kanban do fluxo */
+.kb-chamados { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(168px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 8px; align-items: start; }
+.kb-col { min-width: 0; background: var(--superficie-2); border-radius: 12px; padding: 8px; min-height: 180px; border-top: 4px solid var(--kb-cor, var(--linha)); }
+.kb-col.alvo { outline: 2px dashed var(--verde); outline-offset: -2px; }
+.kb-col h3 { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; margin: 2px 4px 8px; color: var(--texto); }
+.kb-col h3 span { background: var(--superficie); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--texto-2); }
+.kb-cartao { min-width: 0; overflow: hidden; background: var(--superficie); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; box-shadow: var(--sombra); cursor: grab; display: grid; gap: 4px; font-size: 13px; }
+.kb-cartao:active { cursor: grabbing; }
+.kb-cartao.arrastando { opacity: .45; }
+.kb-cartao strong { font-size: 13px; }
+.kb-cartao .linha { gap: 4px; flex-wrap: wrap; }
+.kb-cartao a { color: var(--texto); }
+.kb-vazio { font-size: 12px; color: var(--texto-2); text-align: center; padding: 12px 4px; }
+.kb-mover { font-size: 12px; min-height: 28px; padding: 2px 6px; max-width: 100%; }
+.kb-cartao .kb-mover { width: 100%; }
+.kb-cartao > a { overflow-wrap: anywhere; }
+.kb-cartao .sla { white-space: normal; }
+
+/* ---------------------------------------------------------------- alocar agenda: disponibilidade de 2 semanas */
+.disp { display: grid; gap: 10px; }
+.disp-semana { display: grid; grid-template-columns: 54px repeat(5, minmax(0, 1fr)); gap: 4px; align-items: stretch; }
+.disp-semana > .disp-tit { grid-column: 1 / -1; font-size: 12px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; letter-spacing: .03em; }
+.disp-cab { font-size: 11px; font-weight: 700; text-align: center; color: var(--texto-2); }
+.disp-turno { font-size: 11px; font-weight: 700; color: var(--texto-2); display: flex; align-items: center; }
+.disp-cel { border: 1px solid var(--linha); border-radius: 8px; min-height: 44px; padding: 4px 6px; font-size: 11px; text-align: left; background: var(--superficie-2); color: var(--texto-2); font-family: inherit; overflow: hidden; }
+.disp-cel.livre { background: #dcfce7; border-color: #16a34a; color: #14532d; font-weight: 700; cursor: pointer; }
+.disp-cel.livre:hover { box-shadow: 0 0 0 2px #16a34a; }
+.disp-cel.sel { background: #16a34a; color: #fff; border-color: #166534; }
+.disp-cel.ausente { background: repeating-linear-gradient(45deg, var(--superficie-2), var(--superficie-2) 6px, var(--linha) 6px, var(--linha) 12px); }
+.disp-cel.passado { opacity: .45; }
+.disp-cel small { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disp-legenda { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--texto-2); }
+.disp-leg-ausente { background: repeating-linear-gradient(45deg, var(--superficie-2), var(--superficie-2) 3px, var(--linha) 3px, var(--linha) 6px); }
+.disp-legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1px solid var(--linha); }
+
+/* ---------------------------------------------------------------- escuro */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) .pst-nao_iniciado, :root:not([data-tema="claro"]) .loc-triagem { background: #3f3f46; color: #e4e4e7; }
+  :root:not([data-tema="claro"]) .disp-cel.livre { background: #14532d; color: #dcfce7; }
+}
+:root[data-tema="escuro"] .pst-nao_iniciado, :root[data-tema="escuro"] .loc-triagem { background: #3f3f46; color: #e4e4e7; }
+:root[data-tema="escuro"] .disp-cel.livre { background: #14532d; color: #dcfce7; }

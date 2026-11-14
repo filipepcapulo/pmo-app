@@ -1,0 +1,584 @@
+// Equipe, usuários e permissões numa tela (escopo §1.3): lista de pessoas; ficha em abas (Info · Acessos · Skills);
+// acessos pela funcionalidade (marca usuários/perfis) e catálogo de módulos (skills).
+// V11d-2: aba "App/APK" da ficha e visão "App 2.x/APK" — acesso ao app 2.x/APK (antes nas Propriedades do servidor).
+// V13a-1: e-mail do ClickUp (vínculo com o espelho), troca do e-mail de login (só Admin), Inativar/Reativar e Excluir (só sem histórico).
+// V13b-2: aba "Conta Sankhya" — usuário e senha Sankhya da pessoa, os mesmos do Experience, OM e Zendesk (a própria ou o Admin;
+// senha testada e cifrada no banco).
+import { useEffect, useMemo, useState } from 'react';
+import { api, PAPEIS, PERFIS, rotuloPerfil, type Acessos, type Membro, type ModuloSkill, type Papel, type UsuarioFicha } from '../api/cadastros';
+import { alternarCompleto, apiAcessoApp, completo, formDe, MODULOS_APP, normalizar, quando, resumo,
+  type AcessoApp, type FichaAcessoApp, type FormAcessoApp, type ModuloApp } from '../api/acessoApp';
+import { apiContaSankhya, textoEstado, textoResultado } from '../api/contaSankhya';
+import { Botao } from '../componentes/Botao';
+import { Campo, Formulario } from '../componentes/Campo';
+import { NomePessoa, PilulasSkills } from '../componentes/NomePessoa';
+import { Popup } from '../componentes/Popup';
+import { Tabela, type Coluna } from '../componentes/Tabela';
+import { useToast } from '../componentes/Toasts';
+import { useCarga } from '../estado/carga';
+import { useEquipe, usePode } from '../estado/equipe';
+import { useSessao } from '../estado/sessao';
+
+const semAcento = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+const rotuloPapel = (p: string) => PAPEIS.find(x => x.valor === p)?.rotulo ?? p;
+type Visao = 'pessoas' | 'funcionalidade' | 'app' | 'catalogo';
+
+export function Equipe() {
+  const pode = usePode();
+  const [visao, setVisao] = useState<Visao>('pessoas');
+  const [usuario, setUsuario] = useState<string | 'novo' | null>(null);
+  const [abaInicial, setAbaInicial] = useState<Aba>('info');
+  const abrir = (id: string | null, aba: Aba = 'info') => { setAbaInicial(aba); setUsuario(id); };
+  const visoes: { id: Visao; titulo: string }[] = [
+    { id: 'pessoas', titulo: 'Pessoas' },
+    ...(pode('permissao.editar') ? [{ id: 'funcionalidade' as Visao, titulo: 'Acessos por funcionalidade' },
+      { id: 'app' as Visao, titulo: 'App 2.x/APK' }] : []),
+    { id: 'catalogo', titulo: 'Catálogo de skills' },
+  ];
+  return (
+    <div className="pagina">
+      <header className="pagina-topo">
+        <h1>Equipe</h1>
+        {pode('equipe.editar') && <Botao variante="primario" onClick={() => abrir('novo')}>+ Novo usuário</Botao>}
+      </header>
+      <div className="segmentos" role="tablist" aria-label="Visão da equipe">
+        {visoes.map(v => (
+          <button key={v.id} type="button" role="tab" aria-selected={visao === v.id} onClick={() => setVisao(v.id)}>{v.titulo}</button>
+        ))}
+      </div>
+      {visao === 'pessoas' && <Pessoas aoAbrir={id => abrir(id)} />}
+      {visao === 'funcionalidade' && <PorFuncionalidade />}
+      {visao === 'app' && <AcessosApp aoAbrir={id => abrir(id, 'app')} versao={usuario === null ? 0 : 1} />}
+      {visao === 'catalogo' && <Catalogo />}
+      {usuario && <UsuarioPopup key={usuario} id={usuario} abaInicial={abaInicial} aoFechar={() => setUsuario(null)} aoCriar={id => abrir(id)} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- lista de pessoas
+function Pessoas({ aoAbrir }: { aoAbrir: (id: string) => void }) {
+  const { lista, carregada } = useEquipe();
+  const [texto, setTexto] = useState('');
+  const [papel, setPapel] = useState('');
+  const [inativos, setInativos] = useState(false);
+  const linhas = useMemo(() => lista.filter(m => (inativos || m.ativo) && (!papel || m.papeis.includes(papel as Papel))
+    && (!texto || semAcento(`${m.nome} ${m.email} ${m.email_clickup ?? ''}`).includes(semAcento(texto)))), [lista, texto, papel, inativos]);
+  type L = Membro & Record<string, unknown>;
+  const cols: Coluna<L>[] = [
+    { chave: 'nome', titulo: 'Nome', render: l => <><NomePessoa id={l.id} comAvatar />{!l.ativo && <span className="pilula pilula-neutra"> Inativo</span>}</> },
+    { chave: 'email', titulo: 'E-mail (login)' },
+    { chave: 'email_clickup', titulo: 'E-mail do ClickUp', texto: l => l.email_clickup ?? '', render: l => l.email_clickup ?? <span className="ajuda">—</span> },
+    { chave: 'papeis', titulo: 'Papéis', ordem: l => l.papeis.map(rotuloPapel).join(', '), render: l => <span className="pilulas">{l.papeis.map(p => <span key={p} className="pilula pilula-neutra">{rotuloPapel(p)}</span>)}</span> },
+    { chave: 'perfil_nome', titulo: 'Perfil' },
+    { chave: 'skills', titulo: 'Skills', alinhar: 'dir', texto: l => `${l.skills.filter(s => s.certificado).length} cert. / ${l.skills.length}`, ordem: l => l.skills.filter(s => s.certificado).length * 1000 + l.skills.length, render: l => `${l.skills.filter(s => s.certificado).length} cert. / ${l.skills.length}` },
+  ];
+  return (
+    <>
+      <div className="barra-filtros">
+        <input type="search" aria-label="Buscar pessoa" placeholder="Buscar nome ou e-mail" value={texto} onChange={e => setTexto(e.target.value)} />
+        <select aria-label="Papel" value={papel} onChange={e => setPapel(e.target.value)}>
+          <option value="">Todos os papéis</option>
+          {PAPEIS.map(p => <option key={p.valor} value={p.valor}>{p.rotulo}</option>)}
+        </select>
+        <label className="check"><input type="checkbox" checked={inativos} onChange={e => setInativos(e.target.checked)} /> Mostrar inativos</label>
+      </div>
+      <Tabela id="equipe" nome="Equipe" colunas={cols} linhas={linhas as L[]} chave={l => l.id} tamanhoInicial={30}
+        vazio={carregada ? 'Ninguém encontrado.' : 'Carregando…'} aoClicar={l => aoAbrir(l.id)} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- ficha do usuário em abas
+type Aba = 'info' | 'acessos' | 'skills' | 'app' | 'sankhya';
+
+function UsuarioPopup({ id, abaInicial = 'info', aoFechar, aoCriar }: { id: string; abaInicial?: Aba; aoFechar: () => void; aoCriar: (id: string) => void }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const pode = usePode();
+  const novo = id === 'novo';
+  const [aba, setAba] = useState<Aba>(abaInicial);
+  const c = useCarga(() => (novo ? Promise.resolve(null) : api.usuario(esc, id)), [esc, id]);
+  const equipe = useEquipe();
+  const { recarregarEu, eu } = useSessao();
+  const depois = async () => { await Promise.all([c.recarregar(), equipe.recarregar(), id === eu?.usuario.id ? recarregarEu() : null]); };
+  const abas: { id: Aba; titulo: string }[] = [{ id: 'info', titulo: 'Info' }, { id: 'acessos', titulo: 'Acessos' }, { id: 'skills', titulo: 'Skills' },
+    ...(pode('permissao.editar') ? [{ id: 'app' as Aba, titulo: 'App/APK' }] : []),
+    ...(id === eu?.usuario.id || pode('integracao.gerenciar') ? [{ id: 'sankhya' as Aba, titulo: 'Conta Sankhya' }] : [])];
+  return (
+    <Popup aberto titulo={novo ? 'Novo usuário' : c.dados?.usuario.nome ?? 'Usuário'} aoFechar={aoFechar} largura={760}>
+      {!novo && (
+        <div className="segmentos" role="tablist" aria-label="Abas do usuário">
+          {abas.map(a => <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}>{a.titulo}</button>)}
+        </div>
+      )}
+      {c.erro && <p className="msg-erro">{c.erro}</p>}
+      {novo && <AbaInfo ficha={null} aoGravar={async nid => { await equipe.recarregar(); aoCriar(nid); }} />}
+      {!novo && c.dados && aba === 'info' && <AbaInfo ficha={c.dados} aoGravar={depois}
+        aoExcluir={async () => { await equipe.recarregar(); aoFechar(); }} />}
+      {!novo && c.dados && aba === 'acessos' && <AbaAcessos ficha={c.dados} aoGravar={depois} />}
+      {!novo && c.dados && aba === 'skills' && <AbaSkills ficha={c.dados} aoGravar={depois} />}
+      {!novo && c.dados && aba === 'app' && <AbaApp ficha={c.dados} />}
+      {!novo && c.dados && aba === 'sankhya' && <AbaContaSankhya ficha={c.dados} />}
+      {!novo && !c.dados && !c.erro && <p className="ajuda"><span className="giro" /> Carregando…</p>}
+    </Popup>
+  );
+}
+
+function AbaInfo({ ficha, aoGravar, aoExcluir }: { ficha: UsuarioFicha | null; aoGravar: (id: string) => Promise<void> | void; aoExcluir?: () => Promise<void> }) {
+  const { eu } = useSessao();
+  const esc = eu!.escritorio_id!;
+  const admin = eu?.perfil === 'admin';
+  const proprio = !!ficha && ficha.usuario.id === eu?.usuario.id;
+  const pode = usePode();
+  const avisar = useToast();
+  const u = ficha?.usuario;
+  const [f, setF] = useState({ email: u?.email ?? '', emailCu: u?.email_clickup ?? '', nome: u?.nome ?? '', iniciais: u?.iniciais ?? '', cor: u?.cor ?? '#1f7a45',
+    papeis: (u?.papeis ?? ['consultor']) as Papel[], ativo: u?.ativo ?? true, perfil: ficha?.perfil.codigo ?? 'consultor' });
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const [gravando, setGravando] = useState(false);
+  const [acao, setAcao] = useState<string | null>(null);
+  const [novoLogin, setNovoLogin] = useState<string | null>(null);
+  const editar = pode('equipe.editar');
+  const emailOk = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.trim());
+  const executar = async (qual: string, fn: () => Promise<unknown>, msg: string, depois: () => Promise<void> | void) => {
+    setAcao(qual);
+    try { await fn(); avisar(msg, 'ok'); await depois(); }
+    catch (x) { avisar((x as Error).message, 'erro'); }
+    setAcao(null);
+  };
+  const semHistorico = ficha?.historico?.total === 0;
+  const mudaPerfil = pode('permissao.editar');
+  const alternarPapel = (p: Papel) => setF(x => ({ ...x, papeis: x.papeis.includes(p) ? x.papeis.filter(y => y !== p) : [...x.papeis, p] }));
+  const enviar = async () => {
+    const e: Record<string, string> = {};
+    if (!ficha && !emailOk(f.email)) e.email = 'Informe um e-mail válido.';
+    if (f.emailCu.trim() && !emailOk(f.emailCu)) e.emailCu = 'Informe um e-mail válido (ou deixe vazio).';
+    if (!f.nome.trim()) e.nome = 'Informe o nome.';
+    if (f.iniciais.trim().length > 4) e.iniciais = 'No máximo 4 letras.';
+    setErros(e);
+    if (Object.keys(e).length) return;
+    setGravando(true);
+    try {
+      const dados: Record<string, unknown> = { nome: f.nome.trim(), iniciais: f.iniciais.trim() || null, cor: f.cor, papeis: f.papeis };
+      if (!ficha) dados.ativo = f.ativo;
+      if ((f.emailCu.trim().toLowerCase() || null) !== (u?.email_clickup ?? null)) dados.email_clickup = f.emailCu.trim() || null;
+      if (mudaPerfil && (!ficha || f.perfil !== ficha.perfil.codigo)) dados.perfil = f.perfil;
+      const r = await api.usuarioSalvar(esc, ficha ? { id: ficha.usuario.id, versao: ficha.usuario.versao, ...dados } : { email: f.email.trim(), ...dados });
+      avisar(ficha ? 'Usuário gravado' : 'Usuário cadastrado. Ele já pode entrar com o código por e-mail.', 'ok');
+      if (typeof r.aviso === 'string') avisar(r.aviso, 'info');
+      await aoGravar(r.id);
+    } catch (x) { avisar((x as Error).message, 'erro'); }
+    setGravando(false);
+  };
+  return (
+    <Formulario aoEnviar={enviar}>
+      <div className="grade-campos">
+        {ficha
+          ? <Campo rotulo="E-mail (login)" valor={f.email} aoMudar={() => {}} somenteLeitura
+              ajuda={`${u?.logou ? 'Já entrou no v3.' : 'Ainda não entrou no v3.'}${admin ? '' : ' Só o Admin troca o e-mail de login.'}`} />
+          : <Campo rotulo="E-mail (login)" tipo="email" valor={f.email} aoMudar={v => setF({ ...f, email: v })} obrigatorio erro={erros.email} autoComplete="off" />}
+        <Campo rotulo="E-mail do ClickUp" tipo="email" valor={f.emailCu} aoMudar={v => setF({ ...f, emailCu: v })} erro={erros.emailCu}
+          somenteLeitura={!editar} autoComplete="off"
+          ajuda={ficha?.clickup ? (ficha.clickup.local ? 'Sem membro no ClickUp (criado pelo app).' : `Ligado ao membro ${ficha.clickup.nome} do ClickUp.`)
+            : 'Usado para ligar a pessoa ao membro do ClickUp (pode ser diferente do login).'} />
+        <Campo rotulo="Nome" valor={f.nome} aoMudar={v => setF({ ...f, nome: v })} obrigatorio erro={erros.nome} maxLength={120} />
+        <Campo rotulo="Iniciais" valor={f.iniciais} aoMudar={v => setF({ ...f, iniciais: v.toUpperCase() })} erro={erros.iniciais} maxLength={4} />
+        <div className="campo">
+          <label htmlFor="cor-usuario">Cor</label>
+          <input id="cor-usuario" type="color" value={f.cor} onChange={e => setF({ ...f, cor: e.target.value })} />
+        </div>
+        <Campo rotulo="Perfil de acesso" tipo="select" valor={f.perfil} aoMudar={v => setF({ ...f, perfil: v })}
+          ajuda={mudaPerfil ? 'Perfil ≠ papel: o perfil diz o que a pessoa acessa.' : 'Só quem edita permissões muda o perfil.'}
+          opcoes={PERFIS.map(p => ({ valor: p.valor, rotulo: p.rotulo }))} />
+      </div>
+      <fieldset className="grupo" disabled={!editar}>
+        <legend>Papéis (o que a pessoa faz)</legend>
+        <div className="linha">
+          {PAPEIS.map(p => (
+            <label key={p.valor} className="check"><input type="checkbox" checked={f.papeis.includes(p.valor)} onChange={() => alternarPapel(p.valor)} /> {p.rotulo}</label>
+          ))}
+        </div>
+      </fieldset>
+      {!ficha && <label className="check"><input type="checkbox" checked={f.ativo} disabled={!editar} onChange={e => setF({ ...f, ativo: e.target.checked })} /> Ativo neste escritório</label>}
+      {ficha && admin && novoLogin !== null && (
+        <fieldset className="grupo" disabled={acao !== null}>
+          <legend>Trocar e-mail de login</legend>
+          <p className="ajuda">A conta de login acompanha: {u!.nome} passa a entrar com o e-mail novo (v3, app 2.x e APK) e os aparelhos do app 2.x/APK pedem login de novo.</p>
+          <div className="linha">
+            <Campo rotulo="Novo e-mail de login" tipo="email" valor={novoLogin} aoMudar={setNovoLogin} autoComplete="off" />
+            <Botao variante="primario" carregando={acao === 'login'} disabled={!emailOk(novoLogin) || novoLogin.trim().toLowerCase() === u!.email}
+              onClick={() => executar('login', () => api.usuarioEmailLogin(esc, { id: u!.id, email: novoLogin.trim(), versao: u!.versao }),
+                'E-mail de login trocado', async () => { setNovoLogin(null); await aoGravar(u!.id); })}>Trocar</Botao>
+            <Botao onClick={() => setNovoLogin(null)}>Cancelar</Botao>
+          </div>
+        </fieldset>
+      )}
+      <div className="linha">
+        {editar && <Botao type="submit" variante="primario" carregando={gravando} disabled={acao !== null}>{ficha ? 'Gravar' : 'Cadastrar'}</Botao>}
+        {ficha && admin && novoLogin === null && <Botao disabled={acao !== null} onClick={() => setNovoLogin(u!.email)}>Trocar e-mail de login</Botao>}
+        {ficha && editar && !proprio && (f.ativo
+          ? <Botao className="a-esquerda" carregando={acao === 'ativo'} disabled={acao !== null}
+              onClick={() => { if (confirm(`Inativar ${u!.nome}? Some da Agenda da equipe, Minha agenda, Kanban, Ociosidade e das listas de responsável; o histórico fica.`))
+                void executar('ativo', () => api.usuarioSalvar(esc, { id: u!.id, versao: u!.versao, ativo: false }), 'Usuário inativado',
+                  async () => { setF(x => ({ ...x, ativo: false })); await aoGravar(u!.id); }); }}>Inativar</Botao>
+          : <Botao className="a-esquerda" carregando={acao === 'ativo'} disabled={acao !== null}
+              onClick={() => void executar('ativo', () => api.usuarioSalvar(esc, { id: u!.id, versao: u!.versao, ativo: true }), 'Usuário reativado',
+                async () => { setF(x => ({ ...x, ativo: true })); await aoGravar(u!.id); })}>Reativar</Botao>)}
+        {ficha && editar && !proprio && semHistorico && (
+          <Botao variante="perigo" carregando={acao === 'excluir'} disabled={acao !== null}
+            onClick={() => { if (confirm(`Excluir ${u!.nome}? Não tem histórico; o cadastro, os acessos e as skills somem e não dá para desfazer.`))
+              void executar('excluir', () => api.usuarioExcluir(esc, u!.id), 'Usuário excluído', async () => { await aoExcluir?.(); }); }}>Excluir</Botao>)}
+      </div>
+      {ficha && editar && !proprio && ficha.historico && !semHistorico && (
+        <p className="ajuda">Tem histórico ({ficha.historico.total} registro(s)): não pode ser excluído. Use Inativar.</p>)}
+      {ficha && !f.ativo && <p className="ajuda"><span className="pilula pilula-neutra">Inativo</span> neste escritório.</p>}
+    </Formulario>
+  );
+}
+
+function AbaAcessos({ ficha, aoGravar }: { ficha: UsuarioFicha; aoGravar: () => Promise<void> }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const pode = usePode();
+  const avisar = useToast();
+  const [gravando, setGravando] = useState<string | null>(null);
+  const [marcado, setMarcado] = useState<Record<string, boolean>>({});  // marcação otimista até a resposta
+  if (!ficha.permissoes) return <p className="ajuda">Você não tem permissão para ver os acessos desta pessoa.</p>;
+  const editar = pode('permissao.editar') && ficha.perfil.codigo !== 'admin';
+  const grupos = ficha.permissoes.reduce<Record<string, typeof ficha.permissoes>>((g, p) => { (g[p.modulo] ??= []).push(p); return g; }, {});
+  const alternar = async (codigo: string, novo: boolean, doPerfil: boolean) => {
+    setGravando(codigo);
+    setMarcado(m => ({ ...m, [codigo]: novo }));
+    try {
+      await api.permissaoSalvar(esc, { usuario_id: ficha.usuario.id, funcionalidade: codigo, permitido: novo === doPerfil ? null : novo });
+      await aoGravar();
+    } catch (e) { avisar((e as Error).message, 'erro'); }
+    setMarcado(m => { const { [codigo]: _, ...r } = m; return r; });
+    setGravando(null);
+  };
+  return (
+    <div className="acessos">
+      <p className="ajuda">Perfil <strong>{rotuloPerfil(ficha.perfil.codigo)}</strong>
+        {ficha.perfil.codigo === 'admin' ? ': o Admin acessa tudo.' : '. Marcar diferente do perfil cria uma exceção só para esta pessoa.'}</p>
+      {Object.entries(grupos).map(([mod, lista]) => (
+        <fieldset key={mod} className="grupo">
+          <legend>{mod}</legend>
+          {lista.map(p => (
+            <label key={p.codigo} className="check acesso">
+              <input type="checkbox" checked={marcado[p.codigo] ?? p.efetivo} disabled={!editar || (gravando !== null && gravando !== p.codigo)}
+                onChange={e => alternar(p.codigo, e.target.checked, p.do_perfil)} aria-describedby={`ac-${p.codigo}`} />
+              <span>{p.descricao} <code>{p.codigo}</code></span>
+              <small id={`ac-${p.codigo}`} className={p.excecao === null ? 'ajuda' : 'excecao'}>
+                {p.excecao === null ? 'pelo perfil' : p.excecao ? 'exceção: liberado' : 'exceção: bloqueado'}</small>
+            </label>
+          ))}
+        </fieldset>
+      ))}
+    </div>
+  );
+}
+
+function AbaSkills({ ficha, aoGravar }: { ficha: UsuarioFicha; aoGravar: () => Promise<void> }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const pode = usePode();
+  const avisar = useToast();
+  const [modulos, setModulos] = useState<ModuloSkill[]>([]);
+  const [novo, setNovo] = useState({ modulo: '', certificado: false });
+  const [gravando, setGravando] = useState(false);
+  const [cert, setCert] = useState<Record<string, boolean>>({});
+  const editar = pode('equipe.editar');
+  useEffect(() => { api.modulos(esc).then(setModulos).catch(() => setModulos([])); }, [esc]);
+  const gravar = async (d: { modulo_id: string; certificado?: boolean; remover?: boolean }, msg: string) => {
+    setGravando(true);
+    if (d.certificado !== undefined) setCert(c => ({ ...c, [d.modulo_id]: d.certificado! }));
+    try { await api.skillSalvar(esc, { usuario_id: ficha.usuario.id, ...d }); avisar(msg, 'ok'); await aoGravar(); }
+    catch (e) { avisar((e as Error).message, 'erro'); }
+    setCert({});
+    setGravando(false);
+  };
+  const livres = modulos.filter(m => !ficha.skills.some(s => s.modulo_id === m.id));
+  return (
+    <div className="formulario">
+      <PilulasSkills skills={ficha.skills} />
+      {ficha.skills.length > 0 && (
+        <ul className="lista-skills">
+          {ficha.skills.map(s => (
+            <li key={s.modulo_id}>
+              <span>{s.modulo}</span>
+              <label className="check"><input type="checkbox" checked={cert[s.modulo_id] ?? s.certificado} disabled={!editar || gravando}
+                onChange={e => gravar({ modulo_id: s.modulo_id, certificado: e.target.checked }, 'Skill gravada')} /> Certificado</label>
+              {editar && <button type="button" className="link" disabled={gravando} aria-label={`Remover ${s.modulo}`}
+                onClick={() => gravar({ modulo_id: s.modulo_id, remover: true }, 'Skill removida')}>Remover</button>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {editar && (
+        <div className="linha">
+          <select aria-label="Módulo" value={novo.modulo} onChange={e => setNovo({ ...novo, modulo: e.target.value })}>
+            <option value="">— adicionar módulo —</option>
+            {livres.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+          </select>
+          <label className="check"><input type="checkbox" checked={novo.certificado} onChange={e => setNovo({ ...novo, certificado: e.target.checked })} /> Certificado</label>
+          <Botao disabled={!novo.modulo} carregando={gravando} onClick={async () => {
+            await gravar({ modulo_id: novo.modulo, certificado: novo.certificado }, 'Skill adicionada'); setNovo({ modulo: '', certificado: false });
+          }}>Adicionar</Botao>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- app 2.x/APK (V11d-2)
+function AbaApp({ ficha }: { ficha: UsuarioFicha }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const eu = useSessao().eu?.usuario.id;
+  const avisar = useToast();
+  const c = useCarga<FichaAcessoApp>(() => apiAcessoApp.ficha(esc, ficha.usuario.id), [esc, ficha.usuario.id]);
+  const [f, setF] = useState<FormAcessoApp | null>(null);
+  const [gravando, setGravando] = useState<string | null>(null);
+  const a = c.dados?.acesso ?? null;
+  useEffect(() => { if (c.dados) setF(formDe(c.dados.acesso)); }, [c.dados]);
+  if (c.erro) return <p className="msg-erro">{c.erro}</p>;
+  if (!c.dados || !f) return <p className="ajuda"><span className="giro" /> Carregando…</p>;
+  const proprio = ficha.usuario.id === eu;
+  const executar = async (qual: string, fn: () => Promise<unknown>, msg: string) => {
+    setGravando(qual);
+    try { await fn(); avisar(msg, 'ok'); await c.recarregar(); }
+    catch (e) { avisar((e as Error).message, 'erro'); }
+    setGravando(null);
+  };
+  const marcar = (k: 'ativo' | 'admin' | 'agendar' | 'editar' | 'notifOciosidade', v: boolean) => setF(normalizar({ ...f, [k]: v }));
+  const modulo = (m: ModuloApp, v: boolean) => setF(normalizar({ ...f, modulos: v ? [...f.modulos, m] : f.modulos.filter(x => x !== m) }));
+  const temOci = f.modulos.includes('ociosidade');
+  return (
+    <div className="formulario">
+      <p className="ajuda">
+        Acesso ao <strong>app 2.x</strong> e ao <strong>APK</strong> (login por código no e-mail {ficha.usuario.email}).
+        {a ? <> {a.aparelhos} aparelho(s) conectado(s) · último uso {quando(a.ultimoUso)} · alterado {quando(a.alterado)}{a.por ? ` por ${a.por}` : ''}.</>
+          : ' Esta pessoa ainda não tem acesso: marque abaixo e grave para liberar.'}
+      </p>
+      <fieldset className="grupo" disabled={gravando !== null}>
+        <legend>Acesso</legend>
+        <label className="check"><input type="checkbox" checked={completo(f)} onChange={() => setF(alternarCompleto(f))} /> <strong>Permissão completa</strong></label>
+        <label className="check"><input type="checkbox" checked={f.ativo} disabled={proprio} onChange={e => marcar('ativo', e.target.checked)} /> Ativo (pode entrar no app 2.x/APK)</label>
+      </fieldset>
+      <fieldset className="grupo" disabled={gravando !== null}>
+        <legend>Módulos que pode ver</legend>
+        {MODULOS_APP.map(m => (
+          <label key={m.valor} className="check"><input type="checkbox" checked={f.modulos.includes(m.valor)} onChange={e => modulo(m.valor, e.target.checked)} /> {m.rotulo}</label>
+        ))}
+      </fieldset>
+      <fieldset className="grupo" disabled={gravando !== null}>
+        <legend>Ações</legend>
+        <label className="check"><input type="checkbox" checked={f.agendar} onChange={e => marcar('agendar', e.target.checked)} /> Agendar <small className="ajuda">criar agendas pelo app</small></label>
+        <label className="check"><input type="checkbox" checked={f.editar} onChange={e => marcar('editar', e.target.checked)} /> Editar agendas</label>
+        <label className="check"><input type="checkbox" checked={f.admin} disabled={proprio} onChange={e => marcar('admin', e.target.checked)} /> Administrador <small className="ajuda">cadastra e-mails e muda permissões pelo APK</small></label>
+      </fieldset>
+      <fieldset className="grupo" disabled={gravando !== null}>
+        <legend>Notificações</legend>
+        <label className="check"><input type="checkbox" checked={temOci && f.notifOciosidade} disabled={!temOci} onChange={e => marcar('notifOciosidade', e.target.checked)} />
+          {' '}Receber notificação de Ociosidade <small className="ajuda">{temOci ? '1 vez por dia útil, depois do relatório da manhã' : 'marque antes o módulo Ociosidade'}</small></label>
+      </fieldset>
+      <div className="linha">
+        <Botao variante="primario" carregando={gravando === 'gravar'} disabled={gravando !== null}
+          onClick={() => executar('gravar', () => apiAcessoApp.salvar(esc, ficha.usuario.id, f, a?.versao), a ? 'Acesso ao app gravado' : 'Acesso ao app liberado')}>
+          {a ? 'Gravar' : 'Liberar acesso'}</Botao>
+        {a && <Botao carregando={gravando === 'desc'} disabled={gravando !== null}
+          onClick={() => executar('desc', () => apiAcessoApp.desconectar(esc, ficha.usuario.id), 'Aparelhos desconectados (vale em até 1 minuto)')}>
+          Desconectar aparelhos</Botao>}
+        {a && !proprio && <Botao className="a-esquerda" carregando={gravando === 'rem'} disabled={gravando !== null}
+          onClick={() => { if (window.confirm(`Remover o acesso de ${ficha.usuario.nome} ao app 2.x/APK?`)) void executar('rem', () => apiAcessoApp.remover(esc, ficha.usuario.id), 'Acesso ao app removido'); }}>
+          Remover acesso</Botao>}
+      </div>
+    </div>
+  );
+}
+
+function AbaContaSankhya({ ficha }: { ficha: UsuarioFicha }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const proprio = useSessao().eu?.usuario.id === ficha.usuario.id;
+  const avisar = useToast();
+  const c = useCarga(() => apiContaSankhya.ficha(esc, ficha.usuario.id), [esc, ficha.usuario.id]);
+  const [login, setLogin] = useState('');
+  const [senha, setSenha] = useState('');
+  const [gravando, setGravando] = useState<string | null>(null);
+  const gravado = c.dados?.login;
+  useEffect(() => { if (gravado !== undefined) setLogin(gravado ?? ''); }, [gravado]); // só quando o login gravado muda (recusa não apaga o digitado)
+  if (c.erro) return <p className="msg-erro">{c.erro}</p>;
+  if (!c.dados) return <p className="ajuda"><span className="giro" /> Carregando…</p>;
+  const d = c.dados, est = textoEstado(d);
+  const executar = async (qual: string, fn: () => Promise<{ ok: boolean } & Record<string, unknown>>, msgOk: string) => {
+    setGravando(qual);
+    try {
+      const r = await fn();
+      if (r.ok) { avisar(msgOk, 'ok'); setSenha(''); }
+      else avisar(textoResultado(r as Parameters<typeof textoResultado>[0]), 'erro');
+      await c.recarregar();
+    } catch (e) { avisar((e as Error).message, 'erro'); }
+    setGravando(null);
+  };
+  return (
+    <Formulario aoEnviar={() => executar('gravar', () => apiContaSankhya.salvar(esc, ficha.usuario.id, login, senha), 'Conta Sankhya aceita e gravada')}>
+      <p className="ajuda">
+        Usuário e senha da <strong>conta Sankhya</strong> {proprio ? 'que as rotinas do app usam em seu nome' : `de ${ficha.usuario.nome}`}: os mesmos
+        do <strong>Experience</strong>, do <strong>Sankhya OM</strong> (skw.sankhya.com.br) e do <strong>Zendesk</strong>.
+        A senha é testada na Sankhya antes de gravar, fica cifrada no banco e não aparece mais aqui.
+      </p>
+      <p className={est.tom === 'erro' ? 'msg-erro' : 'ajuda'} role="status" data-estado={est.tom}>{est.texto}
+        {d.temSenha && d.gravadoEm ? ` Gravado em ${new Date(d.gravadoEm).toLocaleDateString('pt-BR')}${d.gravadoPor ? ` por ${d.gravadoPor}` : ''}.` : ''}</p>
+      <Campo rotulo="Usuário Sankhya" valor={login} aoMudar={setLogin} obrigatorio maxLength={200} autoComplete="off" name="sankhya-login" />
+      <Campo rotulo={d.temSenha ? 'Senha nova' : 'Senha'} tipo="password" valor={senha} aoMudar={setSenha} obrigatorio maxLength={200}
+        autoComplete="new-password" name="sankhya-senha" ajuda={d.temSenha ? 'Para trocar, digite a senha nova; a atual não é mostrada.' : undefined} />
+      <div className="linha">
+        <Botao type="submit" variante="primario" carregando={gravando === 'gravar'} disabled={gravando !== null || !login.trim() || !senha}>Testar e gravar</Botao>
+        {d.temSenha && <Botao carregando={gravando === 'testar'} disabled={gravando !== null}
+          onClick={() => executar('testar', () => apiContaSankhya.testar(esc, ficha.usuario.id), 'Login aceito pela Sankhya')}>Testar senha gravada</Botao>}
+        {d.temSenha && <Botao className="a-esquerda" carregando={gravando === 'rem'} disabled={gravando !== null}
+          onClick={() => { if (window.confirm(`Apagar a conta Sankhya de ${ficha.usuario.nome}?`)) void executar('rem', async () => apiContaSankhya.remover(esc, ficha.usuario.id), 'Conta Sankhya apagada'); }}>
+          Apagar conta</Botao>}
+      </div>
+    </Formulario>
+  );
+}
+
+function AcessosApp({ aoAbrir, versao }: { aoAbrir: (id: string) => void; versao: number }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const c = useCarga(() => apiAcessoApp.lista(esc), [esc, versao]);
+  const [texto, setTexto] = useState('');
+  const [inativos, setInativos] = useState(false);
+  type L = AcessoApp & Record<string, unknown>;
+  const linhas = useMemo(() => (c.dados?.usuarios ?? []).filter(u => (inativos || u.ativo)
+    && (!texto || semAcento(`${u.nome} ${u.email}`).includes(semAcento(texto)))), [c.dados, texto, inativos]);
+  const cols: Coluna<L>[] = [
+    { chave: 'nome', titulo: 'Nome', render: l => <>{l.noV3 ? <NomePessoa id={l.usuarioId} comAvatar /> : l.nome}
+      {!l.noV3 && <span className="pilula pilula-neutra"> Só no app 2.x/APK</span>}
+      {!l.ativo && <span className="pilula pilula-neutra"> Inativo</span>}
+      {l.admin && <span className="pilula"> Admin</span>}</> },
+    { chave: 'email', titulo: 'E-mail' },
+    { chave: 'acesso', titulo: 'Acesso', ordem: l => resumo(l), texto: l => resumo(l), render: l => resumo(l) },
+    { chave: 'aparelhos', titulo: 'Aparelhos', alinhar: 'dir' },
+    { chave: 'ultimoUso', titulo: 'Último uso', ordem: l => l.ultimoUso ?? 0, texto: l => quando(l.ultimoUso), render: l => quando(l.ultimoUso) },
+  ];
+  return (
+    <>
+      <p className="ajuda">Quem entra no app 2.x e no APK (login por código no e-mail). Para dar acesso a alguém, abra a pessoa (ou cadastre em "+ Novo usuário") e use a aba App/APK.</p>
+      <div className="barra-filtros">
+        <input type="search" aria-label="Buscar pessoa" placeholder="Buscar nome ou e-mail" value={texto} onChange={e => setTexto(e.target.value)} />
+        <label className="check"><input type="checkbox" checked={inativos} onChange={e => setInativos(e.target.checked)} /> Mostrar inativos</label>
+      </div>
+      {c.erro && <p className="msg-erro">{c.erro}</p>}
+      <Tabela id="acesso-app" nome="Acesso ao app 2.x/APK" colunas={cols} linhas={linhas as L[]} chave={l => l.usuarioId} tamanhoInicial={30}
+        vazio={c.carregando ? 'Carregando…' : 'Ninguém com acesso.'} aoClicar={l => aoAbrir(l.usuarioId)} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- acessos pela funcionalidade (outro sentido)
+function PorFuncionalidade() {
+  const esc = useSessao().eu!.escritorio_id!;
+  const avisar = useToast();
+  const { recarregarEu } = useSessao();
+  const c = useCarga(() => api.acessos(esc), [esc]);
+  const [func, setFunc] = useState('');
+  const [gravando, setGravando] = useState(false);
+  const [marcado, setMarcado] = useState<Record<string, boolean>>({});  // marcação otimista (perfil ou usuário)
+  const a: Acessos | null = c.dados;
+  useEffect(() => { if (a && !func) setFunc(a.funcionalidades[0]?.codigo ?? ''); }, [a, func]);
+  if (c.erro) return <p className="msg-erro">{c.erro}</p>;
+  if (!a) return <p className="ajuda"><span className="giro" /> Carregando…</p>;
+  const perfilDe = (pid: string) => a.perfis.find(p => p.id === pid);
+  const doPerfil = (pid: string) => { const p = perfilDe(pid); return !!p && p.permitidas.includes(func); };
+  const gravar = async (d: { usuario_id?: string; perfil_id?: string; permitido: boolean | null }, chave: string, novo: boolean) => {
+    setGravando(true);
+    setMarcado({ [chave]: novo });
+    try { await api.permissaoSalvar(esc, { ...d, funcionalidade: func }); await Promise.all([c.recarregar(), recarregarEu()]); }
+    catch (e) { avisar((e as Error).message, 'erro'); }
+    setMarcado({});
+    setGravando(false);
+  };
+  const f = a.funcionalidades.find(x => x.codigo === func);
+  return (
+    <div className="formulario">
+      <Campo rotulo="Funcionalidade" tipo="select" valor={func} aoMudar={setFunc}
+        opcoes={a.funcionalidades.map(x => ({ valor: x.codigo, rotulo: `${x.modulo} · ${x.descricao}` }))} ajuda={f ? f.codigo : undefined} />
+      <fieldset className="grupo">
+        <legend>Perfis</legend>
+        <div className="linha">
+          {a.perfis.map(p => (
+            <label key={p.id} className="check">
+              <input type="checkbox" checked={marcado[p.id] ?? p.permitidas.includes(func)} disabled={p.codigo === 'admin' || gravando}
+                onChange={e => gravar({ perfil_id: p.id, permitido: e.target.checked }, p.id, e.target.checked)} /> {p.nome}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset className="grupo">
+        <legend>Pessoas</legend>
+        <ul className="lista-acesso">
+          {a.usuarios.map(u => {
+            const perfil = perfilDe(u.perfil_id);
+            const exc = u.excecoes[func];
+            const efetivo = perfil?.codigo === 'admin' || (exc ?? doPerfil(u.perfil_id));
+            return (
+              <li key={u.id}>
+                <label className="check">
+                  <input type="checkbox" checked={marcado[u.id] ?? efetivo} disabled={perfil?.codigo === 'admin' || gravando}
+                    onChange={e => gravar({ usuario_id: u.id, permitido: e.target.checked === doPerfil(u.perfil_id) ? null : e.target.checked }, u.id, e.target.checked)} />
+                  <NomePessoa id={u.id} />
+                </label>
+                <small className={exc === undefined ? 'ajuda' : 'excecao'}>{rotuloPerfil(perfil?.codigo ?? '')}{exc === undefined ? '' : exc ? ' · exceção: liberado' : ' · exceção: bloqueado'}</small>
+              </li>
+            );
+          })}
+        </ul>
+      </fieldset>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- catálogo de módulos
+function Catalogo() {
+  const esc = useSessao().eu!.escritorio_id!;
+  const pode = usePode();
+  const avisar = useToast();
+  const equipe = useEquipe();
+  const [inativos, setInativos] = useState(false);
+  const c = useCarga(() => api.modulos(esc, inativos), [esc, inativos]);
+  const [edit, setEdit] = useState<Partial<ModuloSkill> | null>(null);
+  const [nome, setNome] = useState('');
+  const [gravando, setGravando] = useState(false);
+  const editar = pode('skill.catalogo');
+  useEffect(() => { setNome(edit?.nome ?? ''); }, [edit]);
+  const gravar = async (d: Record<string, unknown>) => {
+    setGravando(true);
+    try { await api.moduloSalvar(esc, d); avisar('Catálogo gravado', 'ok'); setEdit(null); await Promise.all([c.recarregar(), equipe.recarregar()]); }
+    catch (e) { avisar((e as Error).message, 'erro'); }
+    setGravando(false);
+  };
+  type L = ModuloSkill & Record<string, unknown>;
+  const cols: Coluna<L>[] = [
+    { chave: 'nome', titulo: 'Módulo', render: l => <>{l.nome}{!l.ativo && <span className="pilula pilula-neutra"> Inativo</span>}{l.do_clickup && <small className="ajuda"> · ClickUp</small>}</> },
+    { chave: 'pessoas', titulo: 'Pessoas', alinhar: 'dir' },
+    { chave: 'certificados', titulo: 'Certificados', alinhar: 'dir' },
+  ];
+  return (
+    <>
+      <div className="barra-filtros">
+        <label className="check"><input type="checkbox" checked={inativos} onChange={e => setInativos(e.target.checked)} /> Mostrar inativos</label>
+        {editar && <Botao onClick={() => setEdit({})}>+ Módulo</Botao>}
+      </div>
+      {c.erro && <p className="msg-erro">{c.erro}</p>}
+      <Tabela id="skills" nome="Catálogo de skills" colunas={cols} linhas={(c.dados ?? []) as L[]} chave={l => l.id} tamanhoInicial={30}
+        vazio={c.carregando ? 'Carregando…' : 'Nenhum módulo.'} aoClicar={editar ? l => setEdit(l) : undefined} />
+      <Popup aberto={!!edit} titulo={edit?.id ? 'Módulo' : 'Novo módulo'} aoFechar={() => setEdit(null)}
+        rodape={<>
+          {edit?.id && <Botao className="a-esquerda" carregando={gravando} onClick={() => gravar({ id: edit.id, versao: edit.versao, ativo: !edit.ativo })}>{edit.ativo ? 'Inativar' : 'Reativar'}</Botao>}
+          <Botao onClick={() => setEdit(null)}>Cancelar</Botao>
+          <Botao variante="primario" carregando={gravando} onClick={() => nome.trim() && gravar({ ...(edit?.id ? { id: edit.id, versao: edit.versao } : {}), nome: nome.trim() })}>Gravar</Botao></>}>
+        <Formulario aoEnviar={() => nome.trim() && gravar({ ...(edit?.id ? { id: edit.id, versao: edit.versao } : {}), nome: nome.trim() })}>
+          <Campo rotulo="Nome do módulo" valor={nome} aoMudar={setNome} obrigatorio maxLength={80}
+            ajuda={edit?.do_clickup ? 'Veio do campo Módulo do ClickUp: renomear aqui não muda o ClickUp.' : undefined} />
+        </Formulario>
+      </Popup>
+    </>
+  );
+}

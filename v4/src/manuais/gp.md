@@ -11,7 +11,7 @@ Entre em **https://filipepcapulo.github.io/pmo-app/v3/** com o seu e-mail da San
 - **Execução › Agenda da equipe**: a grade dos consultores e o backlog do lado, para agendar e mudar agendas.
 - **Execução › Desvios de agenda**: aprovar ou recusar os desvios dos seus projetos.
 - **Execução › Ociosidade**: quem está sem agenda ou com horas livres no dia, com sugestões.
-- **Relatórios › Produtividade**: conferir os apontamentos e fazer o fechamento.
+- **Relatórios › Ordens de Serviço**: conferir os apontamentos e fazer o fechamento.
 - **Relatórios › Portfólio** e **Execução › Controle de Férias**: visão geral dos projetos e prazos de férias. No Portfólio, fases e GPs aceitam vários de uma vez, o cliente com plano de ação aberto fica marcado e **+ Plano** cria um 5W2H ali mesmo.
 - **Sistema › Sync com o Experience**: cria, altera e exclui os lançamentos do Experience pelo campo Experience das tarefas com Apontamento "OS Experience" (vazio cria, "Alterar" altera, "Lixeira" exclui só o lançamento com a TAG da tarefa). Começa em **simulação** (mostra o que faria); a tarefa nunca é apagada no app e a ficha dela mostra o que foi feito. Na ficha, **Sincronizar esta tarefa** roda só ela.
 - **Sistema › Sincronização com o ClickUp**: mostra se o espelho com o ClickUp está em dia (verde), pedindo atenção (amarelo) ou parado (vermelho): a última execução boa de cada modo do sync, as quatro filas, os itens com erro ou parados (com o link do ClickUp), o webhook e o merge completo. Só leitura; atualiza sozinha a cada minuto. Vermelho por mais de alguns minutos: avise o Filipe.
@@ -98,27 +98,27 @@ Em **Ociosidade** você vê, por dia, quem está sem agenda, com horas livres, c
 
 ## 7. Conferir os apontamentos dos consultores
 
-1. Abra **Produtividade** e a aba **Apontamentos**.
+1. Abra **Ordens de Serviço** e a aba **Apontamentos**.
 2. Filtre por consultor, origem (Sankhya OM ou Apontamento no APP) e período.
 3. Confira cada apontamento do app e toque em **Conferir**. Para conferir tudo o que está no filtro de uma vez, use **Conferir N do filtro**.
 4. Achou um erro? **Reabrir** devolve ao consultor para ele corrigir.
 
 Conferido, o consultor não edita nem exclui mais. As OS do Sankhya OM não passam pela conferência.
 
-![Produtividade, aba Apontamentos, com Conferir N do filtro](g08-conferir-apontamentos.png)
+![Ordens de Serviço, aba Apontamentos, com Conferir N do filtro](g08-conferir-apontamentos.png)
 
-*Produtividade › Apontamentos: filtros, totais e Conferir N do filtro. Na tabela, arraste para o lado até a coluna Conferência para conferir ou reabrir um por um.*
+*Ordens de Serviço › Apontamentos: filtros, totais e Conferir N do filtro. Na tabela, arraste para o lado até a coluna Conferência para conferir ou reabrir um por um.*
 
 ## 8. Fechamento do mês
 
-1. Em **Produtividade**, aba **Fechamento**. Abre no período do fechamento (dia 21 do mês retrasado ao dia 20 do mês passado).
+1. Em **Ordens de Serviço**, aba **Fechamento**. Abre no período do fechamento (dia 21 do mês retrasado ao dia 20 do mês passado).
 2. Por consultor: dias úteis, capacidade (dias úteis × 8 h − ausências), agendado, horas de OS, horas do app, total, horas normais, extras (acima de 8 h no dia útil e todo sábado/domingo), ocupação e apontamentos sem conferência.
 3. Antes de fechar, zere a coluna **Sem conferência** (seção 7).
 4. **Relatório** na linha do consultor abre o relatório dele (resumo + todos os atendimentos) pronto para imprimir ou salvar em PDF. Os botões Excel e CSV baixam a tabela.
 
-![Produtividade, aba Fechamento](g09-fechamento.png)
+![Ordens de Serviço, aba Fechamento](g09-fechamento.png)
 
-*Produtividade › Fechamento: período de 21 a 20, totais da equipe e uma linha por consultor. Arraste a tabela para o lado para ver Normais, Extras, Ocupação, Sem conferência e o botão Relatório.*
+*Ordens de Serviço › Fechamento: período de 21 a 20, totais da equipe e uma linha por consultor. Arraste a tabela para o lado para ver Normais, Extras, Ocupação, Sem conferência e o botão Relatório.*
 
 **Apontamentos travados (aba Travados):** as OS que estão travadas no Experience esperando a sua liberação e já passaram do prazo de lançamento retroativo (3 dias úteis), por ciclo de 21 a 20 (Ciclo atual, Ciclo anterior ou a lista dos ciclos, que são as antigas abas #RETRO da planilha). **Atualizar do Experience** busca com a sua Conta Sankhya e só acrescenta: o que já estava na lista não muda. Erro "3" do Sankhya já vem com Desconta SIM e Motivo "Sem apontamento de OS"; os demais você preenche na própria tabela (Desconta e Motivo). A OS que você liberou depois fica na lista como **Liberada**. **Relatório do ciclo** abre pronto para imprimir/PDF; o Excel sai pela tabela. O consultor vê só os próprios.
 

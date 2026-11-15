@@ -231,3 +231,49 @@ describe('lista paginada no banco', () => {
     expect(r.itens).toHaveLength(1);
   });
 });
+
+// V4 4.2.0: Portfólio com os filtros da tela de Demandas
+import { filtraPorDemanda, filtrarPortfolio, PADRAO_PORTFOLIO } from './filtrosLista';
+describe('filtrarPortfolio', () => {
+  const ps = [
+    { id: 'p1', nome: 'Implantação', fase: 'P2', cliente_id: 'c1', cliente: 'Alfa', gp: 'Ana' },
+    { id: 'p2', nome: 'Sustentação', fase: 'Sustentação', cliente_id: 'c2', cliente: 'Beta', gp: null },
+    { id: 'p3', nome: 'Avulso', fase: 'Avulso', cliente_id: 'c1', cliente: 'Alfa', gp: 'Bia' },
+  ];
+  const ds = [
+    { id: 'd1', pai_id: null, nome: 'Etapa 1', status: 'em_andamento', projeto_id: 'p1', responsavel_id: 'u1', etapa_app_id: 'e1', prioridade: 'alta', totais: { atrasada: true } },
+    { id: 'd2', pai_id: 'd1', nome: 'Sub', status: 'planejada', projeto_id: 'p1', responsavel_id: 'u2', etapa_app_id: 'e2' },
+    { id: 'd3', pai_id: null, nome: 'Chamado', status: 'backlog', projeto_id: 'p2', responsavel_id: null, etapa_app_id: null, tipo: 'chamado' },
+  ];
+  const ids = (f: Partial<typeof PADRAO_PORTFOLIO>, restringe = false, fora = {}) =>
+    filtrarPortfolio(ps, ds, { ...PADRAO_PORTFOLIO, ...f }, restringe, fora).map(p => p.id);
+  it('sem filtro traz todos, inclusive projeto sem demanda', () => expect(ids({})).toEqual(['p1', 'p2', 'p3']));
+  it('fase, GP (com "Sem GP"), cliente, projeto e texto olham o projeto', () => {
+    expect(ids({ fases: ['P2', 'Avulso'] })).toEqual(['p1', 'p3']);
+    expect(ids({ gps: ['Sem GP'] })).toEqual(['p2']);
+    expect(ids({ clientes: ['c1'] })).toEqual(['p1', 'p3']);
+    expect(ids({ projetos: ['p2'] })).toEqual(['p2']);
+    expect(ids({ texto: 'alfa avulso' })).toEqual(['p3']);
+  });
+  it('etapa, responsável, tipo, prioridade e atrasadas pedem demanda que passe', () => {
+    expect(ids({ etapas: ['e2'] })).toEqual(['p1']);
+    expect(ids({ etapas: ['-'] })).toEqual(['p2']);
+    expect(ids({ responsaveis: ['u2'] })).toEqual(['p1']);
+    expect(ids({ tipos: ['chamado'] })).toEqual(['p2']);
+    expect(ids({ prioridades: ['alta'] })).toEqual(['p1']);
+    expect(ids({ atrasadas: true })).toEqual(['p1']);
+    expect(ids({ etapas: ['e1'], clientes: ['c2'] })).toEqual([]);
+  });
+  it('o nível vale para os filtros de demanda', () => {
+    expect(ids({ responsaveis: ['u2'], nivel: 'demanda' })).toEqual([]);
+    expect(ids({ responsaveis: ['u2'], nivel: 'subdemanda' })).toEqual(['p1']);
+  });
+  it('status só restringe quando pedido; cartões e barras ignoram o próprio filtro', () => {
+    expect(filtraPorDemanda(PADRAO_PORTFOLIO)).toBe(false);
+    expect(ids({}, true)).toEqual(['p1', 'p2']);
+    expect(ids({ fases: ['P2'], gps: ['Bia'] }, false, { fases: true })).toEqual(['p3']);
+    expect(ids({ fases: ['P2'], gps: ['Bia'] }, false, { gps: true })).toEqual(['p1']);
+  });
+  it('demandas ainda não carregadas não escondem projeto', () =>
+    expect(filtrarPortfolio(ps, null, { ...PADRAO_PORTFOLIO, etapas: ['e1'] }).length).toBe(3));
+});

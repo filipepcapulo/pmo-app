@@ -53,7 +53,7 @@ export const MODULOS: Modulo[] = [
   { id: 'reembolso', titulo: 'Reembolso KM', area: 'execucao', icone: 'carro', permissao: 'reembolso.usar', parametro: true },
   { id: 'portfolio', titulo: 'Portfólio', area: 'relatorios', icone: 'grade', permissao: 'portfolio.ver' },
   // todos entram; sem produtividade.ver_todos o banco devolve só o próprio (0045)
-  { id: 'produtividade', titulo: 'Produtividade', area: 'relatorios', icone: 'grafico' },
+  { id: 'produtividade', titulo: 'Ordens de Serviço', area: 'relatorios', icone: 'grafico' },
   // F3 (0071): cofre financeiro; só os autorizados nominais veem (os demais: "Sem acesso")
   // F4 (0075): cada pessoa vê só o próprio fechamento de produtividade (não precisa de papel no cofre)
   { id: 'meu-fechamento', titulo: 'Meu fechamento', area: 'relatorios', icone: 'relogio' },

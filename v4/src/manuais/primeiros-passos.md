@@ -38,7 +38,7 @@ O menu lateral mostra primeiro os **Favoritos** e depois os módulos, agrupados 
 | **Geral** | Início, Manuais, Notificações, Sugestões de melhoria |
 | **Cadastros** | Clientes, Projetos, Modelos de projeto, Equipe, Organograma Sankhya |
 | **Execução** | Demandas, Agenda da equipe, Chamados, Minha agenda, Desvios de agenda e outros |
-| **Relatórios** | Portfólio, Produtividade, Meu fechamento |
+| **Relatórios** | Portfólio, Ordens de Serviço, Meu fechamento |
 | **Financeiro** | Só para quem está autorizado no cofre financeiro |
 | **Sistema** | Sincronizações e ferramentas |
 

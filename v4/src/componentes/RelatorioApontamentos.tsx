@@ -81,7 +81,7 @@ export function RelatorioApontamentos({ equipe }: { equipe?: boolean }) {
         </section>
         {r.total > r.itens.length && <p className="ajuda">Mostrando {r.itens.length} de {r.total}; reduza o período.</p>}
         <section className="cartao">
-          <Tabela id={equipe ? 'produtividade' : 'meus-apontamentos'} nome={equipe ? 'Produtividade' : 'Meus apontamentos'} colunas={colunas} linhas={r.itens}
+          <Tabela id={equipe ? 'produtividade' : 'meus-apontamentos'} nome={equipe ? 'Ordens de Serviço' : 'Meus apontamentos'} colunas={colunas} linhas={r.itens}
             chave={a => a.apontamento_id} tamanhoInicial={15} vazio="Nenhum apontamento no período." />
         </section>
       </>}

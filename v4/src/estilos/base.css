@@ -1130,3 +1130,7 @@ ul.msg-erro { padding-left: 18px; }
 .renta-baixa { color: var(--laranja); }
 .renta-negativa { color: var(--vermelho); }
 .renta-valor { display: flex; align-items: center; gap: 10px; min-height: 38px; }
+
+/* V4 4.3.0: escolha dos consultores para os PDFs de produtividade (Fechamento) */
+.fech-escolha { display: grid; gap: 2px; max-height: 46vh; overflow: auto; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--linha); border-radius: 8px; }
+.fech-escolha .check { padding: 4px 0; }

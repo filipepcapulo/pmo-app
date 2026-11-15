@@ -5,6 +5,8 @@
 //   faturado = horas executadas × valor/hora médio vendido do projeto; custo = horas × remuneração vigente na data.
 // Tipo de OS (0094): o campo Apontamento da tarefa diz se a hora é cobrada. Tipo marcado como "não conta no faturado"
 // (bonificado, interno…) entra só com o custo. O cadastro fica no cofre (ações `tipos_os` e `tipo_os_salvar`).
+// 4.7.0 (0097): cada tipo tem o MODO do faturado — sim, não ou "segue o pedido" (a parte das horas vendida em pedido
+// bonificado não fatura) — e a marca de CUSTO (desligada: a hora só é contada, sem custo).
 import { sb, FalhaApi } from './cliente';
 import { traduzirErro } from './mensagens';
 import type { Planilha } from '../util/xlsx';
@@ -12,18 +14,25 @@ import type { Planilha } from '../util/xlsx';
 export interface CelulaGeral {
   mes: string; periodo: number; cliente_id: string; projeto_id: string; consultor_id: string; tipo_id?: string;
   min: number; faturado: number; custo: number; min_sem_valor: number; min_sem_custo: number; min_nao_fatura?: number;
+  min_bonificado?: number; min_fora_custo?: number;
 }
-export interface Soma { min: number; faturado: number; custo: number; margem: number; margem_pct: number | null; min_sem_valor: number; min_sem_custo: number; min_nao_fatura: number }
+export interface Soma { min: number; faturado: number; custo: number; margem: number; margem_pct: number | null; min_sem_valor: number; min_sem_custo: number; min_nao_fatura: number;
+  min_bonificado: number; min_fora_custo: number }
+/** Como o tipo de OS entra no faturado: sempre, nunca ou conforme o pedido de horas (bonificado ou não). */
+export type ModoFatura = 'sim' | 'nao' | 'pedido';
+export const ROTULO_MODO: Record<ModoFatura, string> = { sim: 'Sim', pedido: 'Segue o pedido', nao: 'Não' };
 export interface RentaGeral {
   ini: string; fim: string;
   clientes: { id: string; nome: string }[]; projetos: { id: string; nome: string; cliente_id: string }[]; pessoas: { id: string; nome: string }[];
   periodos: { key: number; label: string; ini: string; fim: string }[];
   /** tipos de OS que apareceram no intervalo (id = chave do nome) e se contam no faturado */
-  tipos?: { id: string; nome: string; fatura: boolean }[];
+  tipos?: { id: string; nome: string; fatura: boolean; modo?: ModoFatura; custo?: boolean }[];
   celulas: CelulaGeral[]; total: Soma; pendencias: string[];
 }
 /** Linha do cadastro de tipos de OS. */
-export interface TipoOs { chave: string; nome: string; fatura: boolean; cadastrado: boolean; do_campo: boolean; apontamentos: number }
+export interface TipoOs { chave: string; nome: string; fatura: boolean; modo?: ModoFatura; custo?: boolean; cadastrado: boolean; do_campo: boolean; apontamentos: number }
+/** Modo do tipo (banco anterior à 0097 só manda `fatura`). */
+export const modoDoTipo = (t: Pick<TipoOs, 'fatura' | 'modo'>): ModoFatura => t.modo ?? (t.fatura ? 'sim' : 'nao');
 export type Dimensao = 'tempo' | 'cliente' | 'projeto' | 'consultor' | 'tipo';
 /** Como o tempo é fatiado: mês civil ou período de fechamento (21–20). */
 export type Agrupamento = 'mes' | 'periodo';
@@ -44,7 +53,7 @@ export const rentaGeral = {
   ler: (esc: string, ini: string, fim: string) => chamar<RentaGeral>('rentabilidade_geral', esc, { ini, fim }),
   /** Cadastro: tipos de OS (campo Apontamento) e se cada um conta no faturado. */
   tipos: (esc: string) => chamar<{ linhas: TipoOs[] }>('tipos_os', esc).then(r => r.linhas),
-  tipoSalvar: (esc: string, nome: string, fatura: boolean) => chamar<{ ok: true }>('tipo_os_salvar', esc, { dados: { nome, fatura } }),
+  tipoSalvar: (esc: string, nome: string, d: { modo?: ModoFatura; custo?: boolean }) => chamar<{ ok: true }>('tipo_os_salvar', esc, { dados: { nome, ...d } }),
   tipoRemover: (esc: string, nome: string) => chamar<{ ok: true }>('tipo_os_salvar', esc, { dados: { nome, remover: true } }),
 };
 
@@ -63,8 +72,9 @@ const chaveDe = (c: CelulaGeral, dim: Dimensao, ag: Agrupamento) =>
 
 /** Soma de um conjunto de células (margem = faturado − custo; % sobre o faturado). */
 export function somar(celulas: CelulaGeral[]): Soma {
-  const t = { min: 0, faturado: 0, custo: 0, min_sem_valor: 0, min_sem_custo: 0, min_nao_fatura: 0 };
-  for (const c of celulas) { t.min += c.min; t.faturado += c.faturado; t.custo += c.custo; t.min_sem_valor += c.min_sem_valor; t.min_sem_custo += c.min_sem_custo; t.min_nao_fatura += c.min_nao_fatura ?? 0; }
+  const t = { min: 0, faturado: 0, custo: 0, min_sem_valor: 0, min_sem_custo: 0, min_nao_fatura: 0, min_bonificado: 0, min_fora_custo: 0 };
+  for (const c of celulas) { t.min += c.min; t.faturado += c.faturado; t.custo += c.custo; t.min_sem_valor += c.min_sem_valor; t.min_sem_custo += c.min_sem_custo; t.min_nao_fatura += c.min_nao_fatura ?? 0;
+    t.min_bonificado += c.min_bonificado ?? 0; t.min_fora_custo += c.min_fora_custo ?? 0; }
   const faturado = r2(t.faturado), custo = r2(t.custo), margem = r2(faturado - custo);
   return { ...t, faturado, custo, margem, margem_pct: faturado ? margem / faturado : null };
 }
@@ -110,8 +120,10 @@ export function aplicarFiltro(d: Pick<RentaGeral, 'projetos'>, f: FiltroGeral, d
   return n;
 }
 
-/** O grupo inteiro é de hora que não conta no faturado (tipo bonificado, interno…): só custo. */
-export const soCusto = (g: Pick<Soma, 'min' | 'min_nao_fatura'>) => g.min > 0 && g.min_nao_fatura >= g.min;
+/** Minutos sem receita por regra: tipo que não fatura + tipo que segue o pedido em pedido bonificado. */
+export const minSemReceita = (g: Pick<Soma, 'min_nao_fatura'> & Partial<Pick<Soma, 'min_bonificado'>>) => g.min_nao_fatura + (g.min_bonificado ?? 0);
+/** O grupo inteiro é de hora que não conta no faturado (tipo bonificado, interno… ou pedido bonificado): só custo. */
+export const soCusto = (g: Pick<Soma, 'min' | 'min_nao_fatura'> & Partial<Pick<Soma, 'min_bonificado'>>) => g.min > 0 && minSemReceita(g) >= g.min;
 
 /** Intervalo padrão: do 1º dia de 5 meses atrás até hoje (6 meses de calendário). */
 export function intervaloPadrao(hoje: string, meses = 6): { ini: string; fim: string } {
@@ -123,10 +135,11 @@ export function intervaloPadrao(hoje: string, meses = 6): { ini: string; fim: st
 /** Planilha do detalhamento mostrado (só com os valores à mostra). */
 export function planilhaGeral(dim: Dimensao, grupos: Grupo[], total: Soma): Planilha {
   const h = (min: number) => Math.round(min / 60 * 100) / 100;
-  const linha = (nome: string, g: Soma) => [nome, h(g.min), h(g.min_nao_fatura), g.faturado, g.custo, g.margem, g.margem_pct === null ? null : Math.round(g.margem_pct * 1000) / 10];
+  const linha = (nome: string, g: Soma) => [nome, h(g.min), h(g.min_nao_fatura), h(g.min_bonificado), h(g.min_fora_custo), g.faturado, g.custo, g.margem, g.margem_pct === null ? null : Math.round(g.margem_pct * 1000) / 10];
   return {
     aba: 'Rentabilidade',
-    colunas: [{ titulo: ROTULO_DIMENSAO[dim], largura: 40 }, { titulo: 'Horas', tipo: 'V' }, { titulo: 'Horas não faturadas', tipo: 'V' }, { titulo: 'Faturado', tipo: 'V' }, { titulo: 'Custo', tipo: 'V' },
+    colunas: [{ titulo: ROTULO_DIMENSAO[dim], largura: 40 }, { titulo: 'Horas', tipo: 'V' }, { titulo: 'Horas não faturadas', tipo: 'V' }, { titulo: 'Horas em pedido bonificado', tipo: 'V' },
+      { titulo: 'Horas sem custo', tipo: 'V' }, { titulo: 'Faturado', tipo: 'V' }, { titulo: 'Custo', tipo: 'V' },
       { titulo: 'Margem', tipo: 'V' }, { titulo: 'Margem %', tipo: 'V' }],
     linhas: [...grupos.map(g => linha(g.nome, g)), linha('Total', total)],
   };

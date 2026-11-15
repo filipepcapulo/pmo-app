@@ -42,7 +42,7 @@ export function Login({ erroSessao }: { erroSessao: string | null }) {
       <div className="login-caixa">
         <img src="icones/icone-192.png" alt="" width={64} height={64} />
         <h1>PMO BP-MS</h1>
-        <p className="ajuda">Gestão de projetos · v3</p>
+        <p className="ajuda">Gestão de projetos · v4</p>
         {etapa === 'email' ? (
           <Formulario aoEnviar={pedirCodigo}>
             <Campo rotulo="E-mail" tipo="email" valor={email} aoMudar={setEmail} autoComplete="email" inputMode="email" obrigatorio name="email" />

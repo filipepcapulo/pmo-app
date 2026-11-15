@@ -39,7 +39,9 @@ export function Rentabilidade({ tipo, id, geracao }: { tipo: TipoAlvo; id: strin
         <div className="indicadores" aria-label="Indicadores de rentabilidade">
           {!demanda && <div className="indicador"><small>Receita contratada{t.horas_pedidos !== null ? ` · ${horas(t.horas_pedidos)}` : ''}</small><strong data-testid="renta-receita">{reais(t.receita, oculto)}</strong></div>}
           <div className="indicador"><small>Receita das horas executadas · {horasDe(t.min)}</small><strong data-testid="renta-receita-exec">{reais(t.receita_exec, oculto)}</strong></div>
-          {!!t.min_nao_fatura && <div className="indicador"><small>Horas não faturadas (só custo)</small><strong data-testid="renta-nao-fatura">{horasDe(t.min_nao_fatura)}</strong></div>}
+          {!!t.min_nao_fatura && <div className="indicador"><small>Horas não faturadas (tipo de OS)</small><strong data-testid="renta-nao-fatura">{horasDe(t.min_nao_fatura)}</strong></div>}
+          {!!t.min_bonificado && <div className="indicador"><small>Horas em pedido bonificado (sem receita)</small><strong data-testid="renta-bonificado">{horasDe(t.min_bonificado)}</strong></div>}
+          {!!t.min_fora_custo && <div className="indicador"><small>Horas sem custo (retrabalho, treinamento…)</small><strong data-testid="renta-fora-custo">{horasDe(t.min_fora_custo)}</strong></div>}
           <div className="indicador"><small>Custo das horas executadas</small><strong data-testid="renta-custo">{reais(t.custo, oculto)}</strong></div>
           <div className="indicador"><small>Margem</small><strong data-testid="renta-margem"><Margem i={t} oculto={oculto} /></strong></div>
           {!demanda && <div className="indicador"><small>Sobra do contrato (receita − custo)</small><strong data-testid="renta-sobra">{reais(t.sobra, oculto)}</strong></div>}
@@ -60,7 +62,9 @@ export function Rentabilidade({ tipo, id, geracao }: { tipo: TipoAlvo; id: strin
                 <td><a href={hashDe(caminhoEntidade(g.tipo, g.id))}>{g.nome}</a>
                   {g.pedidos_sem_valor > 0 && <> <span className="pilula pilula-neutra" title="Pedido de horas sem valor/hora informado">sem valor</span></>}
                   {g.min_sem_custo > 0 && <> <span className="pilula pilula-neutra" title="Horas executadas sem período de remuneração vigente na data">sem custo</span></>}
-                  {!!g.min_nao_fatura && <> <span className="pilula pilula-neutra" title={`${horasDe(g.min_nao_fatura)} de tipo de OS que não conta no faturado: só custo`}>{g.min_nao_fatura >= g.min ? 'não fatura' : 'parte não fatura'}</span></>}</td>
+                  {!!g.min_nao_fatura && <> <span className="pilula pilula-neutra" title={`${horasDe(g.min_nao_fatura)} de tipo de OS que não conta no faturado: só custo`}>{g.min_nao_fatura >= g.min ? 'não fatura' : 'parte não fatura'}</span></>}
+                  {!!g.min_bonificado && <> <span className="pilula pilula-neutra" title={`${horasDe(g.min_bonificado)} em pedido bonificado: sem receita`}>bonificado</span></>}
+                  {!!g.min_fora_custo && <> <span className="pilula pilula-neutra" title={`${horasDe(g.min_fora_custo)} de tipo de OS que não entra no custo`}>{g.min_fora_custo >= g.min ? 'fora do custo' : 'parte fora do custo'}</span></>}</td>
                 {tipo === 'cliente' && <><td className="dir">{horas(g.horas_pedidos)}</td><td className="dir">{reais(g.receita, oculto)}</td></>}
                 <td className="dir">{horasDe(g.min)}</td><td className="dir">{reais(g.receita_exec, oculto)}</td><td className="dir">{reais(g.custo, oculto)}</td>
                 <td className="dir"><Margem i={g} oculto={oculto} /></td>
@@ -82,7 +86,8 @@ export function Rentabilidade({ tipo, id, geracao }: { tipo: TipoAlvo; id: strin
             <thead><tr><th>Nº do pedido</th><th>Data</th><th className="dir">Horas</th><th className="dir">Valor/hora</th><th className="dir">Total</th></tr></thead>
             <tbody>{d.pedidos.map(p => (
               <tr key={p.id}><td>{p.numero}</td><td>{data(p.data)}</td><td className="dir">{horas(p.horas)}</td>
-                <td className="dir">{p.valor_hora === null ? <span className="pilula pilula-neutra">sem valor</span> : reais(p.valor_hora, oculto)}</td>
+                <td className="dir">{p.bonificado ? <span className="pilula pilula-neutra" title="Pedido bonificado: sem cobrança">bonificado</span>
+                  : p.valor_hora === null ? <span className="pilula pilula-neutra">sem valor</span> : reais(p.valor_hora, oculto)}</td>
                 <td className="dir">{reais(p.total, oculto)}</td></tr>))}</tbody>
           </table></div>
         </section>

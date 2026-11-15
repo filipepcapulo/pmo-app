@@ -89,19 +89,19 @@ describe('PDF de várias páginas', () => {
     for (let i = 0; i < ps.length; i++) {
       expect(textos(i)).toContain('Descrição');
       expect(textos(i)).toContain(`Página ${i + 1} de ${ps.length}`);
-      for (const o of ps[i]) expect(o.y).toBeLessThanOrEqual(595 - 28);
+      for (const o of ps[i]) expect(o.y).toBeLessThanOrEqual(842 - 28);
     }
     expect(ps.flatMap((_, i) => textos(i)).filter(t => /^dia \d+$/.test(t)).length).toBe(80);
   });
-  it('conteudoPagina + gerarPdfTexto: texto selecionável em WinAnsi, alinhado à direita, A4 deitado e xref certo', () => {
+  it('conteudoPagina + gerarPdfTexto: texto selecionável em WinAnsi, alinhado à direita, A4 em retrato e xref certo', () => {
     const c = conteudoPagina([{ t: 'r', x: 28, y: 100, w: 50, h: 10, cor: '#ff0000' },
       { t: 't', s: 'Ação — (R$ 1,00)…', x: 200, y: 105, tam: 10, negrito: true, cor: '#000000', larg: 60, dir: true }]);
-    expect(c).toContain('1 0 0 rg 28 485 50 10 re f');
-    expect(c).toContain('BT /F2 10 Tf 0 0 0 rg 140 486.5 Td (A\xE7\xE3o \x97 \\(R$ 1,00\\)\x85) Tj ET');
+    expect(c).toContain('1 0 0 rg 28 732 50 10 re f');
+    expect(c).toContain('BT /F2 10 Tf 0 0 0 rg 140 733.5 Td (A\xE7\xE3o \x97 \\(R$ 1,00\\)\x85) Tj ET');
     const txt = new TextDecoder('latin1').decode(gerarPdfTexto('Relatório (Ana)', [c, c]));
     expect(txt.startsWith('%PDF-1.4')).toBe(true);
     expect(txt).toContain('/Kids [3 0 R 5 0 R] /Count 2');
-    expect(txt.match(/\/MediaBox \[0 0 842 595\]/g)?.length).toBe(2);
+    expect(txt.match(/\/MediaBox \[0 0 595 842\]/g)?.length).toBe(2);
     expect(txt).toContain('/BaseFont /Helvetica-Bold');
     expect(txt).toContain('/Title (Relat\xF3rio \\(Ana\\))');
     const xref = Number(/startxref\n(\d+)/.exec(txt)![1]);

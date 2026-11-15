@@ -1,6 +1,6 @@
 // Documento em PDF de várias páginas (V4 4.3.0: relatório de produtividade por consultor): título, subtítulo e tabelas
 // com quebra de linha nas células e quebra de página (o cabeçalho da tabela se repete). O PDF sai com texto de verdade
-// (Helvetica; leve e selecionável), sem biblioteca; o canvas só mede a largura dos textos. A4 deitado. Roda só no navegador.
+// (Helvetica; leve e selecionável), sem biblioteca; o canvas só mede a largura dos textos. A4 em retrato. Roda só no navegador.
 import { baixarArquivo } from './csv';
 import { gerarPdfTexto, textoWinAnsi } from './pdf';
 
@@ -29,7 +29,7 @@ export function quebrar(texto: string, larg: number, medir: (s: string) => numbe
   return out;
 }
 
-const W = 842, H = 595, M = 28, PAD = 5, LINHA = 11, TAM = 8.5, RODAPE = 18;
+const W = 595, H = 842, M = 28, PAD = 5, LINHA = 11, TAM = 8.5, RODAPE = 18;
 /** O que desenhar numa página, em pontos, com o y de cima para baixo. */
 type Op = { t: 'r'; x: number; y: number; w: number; h: number; cor: string }
   | { t: 't'; s: string; x: number; y: number; tam: number; negrito: boolean; cor: string; larg: number; dir: boolean };

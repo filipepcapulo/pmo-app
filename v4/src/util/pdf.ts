@@ -48,11 +48,11 @@ const CP1252: Record<number, number> = { 0x20ac: 0x80, 0x201a: 0x82, 0x192: 0x83
 export const textoWinAnsi = (s: string) => textoPdf([...s].map(c => { const n = c.codePointAt(0)!; return n < 256 && (n < 0x80 || n > 0x9f) ? c : CP1252[n] ? String.fromCharCode(CP1252[n]) : '?'; }).join(''));
 
 /**
- * PDF de várias páginas A4 deitadas (842 × 595 pt) com texto de verdade (V4 4.3.0: relatório por consultor): cada página
+ * PDF de várias páginas A4 em retrato (595 × 842 pt) com texto de verdade (V4 4.3.0: relatório por consultor): cada página
  * é o seu fluxo de conteúdo já montado; as fontes são /F1 Helvetica e /F2 Helvetica-Bold (WinAnsi).
  */
 export function gerarPdfTexto(titulo: string, conteudos: string[]): Uint8Array {
-  const W = 842, H = 595, n = conteudos.length, f1 = 3 + 2 * n, f2 = f1 + 1;
+  const W = 595, H = 842, n = conteudos.length, f1 = 3 + 2 * n, f2 = f1 + 1;
   const objs: (string | Uint8Array)[][] = [
     ['<< /Type /Catalog /Pages 2 0 R >>'],
     [`<< /Type /Pages /Kids [${conteudos.map((_, i) => `${3 + 2 * i} 0 R`).join(' ')}] /Count ${n} >>`],

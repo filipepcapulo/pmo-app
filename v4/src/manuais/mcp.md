@@ -39,6 +39,22 @@ No terminal, rode o comando que a janela do token mostra em **Claude Code (termi
 
 Para outros clientes (Claude Desktop etc.), use o bloco **Outros clientes (configuração JSON)** com **Copiar configuração**. Os dados são os mesmos: tipo HTTP, o endereço do servidor e o cabeçalho `Authorization: Bearer <seu token>`.
 
+### No chat do Claude e no Cowork (conector, sem token)
+
+O chat comum do Claude, o Cowork, o Claude Desktop e o Claude no celular não aceitam token colado. Neles a ligação é por **conector**:
+
+1. No Claude, abra **Configurações › Conectores** e escolha **Adicionar conector personalizado**.
+2. Em nome, escreva **PMO BP-MS**. Em endereço, cole o que a tela mostra em **No chat do Claude e no Cowork (conector)** (botão **Copiar**). É o mesmo endereço do servidor MCP.
+3. Toque em **Conectar**. O Claude abre o PMO no navegador. Se pedir, entre com o seu e-mail e o código.
+4. Na tela **Conectar o Claude ao PMO**, confira o seu nome e o escritório e toque em **Autorizar**. Você volta ao Claude já conectado.
+
+- Você não gera nem copia token: o Claude recebe a conexão direto do PMO.
+- A conexão vale **90 dias** e aparece em **Meus tokens** com o nome **Conector do Claude**. Revogar funciona igual (seção 8).
+- Vencida ou revogada, basta conectar de novo no Claude (passos 3 e 4).
+- Cada pessoa pode ter até **3 conexões ativas**; na quarta, a mais antiga cai. As conexões contam junto com os tokens no limite de 5 da seção 2.
+- Precisa da mesma permissão `mcp.usar`. Sem ela, a tela avisa e nada é autorizado.
+- O conector é pessoal: cada pessoa conecta o seu Claude.
+
 ## 4. O que a IA alcança
 
 A IA age com as **mesmas permissões e a mesma visibilidade que você tem nas telas**. O que você não vê no app, ela não vê. O que você não pode gravar, ela não grava. Exemplo: quem não vê a agenda da equipe recebe só a própria agenda.
@@ -127,6 +143,8 @@ Na lista, toque em **Revogar** na linha do token e confirme. A IA que usa esse t
 - **Erro 401, "TOKEN: envie o token pessoal de MCP em Authorization: Bearer".** A IA não mandou o token, ou ele não começa com `pmo_mcp_`. Confira o comando da seção 3.
 - **Erro 401, "TOKEN: token de MCP inválido, vencido ou revogado; gere outro em Sistema › IA (MCP)".** O token foi digitado errado, venceu ou foi revogado. Gere outro.
 - **Erro 401, "TOKEN: o dono deste token está inativo ou nunca entrou no app".** O usuário dono do token foi desativado.
+- **No conector, a tela diz "Este pedido não veio do conector do Claude".** O endereço foi aberto por outro programa. O PMO só aceita o conector do Claude; nada foi autorizado.
+- **No conector, o Claude diz que a conexão falhou depois de autorizar.** O código vale 5 minutos e só uma vez. Conecte de novo no Claude.
 - **"LIMITE: muitas chamadas do MCP em 1 minuto (60); aguarde um pouco".** Passou do limite. Espere um minuto.
 - **"LIMITE: você já tem 5 tokens ativos; revogue um antes de gerar outro".** Revogue um token que não usa mais.
 - **"CONFIRMACAO: código inválido, vencido ou já usado; peça uma nova prévia".** Passaram os 10 minutos ou o código já foi usado. Peça à IA para refazer a prévia.

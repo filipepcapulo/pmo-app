@@ -43,6 +43,8 @@ export const MODULOS: Modulo[] = [
   // V13e-2: #/chamados/portal abre a aba Portal Sankhya (link dos avisos do sino)
   { id: 'chamados', titulo: 'Chamados', area: 'execucao', icone: 'chamado', parametro: true },
   { id: 'consultor', titulo: 'Minha agenda', area: 'execucao', icone: 'relogio' },
+  // V4 (0090): a pessoa solicita a própria ausência; quem tem ausencia.aprovar decide
+  { id: 'ausencias', titulo: 'Ausências', area: 'execucao', icone: 'calendario' },
   { id: 'desvios', titulo: 'Desvios de agenda', area: 'execucao', icone: 'seta', permissao: 'desvio.aprovar' },
   { id: 'envio-agendas', titulo: 'Envio de agendas', area: 'execucao', icone: 'calendario', permissao: 'agenda.enviar' },
   // V13d-3: Aceite de OS (módulo 05 da Central); #/aceite-os/<FAP> é o atalho do Projeto
@@ -57,6 +59,8 @@ export const MODULOS: Modulo[] = [
   // F3 (0071): cofre financeiro; só os autorizados nominais veem (os demais: "Sem acesso")
   // F4 (0075): cada pessoa vê só o próprio fechamento de produtividade (não precisa de papel no cofre)
   { id: 'meu-fechamento', titulo: 'Meu fechamento', area: 'relatorios', icone: 'relogio' },
+  // V4 (0091): faturado × custo do escritório por período, cliente, projeto e consultor; só os papéis dono e rentabilidade
+  { id: 'rentabilidade-geral', titulo: 'Rentabilidade geral', area: 'relatorios', icone: 'grafico', cofre: true, papeisCofre: ['dono', 'rentabilidade'] },
   { id: 'financeiro', titulo: 'Acessos e Remuneração', area: 'financeiro', icone: 'cadeado', cofre: true },
   // F4 (0075): fechamento do período 21–20 de todos; só os papéis dono e fechamento do cofre
   { id: 'fechamento', titulo: 'Fechamento de produtividade', area: 'financeiro', icone: 'grafico', cofre: true, papeisCofre: ['dono', 'fechamento'] },

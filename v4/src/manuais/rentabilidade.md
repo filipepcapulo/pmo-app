@@ -1,12 +1,12 @@
 # Manual da Rentabilidade
 
-Para quem tem o papel Dono ou Rentabilidade no cofre financeiro · app PMO v3 (web)
+Para quem tem o papel Dono ou Rentabilidade no cofre financeiro · app PMO (web)
 
 *Nomes e valores citados neste manual são exemplos fictícios.*
 
 ## 1. Onde fica e quem vê
 
-A rentabilidade é a aba **Rentabilidade** dentro de três fichas:
+A rentabilidade aparece em dois lugares: a tela **Relatórios › Rentabilidade geral**, com o escritório inteiro em gráficos (seção 9), e a aba **Rentabilidade** dentro de três fichas:
 
 - **Ficha do Cliente**: aparecem as abas **Dados** e **Rentabilidade**.
 - **Ficha do Projeto**: a aba **Rentabilidade** fica depois das outras abas do projeto.
@@ -118,8 +118,38 @@ Atenção ao aviso de horas sem custo: sem remuneração cadastrada com vigênci
 
 Nas tabelas de quebra, as marcas **sem valor** (pedido sem valor/hora) e **sem custo** (horas sem remuneração vigente) mostram em qual linha está a falta.
 
-## 9. Dúvidas comuns
+## 9. Rentabilidade geral (Relatórios)
 
+**Relatórios › Rentabilidade geral** mostra, em uma tela só, o **faturado × custo** de todo o escritório em um intervalo de datas.
+
+- **Faturado** = horas executadas no intervalo × valor/hora médio vendido do projeto (o mesmo "receita das horas executadas" da seção 5).
+- **Custo** = horas executadas × remuneração vigente do consultor na data.
+- **Margem** = faturado − custo; o percentual é sobre o faturado.
+
+Como usar:
+
+1. Escolha o intervalo em **De** / **Até** ou use os atalhos (**Últimos 3 meses**, **Últimos 6**, **Últimos 12**, **Este ano**). A tela abre com os últimos 6 meses.
+2. Em **Período por**, escolha **Mês** (mês civil) ou **Fechamento (21–20)**.
+3. Toque em **Mostrar valores**. Os gráficos só aparecem com os valores à mostra.
+
+| Quadro | O que mostra |
+| --- | --- |
+| Indicadores | Faturado, Custo, Margem, Horas executadas e faturado/hora · custo/hora do recorte |
+| **Por período — faturado × custo** | Duas colunas por mês ou período (verde = faturado, azul = custo), com a margem em % em cima |
+| **Por cliente**, **Por projeto**, **Por consultor** | Barras de faturado e custo de cada um, do maior faturado para o menor, com a margem em % |
+| **Detalhamento** | A tabela do nível de baixo, com horas, faturado, custo e margem, e o botão **Excel** |
+
+Descer de nível: toque em uma coluna, em uma barra ou em um nome do Detalhamento. A escolha vira um item da trilha no topo (por exemplo, Geral › Cliente Alfa › Projeto Implantação) e **todos** os quadros passam a mostrar só aquele recorte. O Detalhamento acompanha: no geral lista os clientes; com um cliente, os projetos dele; com um projeto, os consultores; dá para trocar pelas abas Cliente, Projeto, Consultor e Período.
+
+- Toque de novo no item escolhido, ou no **×** da trilha, para subir um nível. **Geral** limpa tudo.
+- Com um projeto na trilha, **Abrir o projeto** leva à ficha dele, onde a aba Rentabilidade detalha **por demanda**.
+- **sem valor**: horas em projeto sem valor/hora nos pedidos — ficam fora do faturado. **sem custo**: horas sem remuneração vigente na data.
+- A quebra por consultor mostra o custo de cada pessoa: abra em lugar reservado.
+
+## 10. Dúvidas comuns
+
+- **Não vejo Rentabilidade geral no menu**: é o mesmo papel da aba (Dono ou Rentabilidade no cofre).
+- **O faturado da Rentabilidade geral é a nota emitida?** Não. É a conta horas executadas × valor/hora vendido; o app não lê o faturamento do Sankhya.
 - **Não vejo a aba Rentabilidade**: falta o papel Dono ou Rentabilidade no cofre. Depois de receber o papel, recarregue o app.
 - **"A rentabilidade é só para quem tem o papel Dono ou Rentabilidade no cofre financeiro."**: o papel foi revogado. Fale com o Dono.
 - **Receita e margem aparecem como "—"**: falta pedido de horas ou falta valor/hora nos pedidos (seção 3).

@@ -131,7 +131,18 @@ Lista o que há para agendar, em Cliente › Projeto › Demanda › Subdemanda.
 - **Agendar** (para quem tem `tarefa.criar`) abre a tarefa com a demanda, o dia e o consultor.
 - **Copiar relatório** copia o resumo do dia em texto, pronto para colar no WhatsApp. O botão vira "Copiado!".
 
-## 8. Se algo der errado
+## 8. Pedidos de ausência
+
+Em **Execução › Ausências** qualquer pessoa solicita a própria ausência. O pedido não bloqueia a agenda enquanto não for aprovado.
+
+- A aba **Para aprovar** aparece para quem tem a funcionalidade **Aprovar ou recusar os pedidos de ausência da equipe** (padrão: Admin e GP). O número ao lado é quantos pedidos aguardam.
+- Cada linha mostra a pessoa, o período, o tipo, o motivo e as **Tarefas no período** (planejadas ou em andamento da pessoa nesses dias).
+- **Aprovar**: a ausência entra na Grade na hora, como se tivesse sido lançada pelo **+ Ausência**. As tarefas já agendadas não mudam: remaneje pela Grade.
+- **Recusar**: o **Motivo da recusa** é obrigatório. A pessoa recebe a resposta no sino.
+- Desmarque **Só os que aguardam aprovação** para ver também os já decididos e os cancelados.
+- Para desfazer uma ausência aprovada, exclua a ausência na Grade (toque nela).
+
+## 9. Se algo der errado
 
 | Mensagem | O que fazer |
 | --- | --- |

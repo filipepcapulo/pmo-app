@@ -12,18 +12,21 @@ export interface Indicadores {
   vh_medio: number | null; pedidos_sem_valor: number;
   /** minutos executados; os que caíram fora de qualquer período de remuneração entram sem custo */
   /** min_nao_fatura (0094): minutos de tipos de OS que não contam no faturado — entram só com o custo */
-  min: number; min_sem_custo: number; min_nao_fatura?: number; custo: number; custo_hora: number | null;
+  /** 0097: min_bonificado = minutos de tipo que segue o pedido e caíram em pedido bonificado (sem receita);
+   *  min_fora_custo = minutos de tipo que não entra no custo (retrabalho, treinamento…): só contam as horas */
+  min: number; min_sem_custo: number; min_nao_fatura?: number; min_bonificado?: number; min_fora_custo?: number; custo: number; custo_hora: number | null;
+  horas_pedidos_bonif?: number | null;
   /** horas executadas × valor/hora médio do projeto; margem = receita executada − custo */
   receita_exec: number | null; margem: number | null; margem_pct: number | null;
   /** receita dos pedidos − custo até agora */
   sobra: number | null;
 }
 export interface GrupoRent extends Indicadores { id: string; nome: string; tipo: 'projeto' | 'demanda' }
-export interface PedidoRent { id: string; projeto_id: string; numero: string; tipo: string; horas: number; data: string; valor_hora: number | null; total: number | null }
+export interface PedidoRent { id: string; projeto_id: string; numero: string; tipo: string; horas: number; data: string; valor_hora: number | null; total: number | null; bonificado?: boolean }
 export interface Rentabilidade {
   alvo: { tipo: TipoAlvo; id: string; nome: string }; total: Indicadores; grupos: GrupoRent[]; pedidos: PedidoRent[]; pendencias: string[];
 }
-export type ValoresPedidos = Record<string, { valor_hora: number | null; versao: number; ilegivel?: boolean }>;
+export type ValoresPedidos = Record<string, { valor_hora: number | null; bonificado?: boolean; versao: number; ilegivel?: boolean }>;
 
 async function chamar<T>(acao: string, esc: string, extra: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await sb.functions.invoke('financeiro', { body: { acao, escritorio: esc, ...extra } });
@@ -38,8 +41,8 @@ async function chamar<T>(acao: string, esc: string, extra: Record<string, unknow
 export const renta = {
   ler: (esc: string, tipo: TipoAlvo, id: string) => chamar<Rentabilidade>('rentabilidade', esc, { tipo, id }),
   valores: (esc: string, projeto: string) => chamar<{ valores: ValoresPedidos }>('pedidos_valores', esc, { projeto }).then(r => r.valores),
-  /** `valor_hora: null` remove o valor do pedido. */
-  valorSalvar: (esc: string, d: { pedido_id: string; valor_hora: number | null; versao?: number }) => chamar<{ ok: true }>('pedido_valor_salvar', esc, { dados: d }),
+  /** `valor_hora: null` remove o valor do pedido. `bonificado: true` (0097) marca o pedido como sem cobrança: não tem valor/hora. */
+  valorSalvar: (esc: string, d: { pedido_id: string; valor_hora: number | null; bonificado?: boolean; versao?: number }) => chamar<{ ok: true }>('pedido_valor_salvar', esc, { dados: d }),
 };
 
 /** Quem enxerga a rentabilidade e grava o valor do pedido: papéis Dono e Rentabilidade do cofre (Admin e GP não herdam). */

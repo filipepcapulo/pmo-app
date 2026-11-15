@@ -39,6 +39,7 @@ O que saber:
 
 - O valor fica cifrado no cofre. Só Dono e Rentabilidade veem o campo; para os demais o pedido aparece sem ele.
 - Deixar o campo vazio e gravar remove o valor do pedido.
+- **Pedido bonificado (sem cobrança)**: marque a caixa quando as horas do pedido foram dadas ao cliente. O pedido fica sem valor/hora, sai da receita contratada e as horas dos tipos de OS que **seguem o pedido** deixam de faturar na proporção dele (seção 9).
 - Em pedido vindo do Sankhya OM os outros campos são só leitura, mas o valor/hora pode ser informado.
 - Para criar um pedido novo (**+ Pedido**) continua sendo preciso a permissão de gravar pedido de horas. Quem tem só o papel do cofre abre os pedidos existentes e grava apenas o valor/hora.
 - Depois de gravar, a aba **Rentabilidade** do projeto recalcula.
@@ -144,22 +145,30 @@ Descer de nível: toque em uma coluna, em uma barra ou em um nome do Detalhament
 - Toque de novo no item escolhido, ou no **×** da trilha, para subir um nível. **Geral** limpa tudo.
 - Com um projeto na trilha, **Abrir o projeto** leva à ficha dele, onde a aba Rentabilidade detalha **por demanda**.
 - **sem valor**: horas em projeto sem valor/hora nos pedidos — ficam fora do faturado. **sem custo**: horas sem remuneração vigente na data.
-- **não fatura** / **só custo**: horas de um tipo de OS que não conta no faturado (veja abaixo).
+- **não fatura** / **só custo**: horas de um tipo de OS que não conta no faturado (veja abaixo). **bonificado**: horas que caíram em pedido bonificado. **fora do custo**: horas de tipo que não entra no custo.
 
-Tipos de OS — o que conta no faturado. O campo **Apontamento** da tarefa (OS Experience, Faturado (Planilha), Bonificado (Planilha), Treinamento…) diz se o cliente paga por aquela hora. No botão **Tipos de OS**, no topo da tela:
+Tipos de OS — faturado e custo. O campo **Apontamento** da tarefa (OS Experience, Faturado (Planilha), Bonificado (Planilha), Treinamento…) diz como aquela hora entra na conta. No botão **Tipos de OS**, no topo da tela:
 
 1. A lista traz as opções do campo, os tipos já usados em apontamentos (com a quantidade) e os que você cadastrou.
-2. Desmarque **Conta no faturado** nos tipos que o cliente **não paga** (bonificado, trabalho interno). A mudança grava na hora.
+2. Em **Faturado**, escolha **Sim**, **Segue o pedido** ou **Não**. Em **Entra no custo**, desmarque o que só deve ser contado em horas. Cada mudança grava na hora.
 3. Para um tipo que ainda não existe no campo, digite o nome e toque em **+ Adicionar como só custo**. Um tipo cadastrado assim, sem uso, pode ser removido.
 
-| Tipo | Como entra na rentabilidade |
+| Faturado | Como entra na rentabilidade |
 | --- | --- |
-| Conta no faturado (padrão) | Faturado = horas × valor/hora vendido do projeto; custo normal |
-| Não conta | **Só o custo**. Receita zero: a margem dessas horas é o custo com sinal negativo |
+| **Sim** (padrão) | Faturado = horas × valor/hora médio vendido do projeto, sempre |
+| **Segue o pedido** | Vale o pedido de horas do projeto: a parte das horas vendida em **pedido bonificado** não fatura. Ex.: 60 h pagas e 40 h bonificadas nos pedidos → 60% de cada hora executada fatura |
+| **Não** | Receita zero (bonificado, trabalho interno) |
 
-- Vale para a Rentabilidade geral e para a aba Rentabilidade das fichas (o indicador **Horas não faturadas (só custo)** aparece quando há horas assim).
+| Entra no custo | Como entra na rentabilidade |
+| --- | --- |
+| **Sim** (padrão) | Custo = horas × remuneração vigente na data |
+| **Não: só horas** | A hora não pesa no custo nem no custo/hora; só é contada (retrabalho, treinamento, ajuste) |
+
+- Como o BP-MS está configurado: OS Experience, Sankhya OM, Hora Dobrada e Empreito **seguem o pedido**; Bonificado, Planilha - Serviços e Gerenciamento de Projeto **não faturam** (só custo); Retrabalho, Treinamento e Ajuste Administrativo **não faturam e não entram no custo**.
+- A bonificação é medida em dois lugares: **Horas em pedido bonificado** (tipos que seguem o pedido) e, no quadro **Por tipo de OS**, os tipos Bonificado. O trabalho interno aparece nos seus próprios tipos.
+- Vale para a Rentabilidade geral e para a aba Rentabilidade das fichas (os indicadores **Horas não faturadas (tipo de OS)**, **Horas em pedido bonificado** e **Horas sem custo** aparecem quando há horas assim).
 - O quadro **Por tipo de OS** mostra o faturado e o custo de cada tipo; toque em um tipo para ver só as horas dele por cliente, projeto e consultor.
-- Tipo novo que aparecer no campo entra contando no faturado até você desmarcar. Tarefa sem o campo preenchido aparece como **(vazio)**.
+- Tipo novo que aparecer no campo entra contando no faturado e no custo até você mudar. Tarefa sem o campo preenchido aparece como **(vazio)**.
 - A receita contratada (horas dos pedidos × valor) não muda: o tipo só afeta as horas executadas.
 - Cada mudança fica registrada no cofre (quem e quando).
 - A quebra por consultor mostra o custo de cada pessoa: abra em lugar reservado.
@@ -167,7 +176,7 @@ Tipos de OS — o que conta no faturado. O campo **Apontamento** da tarefa (OS E
 ## 10. Dúvidas comuns
 
 - **Não vejo Rentabilidade geral no menu**: é o mesmo papel da aba (Dono ou Rentabilidade no cofre).
-- **Uma OS bonificada está inflando o faturado**: em Rentabilidade geral › **Tipos de OS**, desmarque o tipo. Se a tarefa está com o tipo errado, corrija o campo Apontamento da tarefa.
+- **Uma OS bonificada está inflando o faturado**: em Rentabilidade geral › **Tipos de OS**, ponha o tipo como **Não**; se o tipo é OS Experience e o pedido é que foi bonificado, marque **Pedido bonificado** no pedido de horas. Se a tarefa está com o tipo errado, corrija o campo Apontamento da tarefa.
 - **O faturado da Rentabilidade geral é a nota emitida?** Não. É a conta horas executadas × valor/hora vendido; o app não lê o faturamento do Sankhya.
 - **Não vejo a aba Rentabilidade**: falta o papel Dono ou Rentabilidade no cofre. Depois de receber o papel, recarregue o app.
 - **"A rentabilidade é só para quem tem o papel Dono ou Rentabilidade no cofre financeiro."**: o papel foi revogado. Fale com o Dono.

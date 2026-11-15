@@ -573,12 +573,14 @@ function PedidoPopup({ pedido, aoFechar, aoGravar }: { pedido: Partial<PedidoHor
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
   // valor/hora: `atual` = o que está no cofre (undefined = carregando); `texto` só existe depois de "Mostrar"/"Informar"
-  const [vh, setVh] = useState<{ atual?: { valor_hora: number | null; versao?: number; ilegivel?: boolean }; texto: string | null; erro?: string }>({ texto: null });
+  const [vh, setVh] = useState<{ atual?: { valor_hora: number | null; bonificado?: boolean; versao?: number; ilegivel?: boolean }; texto: string | null; erro?: string }>({ texto: null });
+  // pedido bonificado (0097): null = não mexeu; marcado, o pedido não tem valor/hora e as horas dele não faturam
+  const [bonif, setBonif] = useState<boolean | null>(null);
   const pedidoId = pedido?.id, projetoId = pedido?.projeto_id;
   useEffect(() => {
     if (pedido) setF({ numero: pedido.numero ?? '', tipo: pedido.tipo ?? 'empreito', horas: pedido.horas != null ? String(pedido.horas) : '',
       data: pedido.data ?? new Date().toISOString().slice(0, 10), vigencia: pedido.vigencia_ate ?? '', observacao: pedido.observacao ?? '' });
-    setErro(null);
+    setErro(null); setBonif(null);
   }, [pedido]);
   useEffect(() => {
     if (!pedido || !veRenta) return;
@@ -595,7 +597,8 @@ function PedidoPopup({ pedido, aoFechar, aoGravar }: { pedido: Partial<PedidoHor
   const enviar = async (excluir = false) => {
     if (gravaPedido && !excluir && (!f.numero.trim() || !(Number(f.horas) > 0))) { setErro('Informe o número do pedido e as horas (> 0).'); return; }
     if (gravaPedido && !excluir && f.vigencia && f.vigencia < f.data) { setErro('A vigência não pode terminar antes da data do pedido.'); return; }
-    const novoVh = !excluir && veRenta && vh.texto !== null ? valorHoraDe(vh.texto) : undefined;   // undefined = não mexeu
+    const eraBonif = vh.atual?.bonificado === true, ficaBonif = bonif ?? eraBonif;
+    const novoVh = !excluir && veRenta && !ficaBonif && vh.texto !== null ? valorHoraDe(vh.texto) : undefined;   // undefined = não mexeu
     if (novoVh !== undefined && Number.isNaN(novoVh)) { setErro('Valor/hora: use um número (ex.: 185,50) ou deixe vazio.'); return; }
     setGravando(true);
     try {
@@ -606,8 +609,12 @@ function PedidoPopup({ pedido, aoFechar, aoGravar }: { pedido: Partial<PedidoHor
           : { projeto_id: pedido!.projeto_id, ...campos });
         id = id ?? (r as { id?: string }).id;
       }
-      if (novoVh !== undefined && id && novoVh !== (vh.atual?.valor_hora ?? null)) {
-        await renta.valorSalvar(esc, { pedido_id: id, valor_hora: novoVh, ...(vh.atual?.versao ? { versao: vh.atual.versao } : {}) });
+      const versaoVh = vh.atual?.versao ? { versao: vh.atual.versao } : {};
+      if (!excluir && veRenta && id && ficaBonif !== eraBonif) {
+        // marcar: o pedido fica sem valor/hora; desmarcar: volta a valer o valor digitado agora (ou fica sem valor)
+        await renta.valorSalvar(esc, { pedido_id: id, valor_hora: ficaBonif ? null : novoVh ?? null, bonificado: ficaBonif, ...versaoVh });
+      } else if (novoVh !== undefined && id && novoVh !== (vh.atual?.valor_hora ?? null)) {
+        await renta.valorSalvar(esc, { pedido_id: id, valor_hora: novoVh, ...versaoVh });
       }
       avisar(excluir ? 'Pedido excluído' : 'Pedido gravado', 'ok');
       aoGravar();
@@ -615,6 +622,7 @@ function PedidoPopup({ pedido, aoFechar, aoGravar }: { pedido: Partial<PedidoHor
     setGravando(false);
   };
   const temVh = vh.atual?.valor_hora != null;
+  const marcadoBonif = bonif ?? vh.atual?.bonificado === true;
   return (
     <Popup aberto={!!pedido} titulo={pedido?.id ? 'Pedido de horas' : 'Novo pedido de horas'} aoFechar={aoFechar} largura={600}
       rodape={<>
@@ -630,7 +638,9 @@ function PedidoPopup({ pedido, aoFechar, aoGravar }: { pedido: Partial<PedidoHor
           <Campo rotulo="Horas contratadas" tipo="number" valor={f.horas} aoMudar={v => setF({ ...f, horas: v })} obrigatorio inputMode="numeric" somenteLeitura={!gravaPedido} />
           <Campo rotulo="Data" tipo="date" valor={f.data} aoMudar={v => setF({ ...f, data: v })} somenteLeitura={!gravaPedido} />
           <Campo rotulo="Vigência até" tipo="date" valor={f.vigencia} aoMudar={v => setF({ ...f, vigencia: v })} somenteLeitura={!gravaPedido} />
-          {veRenta && (vh.texto !== null
+          {veRenta && (marcadoBonif
+            ? <div className="campo"><label>Valor/hora vendido (R$)</label><div className="renta-valor" data-testid="pedido-valor-hora"><span>pedido bonificado: sem valor</span></div></div>
+            : vh.texto !== null
             ? <Campo rotulo="Valor/hora vendido (R$)" valor={vh.texto} aoMudar={v => setVh({ ...vh, texto: v })} placeholder="ex.: 185,50" autoComplete="off"
                 ajuda="Fica cifrado no cofre financeiro; só Dono e Rentabilidade veem. Vazio = sem valor." />
             : <div className="campo">
@@ -643,6 +653,8 @@ function PedidoPopup({ pedido, aoFechar, aoGravar }: { pedido: Partial<PedidoHor
                 {vh.erro && <small className="msg-erro">{vh.erro}</small>}
               </div>)}
         </div>
+        {veRenta && vh.atual !== undefined && <label className="check" title="Fica no cofre financeiro; só Dono e Rentabilidade veem">
+          <input type="checkbox" checked={marcadoBonif} aria-label="Pedido bonificado" onChange={e => setBonif(e.target.checked)} /> Pedido bonificado (sem cobrança): as horas dos tipos de OS que seguem o pedido não entram no faturado</label>}
         <Campo rotulo="Observação" tipo="textarea" valor={f.observacao} aoMudar={v => setF({ ...f, observacao: v })} maxLength={1000} somenteLeitura={!gravaPedido} />
         {erro && <p className="msg-erro">{erro}</p>}
       </Formulario>

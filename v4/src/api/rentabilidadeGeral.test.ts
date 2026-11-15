@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { agrupar, aplicarFiltro, filtrar, intervaloPadrao, nomeDe, planilhaGeral, proximoNivel, rotuloMes, somar, type CelulaGeral, type RentaGeral } from './rentabilidadeGeral';
+import { agrupar, aplicarFiltro, filtrar, intervaloPadrao, nomeDe, planilhaGeral, proximoNivel, rotuloMes, soCusto, somar, type CelulaGeral, type RentaGeral } from './rentabilidadeGeral';
 
 const cel = (mes: string, periodo: number, cliente: string, projeto: string, consultor: string, h: number, faturado: number, custo: number, x: Partial<CelulaGeral> = {}): CelulaGeral =>
   ({ mes, periodo, cliente_id: cliente, projeto_id: projeto, consultor_id: consultor, min: h * 60, faturado, custo, min_sem_valor: 0, min_sem_custo: 0, ...x });
-const D: Pick<RentaGeral, 'clientes' | 'projetos' | 'pessoas' | 'periodos'> = {
+const D: Pick<RentaGeral, 'clientes' | 'projetos' | 'pessoas' | 'periodos' | 'tipos'> = {
+  tipos: [{ id: 'osexperience', nome: 'OS Experience', fatura: true }, { id: 'bonificadoplanilha', nome: 'Bonificado (Planilha)', fatura: false }],
   clientes: [{ id: 'c1', nome: 'Alfa' }, { id: 'c2', nome: 'Beta' }],
   projetos: [{ id: 'p1', nome: 'Implantação', cliente_id: 'c1' }, { id: 'p2', nome: 'Sustentação', cliente_id: 'c1' }, { id: 'p3', nome: 'Fiscal', cliente_id: 'c2' }],
   pessoas: [{ id: 'u1', nome: 'Ana' }, { id: 'u2', nome: 'Bia' }],
@@ -59,8 +60,26 @@ describe('rentabilidade geral (0091)', () => {
     expect(intervaloPadrao('2026-11-14')).toEqual({ ini: '2026-06-01', fim: '2026-11-14' });
     expect(intervaloPadrao('2026-02-10')).toEqual({ ini: '2025-09-01', fim: '2026-02-10' });
     const p = planilhaGeral('cliente', agrupar(D, CELS, 'cliente', 'mes'), somar(CELS));
-    expect(p.colunas.map(c => c.titulo)).toEqual(['Cliente', 'Horas', 'Faturado', 'Custo', 'Margem', 'Margem %']);
-    expect(p.linhas[0]).toEqual(['Alfa', 19, 3000, 1720, 1280, 42.7]);
+    expect(p.colunas.map(c => c.titulo)).toEqual(['Cliente', 'Horas', 'Horas não faturadas', 'Faturado', 'Custo', 'Margem', 'Margem %']);
+    expect(p.linhas[0]).toEqual(['Alfa', 19, 0, 3000, 1720, 1280, 42.7]);
     expect(p.linhas[p.linhas.length - 1][0]).toBe('Total');
+  });
+  it('tipo de OS (0094): vira dimensão; o que não conta no faturado aparece só com o custo', () => {
+    const cels = [
+      cel('2026-11', 202611, 'c1', 'p1', 'u1', 10, 2000, 800, { tipo_id: 'osexperience' }),
+      cel('2026-11', 202611, 'c1', 'p1', 'u1', 5, 0, 400, { tipo_id: 'bonificadoplanilha', min_nao_fatura: 300 }),
+      cel('2026-11', 202611, 'c1', 'p1', 'u2', 2, 400, 240),                       // célula antiga, sem tipo: cai em (vazio)
+    ];
+    const g = agrupar(D, cels, 'tipo', 'mes');
+    expect(g.map(x => [x.nome, x.faturado, x.custo, x.margem, x.min_nao_fatura])).toEqual([
+      ['OS Experience', 2000, 800, 1200, 0], ['(vazio)', 400, 240, 160, 0], ['Bonificado (Planilha)', 0, 400, -400, 300]]);
+    expect(g.map(soCusto)).toEqual([false, false, true]);
+    const t = somar(cels);
+    expect([t.faturado, t.custo, t.margem, t.min_nao_fatura, t.min_sem_valor]).toEqual([2400, 1440, 960, 300, 0]);
+    expect(soCusto(t)).toBe(false);
+    expect(filtrar(cels, { tipo: 'bonificadoplanilha' }, 'mes').length).toBe(1);
+    expect(filtrar(cels, { tipo: 'vazio' }, 'mes').length).toBe(1);
+    expect(nomeDe(D, 'tipo', 'osexperience', 'mes')).toBe('OS Experience');
+    expect(aplicarFiltro(D, { cliente: 'c1' }, 'tipo', 'bonificadoplanilha')).toEqual({ cliente: 'c1', tipo: 'bonificadoplanilha' });
   });
 });

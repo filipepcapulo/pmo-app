@@ -73,6 +73,7 @@ const ACOES: Record<string, string> = {
   'remuneracao.excluir': 'Excluiu período', 'remuneracao.importar': 'Importou período', 'cofre.iniciar': 'Abriu o cofre pela primeira vez',
   'fechamento.ver': 'Viu o fechamento', 'fechamento.ver_meu': 'Viu o próprio fechamento', 'fechamento.fechar': 'Fechou o período', 'fechamento.reabrir': 'Reabriu o período',
   'fechamento.importar': 'Importou fechamento', 'ajuste.salvar': 'Ajustou horas', 'ajuste.remover': 'Removeu ajuste de horas',
+  'rentabilidade.ver_geral': 'Viu a rentabilidade geral', 'tipo_os.ver': 'Viu os tipos de OS', 'tipo_os.salvar': 'Mudou se um tipo de OS conta no faturado', 'tipo_os.remover': 'Removeu um tipo de OS',
   'rentabilidade.ver': 'Viu a rentabilidade', 'pedido_valor.ver': 'Viu o valor dos pedidos', 'pedido_valor.salvar': 'Gravou o valor/hora de um pedido',
   'pedido_valor.remover': 'Removeu o valor/hora de um pedido', 'fechamento.obs': 'Gravou OBS no fechamento',
 };

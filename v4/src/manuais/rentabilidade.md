@@ -144,11 +144,30 @@ Descer de nível: toque em uma coluna, em uma barra ou em um nome do Detalhament
 - Toque de novo no item escolhido, ou no **×** da trilha, para subir um nível. **Geral** limpa tudo.
 - Com um projeto na trilha, **Abrir o projeto** leva à ficha dele, onde a aba Rentabilidade detalha **por demanda**.
 - **sem valor**: horas em projeto sem valor/hora nos pedidos — ficam fora do faturado. **sem custo**: horas sem remuneração vigente na data.
+- **não fatura** / **só custo**: horas de um tipo de OS que não conta no faturado (veja abaixo).
+
+Tipos de OS — o que conta no faturado. O campo **Apontamento** da tarefa (OS Experience, Faturado (Planilha), Bonificado (Planilha), Treinamento…) diz se o cliente paga por aquela hora. No botão **Tipos de OS**, no topo da tela:
+
+1. A lista traz as opções do campo, os tipos já usados em apontamentos (com a quantidade) e os que você cadastrou.
+2. Desmarque **Conta no faturado** nos tipos que o cliente **não paga** (bonificado, trabalho interno). A mudança grava na hora.
+3. Para um tipo que ainda não existe no campo, digite o nome e toque em **+ Adicionar como só custo**. Um tipo cadastrado assim, sem uso, pode ser removido.
+
+| Tipo | Como entra na rentabilidade |
+| --- | --- |
+| Conta no faturado (padrão) | Faturado = horas × valor/hora vendido do projeto; custo normal |
+| Não conta | **Só o custo**. Receita zero: a margem dessas horas é o custo com sinal negativo |
+
+- Vale para a Rentabilidade geral e para a aba Rentabilidade das fichas (o indicador **Horas não faturadas (só custo)** aparece quando há horas assim).
+- O quadro **Por tipo de OS** mostra o faturado e o custo de cada tipo; toque em um tipo para ver só as horas dele por cliente, projeto e consultor.
+- Tipo novo que aparecer no campo entra contando no faturado até você desmarcar. Tarefa sem o campo preenchido aparece como **(vazio)**.
+- A receita contratada (horas dos pedidos × valor) não muda: o tipo só afeta as horas executadas.
+- Cada mudança fica registrada no cofre (quem e quando).
 - A quebra por consultor mostra o custo de cada pessoa: abra em lugar reservado.
 
 ## 10. Dúvidas comuns
 
 - **Não vejo Rentabilidade geral no menu**: é o mesmo papel da aba (Dono ou Rentabilidade no cofre).
+- **Uma OS bonificada está inflando o faturado**: em Rentabilidade geral › **Tipos de OS**, desmarque o tipo. Se a tarefa está com o tipo errado, corrija o campo Apontamento da tarefa.
 - **O faturado da Rentabilidade geral é a nota emitida?** Não. É a conta horas executadas × valor/hora vendido; o app não lê o faturamento do Sankhya.
 - **Não vejo a aba Rentabilidade**: falta o papel Dono ou Rentabilidade no cofre. Depois de receber o papel, recarregue o app.
 - **"A rentabilidade é só para quem tem o papel Dono ou Rentabilidade no cofre financeiro."**: o papel foi revogado. Fale com o Dono.

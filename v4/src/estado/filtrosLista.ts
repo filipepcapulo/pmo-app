@@ -184,6 +184,35 @@ export function filtrarDemandas<T extends DemandaFiltravel>(lista: T[], f: Filtr
   return lista.filter(d => passam.has(d.id) || maes.has(d.id));
 }
 
+// ---------------------------------------------------------------- portfólio
+/** Portfólio (V4 4.2.0): os mesmos filtros da tela de Demandas + GP (pelo nome, como nas barras). */
+export interface FiltroPortfolio extends FiltroDemandas { gps: string[] }
+export const PADRAO_PORTFOLIO: FiltroPortfolio = { ...PADRAO_DEMANDAS, gps: [] };
+interface ProjetoDoPortfolio { id: string; nome: string; fase: string; cliente_id: string; cliente: string; gp: string | null }
+/** Há filtro que olha as demandas do projeto (etapa, responsável, tipo, prioridade, só atrasadas)? O status entra por `statusRestringe`. */
+export const filtraPorDemanda = (f: FiltroPortfolio, statusRestringe = false) =>
+  statusRestringe || f.etapas.length > 0 || f.responsaveis.length > 0 || f.tipos.length > 0 || f.prioridades.length > 0 || f.atrasadas;
+/**
+ * Projetos do Portfólio que passam no filtro. Fase, cliente, projeto, GP e texto valem para o projeto; etapa, responsável,
+ * tipo, prioridade e "só atrasadas" (e o status, quando `statusRestringe`) pedem ao menos uma demanda do projeto que
+ * passe — no nível escolhido em "Aplicar filtros em". `demandas` já vem do banco só com os status escolhidos.
+ * `fora` deixa de aplicar fases e/ou GPs (os cartões por fase contam sem o filtro de fase; as barras, sem o de GP).
+ */
+export function filtrarPortfolio<P extends ProjetoDoPortfolio>(ps: P[], demandas: DemandaFiltravel[] | null, f: FiltroPortfolio,
+  statusRestringe = false, fora: { fases?: boolean; gps?: boolean } = {}, semGp = 'Sem GP'): P[] {
+  let comDemanda: Set<string> | null = null;
+  if (demandas && filtraPorDemanda(f, statusRestringe)) {
+    const passam = filtrarDemandas(demandas, { ...f, texto: '', fases: [], clientes: [], projetos: [], status: [] });
+    comDemanda = new Set(passam.map(d => d.projeto_id).filter((x): x is string => !!x));
+  }
+  return ps.filter(p =>
+    (fora.fases || em(f.fases, p.fase)) && (fora.gps || f.gps.length === 0 || f.gps.includes(p.gp ?? semGp))
+    && (f.clientes.length === 0 || f.clientes.includes(p.cliente_id))
+    && (f.projetos.length === 0 || f.projetos.includes(p.id))
+    && (!comDemanda || comDemanda.has(p.id))
+    && temTexto(f.texto, p.nome, p.cliente, p.gp, p.fase));
+}
+
 // ---------------------------------------------------------------- tarefas
 export interface FiltroTarefas { texto: string; responsaveis: string[]; status: string[]; de: string; ate: string }
 export const PADRAO_TAREFAS: FiltroTarefas = { texto: '', responsaveis: [], status: [], de: '', ate: '' };

@@ -8,26 +8,36 @@ Menu **☰ › Relatórios › Portfólio**. Aparece só para quem tem a permiss
 
 A tela mostra os projetos ativos de clientes ativos: por fase e por GP, com Go Live, atraso, horas e os riscos abertos. É uma tela de consulta; a única gravação é criar um plano de ação (**+ Plano**).
 
-## 2. Cartões por fase
+## 2. Filtros
 
-No topo, o cartão **Projetos** mostra o total e um cartão para cada fase (P1 a P5, Operação Assistida, Sustentação, Banco de Horas, Avulso e outras que existirem).
+No topo da tela, acima dos cartões, fica a barra de filtros. São os mesmos da tela de Demandas, mais o GP, e valem para os cartões, as barras, o cronograma e a tabela:
+
+- **Buscar projeto, cliente, GP ou fase**, **Fase**, **GP**, **Cliente** e **Projeto**: olham o projeto.
+- **Status**, **Etapa**, **Responsável**, **Tipo**, **Prioridade** e **Só atrasadas**: mostram os projetos que têm ao menos uma demanda assim. Com o status em "Abertas" (padrão) ou "Todas" e nenhum dos outros marcado, nenhum projeto sai da lista.
+- **Aplicar filtros em**: diz se esses filtros de demanda olham demandas, subdemandas ou os dois.
+- **Filtros salvos**: guarda a combinação atual, como em Demandas.
+- **Limpar filtros**: zera tudo. O filtro escolhido fica lembrado neste navegador.
+
+## 3. Cartões por fase
+
+Abaixo dos filtros, o cartão **Projetos** mostra o total e um cartão para cada fase (P1 a P5, Operação Assistida, Sustentação, Banco de Horas, Avulso e outras que existirem).
 
 - Toque numa fase para filtrar. Pode marcar várias.
 - Toque de novo para desmarcar.
 - Toque em **Projetos** para voltar a ver todas as fases.
 
-Os números dos cartões já consideram os GPs escolhidos.
+Os números dos cartões já consideram os demais filtros.
 
-## 3. Projetos por GP
+## 4. Projetos por GP
 
 Gráfico de barras com a quantidade de projetos de cada GP e, ao lado, quantos estão atrasados. Projeto sem GP entra em "Sem GP". O GP é o do projeto; se não houver, o do cliente.
 
 - Toque numa barra para filtrar por aquele GP. Pode marcar vários.
 - Toque de novo para desmarcar.
 
-As barras já consideram as fases escolhidas.
+As barras já consideram os demais filtros.
 
-## 4. Riscos ativos
+## 5. Riscos ativos
 
 Lista os planos de ação (5W2H) abertos: Nível, Plano de ação, Cliente, Projeto, Responsável, Vencimento e Dias. O nome abre a demanda do plano.
 
@@ -38,14 +48,6 @@ Lista os planos de ação (5W2H) abertos: Nível, Plano de ação, Cliente, Proj
 | **Moderado** (cinza) | Os demais. |
 
 Em **Dias**, o número é quanto falta para o vencimento; vencido aparece "venceu há N".
-
-## 5. Filtros
-
-Abaixo dos quadros há a barra de filtros, que vale para o cronograma e para a tabela:
-
-- **Fases** e **GPs**: seleção múltipla, igual aos cartões e às barras.
-- **Buscar projeto, cliente, GP ou fase**: busca por texto.
-- **Limpar filtros**: zera tudo.
 
 ## 6. Saldo dos pedidos (Experience)
 
@@ -99,7 +101,7 @@ Toque em **+ Plano** na linha do projeto. Abre o mesmo 5W2H da Tela do Projeto, 
 ## 9. Dúvidas comuns
 
 **Um projeto não aparece.**
-Só entram projetos com situação ativa, de cliente ativo. Confira também os filtros de fase, GP e a busca; **Limpar filtros** zera tudo.
+Só entram projetos com situação ativa, de cliente ativo. Confira também os filtros no topo da tela; **Limpar filtros** zera tudo.
 
 **O projeto está na tabela, mas não no cronograma.**
 É da fase Avulso e não tem etapa com data.

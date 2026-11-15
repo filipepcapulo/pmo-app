@@ -3,10 +3,19 @@
 // 3.13.0: fases e GPs em seleção múltipla; Avulso só no Gantt com cronograma; a tabela sinaliza o cliente com plano de
 // ação aberto e o "+ Plano" abre o mesmo 5W2H da Tela de Projeto.
 // 3.25.0 (V13c-1): saldo dos pedidos do Experience × horas agendadas (seção própria e coluna "Pedido" na tabela).
-import { useMemo, useState } from 'react';
+// V4 4.2.0: barra de filtros no topo (acima dos cartões) com os mesmos filtros da tela de Demandas + GP; os filtros de
+// demanda (status, etapa, responsável, tipo, prioridade, só atrasadas) mostram os projetos que têm demanda assim.
+import { useEffect, useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
+import { PRIORIDADES, STATUS_V4, todasDemandas } from '../api/execucao';
+import { ABERTAS, lerStatus, rotuloStatus, TODOS } from '../api/relatorios';
+import { BarraFiltros } from '../componentes/BarraFiltros';
+import { FiltrosSalvos } from '../componentes/FiltrosSalvos';
+import { useEquipe } from '../estado/equipe';
+import { useEtapas } from '../estado/etapas';
+import { filtraPorDemanda, filtrarPortfolio, NIVEIS_FILTRO, opcoesNomeadas, opcoesPessoas, PADRAO_PORTFOLIO, SEM, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
 import { diaNum } from '../api/projeto';
-import { alternar, fasesDe, filtrar, gpsDe, janelaGantt, paraGantt, planosPorCliente, porGp, portfolio, SEM_GP, type ProjetoPortfolio, type RiscoPortfolio } from '../api/portfolio';
+import { alternar, fasesDe, gpsDe, janelaGantt, paraGantt, planosPorCliente, porGp, portfolio, SEM_GP, type ProjetoPortfolio, type RiscoPortfolio } from '../api/portfolio';
 import type { DemandaProjeto } from '../api/projeto';
 import { Popup5W2H } from '../componentes/Popup5W2H';
 import { SaldoPedidos, SeloSituacao } from '../componentes/SaldoPedidos';
@@ -22,6 +31,8 @@ import { useSessao } from '../estado/sessao';
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const COR_NIVEL = { critico: 'var(--vermelho)', alto: 'var(--laranja)', moderado: 'var(--texto-2)' };
 const ROT_NIVEL = { critico: 'Crítico', alto: 'Alto', moderado: 'Moderado' };
+const CHAVE_STATUS = 'pmo4.portfolio.status';
+const mesmos = (a: string[], b: string[]) => a.length === b.length && a.every(x => b.includes(x));
 const linkProjeto = (id: string, nome: string) => <a href={hashDe(caminhoEntidade('projeto', id))}>{nome}</a>;
 
 function GanttPortfolio({ ps, hoje }: { ps: ProjetoPortfolio[]; hoje: string }) {
@@ -68,14 +79,40 @@ export function Portfolio() {
   const ped = useCarga(() => pedidos.ultima(esc), [esc, ed.geracao]);
   const situacoes = useMemo(() => porProjeto(ped.dados?.linhas ?? []), [ped.dados]);
   const pode = usePode();
-  const [fases, setFases] = useState<string[]>([]);
-  const [gpsSel, setGps] = useState<string[]>([]);
-  const [texto, setTexto] = useState('');
+  const { porId } = useEquipe();
+  const et = useEtapas();
+  const { f, mudar, limpar, aplicar, ativos } = useFiltroLista('portfolio', PADRAO_PORTFOLIO);
+  const [status, setStatus] = useState<string[]>(() => { try { return lerStatus(localStorage.getItem(CHAVE_STATUS)); } catch { return ABERTAS; } });
+  useEffect(() => { try { localStorage.setItem(CHAVE_STATUS, JSON.stringify(status)); } catch { /* sem armazenamento */ } }, [status]);
+  const trocar = (banco: string[]) => setStatus(l => {
+    const n = banco.every(v => l.includes(v)) ? l.filter(x => !banco.includes(x)) : [...new Set([...l, ...banco])];
+    return n.length ? TODOS.filter(x => n.includes(x)) : l;
+  });
   const [plano, setPlano] = useState<Partial<DemandaProjeto> | null>(null);
+  // demandas dos status escolhidos: dão as opções de etapa/responsável e dizem que projeto tem demanda que passa no filtro
+  const dem = useCarga(() => todasDemandas(esc, status.length === TODOS.length ? null : status), [esc, status.join(), ed.geracao]);
+  const demandas = useMemo(() => (dem.dados ? dem.dados.itens.map(d => ({ ...d, etapa_app_id: et.idDe(d) })) : null), [dem.dados, et]);
   const ps = c.dados?.projetos ?? [];
-  const doGp = useMemo(() => filtrar(ps, { gps: gpsSel }), [ps, gpsSel]);
-  const daFase = useMemo(() => filtrar(ps, { fases }), [ps, fases]);
-  const lista = useMemo(() => filtrar(ps, { fases, gps: gpsSel, texto }), [ps, fases, gpsSel, texto]);
+  const statusFora = !mesmos(status, ABERTAS);
+  // "Abertas" (padrão) e "Todas" não restringem sozinhas: projeto sem demanda continua na lista
+  const statusRestringe = statusFora && status.length !== TODOS.length;
+  const fases = f.fases, gpsSel = f.gps;
+  const setFases = (v: string[]) => mudar({ fases: v }), setGps = (v: string[]) => mudar({ gps: v });
+  const doGp = useMemo(() => filtrarPortfolio(ps, demandas, f, statusRestringe, { fases: true }, SEM_GP), [ps, demandas, f, statusRestringe]);
+  const daFase = useMemo(() => filtrarPortfolio(ps, demandas, f, statusRestringe, { gps: true }, SEM_GP), [ps, demandas, f, statusRestringe]);
+  const lista = useMemo(() => filtrarPortfolio(ps, demandas, f, statusRestringe, {}, SEM_GP), [ps, demandas, f, statusRestringe]);
+  const ops = useMemo(() => {
+    const ds = demandas ?? [];
+    return {
+      etapas: [...et.lista.filter(e => e.ativo || ds.some(d => d.etapa_app_id === e.id)).map(e => ({ valor: e.id, rotulo: e.nome })),
+        ...(ds.some(d => !d.etapa_app_id) ? [{ valor: SEM, rotulo: '(sem etapa)' }] : [])],
+      responsaveis: opcoesPessoas(ds.map(d => d.responsavel_id), id => porId.get(id)?.nome),
+      clientes: opcoesNomeadas(ps.map(p => [p.cliente_id, p.cliente])),
+      projetos: opcoesNomeadas(ps.filter(p => !f.clientes.length || f.clientes.includes(p.cliente_id)).map(p => [p.id, `${p.cliente} · ${p.nome}`])),
+    };
+  }, [demandas, ps, porId, f.clientes, et]);
+  const limparTudo = () => { limpar(); setStatus(ABERTAS); };
+  const aguardaDemandas = filtraPorDemanda(f, statusRestringe) && !demandas;
   const planos = useMemo(() => planosPorCliente(c.dados?.riscos ?? [], ps), [c.dados, ps]);
   const podePlano = pode('demanda.criar');
   const barras = porGp(daFase), max = Math.max(1, ...barras.map(b => b.n));
@@ -111,7 +148,39 @@ export function Portfolio() {
   ], []);
   return (
     <div className="pagina pagina-larga">
-      <header className="pagina-topo"><div><h1>Portfólio de projetos</h1><p className="ajuda">Projetos ativos por fase e GP, Go Live, atraso, horas e riscos ativos. Toque nos cartões e nas barras para filtrar (vários de uma vez). No Gantt, projeto Avulso só aparece com cronograma.</p></div></header>
+      <header className="pagina-topo"><div><h1>Portfólio de projetos</h1><p className="ajuda">Projetos ativos por fase e GP, Go Live, atraso, horas e riscos ativos. Os filtros são os mesmos da tela de Demandas: status, etapa, responsável, tipo, prioridade e "só atrasadas" mostram os projetos que têm demanda assim. Toque nos cartões e nas barras para filtrar (vários de uma vez). No Gantt, projeto Avulso só aparece com cronograma.</p></div></header>
+      <BarraFiltros nome="projetos" n={c.dados ? lista.length : null} total={c.dados ? ps.length : null} ativos={ativos + (statusFora ? 1 : 0)} aoLimpar={limparTudo}>
+        <input type="search" value={f.texto} onChange={e => mudar({ texto: e.target.value })} placeholder="Buscar projeto, cliente, GP ou fase" aria-label="Buscar projeto" />
+        <details className="filtro-status">
+          <summary>Status: {rotuloStatus(status)}</summary>
+          <div className="filtro-status-caixa">
+            <div className="linha">
+              <button type="button" className="link" onClick={() => setStatus(ABERTAS)}>Abertas</button>
+              <button type="button" className="link" onClick={() => setStatus(TODOS)}>Todas</button>
+            </div>
+            {STATUS_V4.map(s => <label key={s.valor} className="check"><input type="checkbox" checked={s.banco.every(v => status.includes(v))} onChange={() => trocar(s.banco)} /> {s.rotulo}</label>)}
+          </div>
+        </details>
+        <SelecaoMultipla rotulo="Fase" opcoes={fasesDe(ps)} sel={f.fases} aoMudar={setFases} />
+        <SelecaoMultipla rotulo="GP" opcoes={gpsDe(ps)} sel={f.gps} aoMudar={setGps} />
+        <SelecaoMultipla rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
+        <SelecaoMultipla rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
+        <SelecaoMultipla rotulo="Cliente" opcoes={ops.clientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
+        <SelecaoMultipla rotulo="Projeto" opcoes={ops.projetos} sel={f.projetos} aoMudar={v => mudar({ projetos: v })} />
+        <SelecaoMultipla rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />
+        <SelecaoMultipla rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
+        <label className="check"><input type="checkbox" checked={f.atrasadas} onChange={e => mudar({ atrasadas: e.target.checked })} /> Só atrasadas</label>
+        <FiltrosSalvos tela="portfolio" atuais={{ ...f, statusLista: status }}
+          aoAplicar={x => { aplicar(x); setStatus(Array.isArray(x.statusLista) ? lerStatus(JSON.stringify(x.statusLista)) : ABERTAS); }} />
+        <span className="filtro-nivel" role="group" aria-label="Nível em que os filtros são aplicados" title="Vale para os filtros de demanda (status, etapa, responsável, tipo, prioridade, só atrasadas)">
+          Aplicar filtros em
+          <span className="filtro-nivel-ops">
+            {NIVEIS_FILTRO.map(n => <button key={n.valor || 'todos'} type="button" aria-pressed={(f.nivel || '') === n.valor} onClick={() => mudar({ nivel: n.valor })}>{n.rotulo}</button>)}
+          </span>
+        </span>
+      </BarraFiltros>
+      {dem.erro && <p className="msg-erro">{dem.erro}</p>}
+      {aguardaDemandas && !dem.erro && <p className="ajuda"><span className="giro" /> Carregando as demandas para aplicar o filtro…</p>}
       {c.erro && <p className="msg-erro">{c.erro}</p>}
       {c.dados && <>
         <section className="indicadores" aria-label="Projetos por fase">
@@ -141,12 +210,6 @@ export function Portfolio() {
               ? <Tabela id="portfolio-riscos" nome="Riscos ativos" colunas={colRiscos} linhas={c.dados.riscos} chave={r => r.demanda_id} tamanhoInicial={10} />
               : <p className="ajuda">Nenhum plano de ação aberto.</p>}
           </section>
-        </div>
-        <div className="barra-filtros">
-          <SelecaoMultipla rotulo="Fases" opcoes={fasesDe(ps)} sel={fases} aoMudar={setFases} />
-          <SelecaoMultipla rotulo="GPs" opcoes={gpsDe(ps)} sel={gpsSel} aoMudar={setGps} />
-          <input type="search" placeholder="Buscar projeto, cliente, GP ou fase" value={texto} onChange={e => setTexto(e.target.value)} aria-label="Buscar projeto" />
-          {(fases.length > 0 || gpsSel.length > 0 || texto) && <button type="button" className="link" onClick={() => { setFases([]); setGps([]); setTexto(''); }}>Limpar filtros</button>}
         </div>
         <SaldoPedidos />
         <section className="cartao"><h2 className="secao">Cronograma</h2><GanttPortfolio ps={paraGantt(lista)} hoje={c.dados.hoje} /></section>

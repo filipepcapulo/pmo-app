@@ -78,7 +78,7 @@ export const MANUAIS: Manual[] = [
     resumo: 'Registrar os deslocamentos e montar o relatório de reembolso de quilometragem.' },
   { id: 'portfolio', titulo: 'Portfólio', para: 'modulo', texto: portfolio, modulos: ['portfolio'],
     resumo: 'A visão geral dos projetos: fases, GPs, situação e planos de ação.' },
-  { id: 'produtividade', titulo: 'Produtividade e Meu fechamento', para: 'modulo', texto: produtividade, modulos: ['produtividade', 'meu-fechamento'],
+  { id: 'produtividade', titulo: 'Ordens de Serviço e Meu fechamento', para: 'modulo', texto: produtividade, modulos: ['produtividade', 'meu-fechamento'],
     resumo: 'Os apontamentos, o gráfico de horas e o fechamento do seu período.' },
   { id: 'financeiro', titulo: 'Financeiro: Acessos e Remuneração', para: 'modulo', texto: financeiro, modulos: ['financeiro'],
     resumo: 'O cofre financeiro: quem tem acesso, os papéis e a remuneração com vigência.' },

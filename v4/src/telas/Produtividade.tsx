@@ -1,6 +1,7 @@
 // Produtividade (#/produtividade): fechamento por consultor e apontamentos da equipe, OS do Sankhya OM + app (D10: substitui
 // as planilhas do Drive e a planilha mestre). O relatório por consultor abre pronto para imprimir ou salvar em PDF.
-// Sem produtividade.ver_todos (o consultor), o banco devolve só o próprio (0045) e a tela vira "Minha produtividade".
+// Sem produtividade.ver_todos (o consultor), o banco devolve só o próprio (0045) e a tela vira "Minhas ordens de serviço".
+// V4 4.2.0: a tela passou a se chamar "Ordens de Serviço" (a rota #/produtividade e a permissão não mudam).
 // Travados (V13c-2): apontamentos travados no Experience fora do prazo retroativo, por ciclo 21–20 (substitui a planilha).
 // Conferência de OS (V13c-3): OS do Experience × agendas do banco, relatório por consultor e vínculo da OS na agenda.
 // Gráfico (F2): horas executadas acumuladas no período, por dia, empilhadas por tipo de OS (aba Fechamento).
@@ -33,7 +34,7 @@ async function relatorio(escritorio: string, l: LinhaFechamento, de: string, ate
   const itens = [...r.itens].sort((a, b) => a.data.localeCompare(b.data) || String(a.hora_ini ?? '').localeCompare(String(b.hora_ini ?? '')));
   const lin = (k: string, v: string) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`;
   w.document.open();
-  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Produtividade ${esc(l.consultor)} ${data(de)} a ${data(ate)}</title>
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Ordens de Serviço ${esc(l.consultor)} ${data(de)} a ${data(ate)}</title>
 <style>body{font:12px/1.4 system-ui,sans-serif;color:#1d2a22;margin:24px}h1{font-size:18px;margin:0 0 2px}h2{font-size:14px;margin:18px 0 6px}
 table{border-collapse:collapse;width:100%}th,td{border:1px solid #cfd8d2;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eef4f0}
 .resumo{width:auto}.resumo th{width:200px}.num{text-align:right;white-space:nowrap}small{color:#5c6b62}@media print{button{display:none}}</style></head><body>
@@ -104,11 +105,11 @@ export function Produtividade() {
   return (
     <div className="pagina">
       <header className="pagina-topo"><div>
-        <h1>{todos ? 'Produtividade' : 'Minha produtividade'}</h1>
+        <h1>{todos ? 'Ordens de Serviço' : 'Minhas ordens de serviço'}</h1>
         <p className="ajuda">{todos ? 'Fechamento por consultor e apontamentos da equipe (Sankhya OM + app).'
           : 'O seu fechamento e os seus apontamentos (Sankhya OM + app). A dos colegas só aparece para a gerência.'}</p>
       </div></header>
-      <div className="segmentos" role="tablist" aria-label="Seções de produtividade">
+      <div className="segmentos" role="tablist" aria-label="Seções de ordens de serviço">
         <button type="button" role="tab" aria-selected={aba === 'fechamento'} onClick={() => setAba('fechamento')}>Fechamento</button>
         <button type="button" role="tab" aria-selected={aba === 'apontamentos'} onClick={() => setAba('apontamentos')}>{todos ? 'Apontamentos' : 'Meus apontamentos'}</button>
         <button type="button" role="tab" aria-selected={aba === 'travados'} onClick={() => setAba('travados')}>{todos ? 'Travados' : 'Meus travados'}</button>

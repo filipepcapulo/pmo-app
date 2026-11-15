@@ -1,4 +1,4 @@
-# Manual de Produtividade e Meu fechamento
+# Manual de Ordens de Serviço e Meu fechamento
 
 Para todos os usuários (consultores e gestão) · app PMO v3 (web)
 
@@ -8,19 +8,19 @@ Para todos os usuários (consultores e gestão) · app PMO v3 (web)
 
 No menu (☰), na área **Relatórios**, há dois módulos:
 
-- **Relatórios › Produtividade**: horas apontadas (Sankhya OM + app), com o gráfico de horas acumuladas. Todos entram.
+- **Relatórios › Ordens de Serviço** (antiga Produtividade): horas apontadas (Sankhya OM + app), com o gráfico de horas acumuladas. Todos entram.
 - **Relatórios › Meu fechamento**: o seu fechamento do período de 21 a 20, com o valor calculado. Todos entram, e cada pessoa vê só o próprio.
 
-Na Produtividade, o que aparece depende da permissão **produtividade.ver_todos**:
+Em Ordens de Serviço, o que aparece depende da permissão **produtividade.ver_todos**:
 
 | Quem | O que vê | Título da tela |
 | --- | --- | --- |
-| Tem a permissão (padrão: Admin, GP, Líder Tech e Triagem) | A equipe toda | **Produtividade** |
-| Não tem (padrão: Consultor) | Só os próprios números | **Minha produtividade** |
+| Tem a permissão (padrão: Admin, GP, Líder Tech e Triagem) | A equipe toda | **Ordens de Serviço** |
+| Não tem (padrão: Consultor) | Só os próprios números | **Minhas ordens de serviço** |
 
 No **Meu fechamento** não existe essa permissão: ninguém vê o fechamento de outra pessoa por ali, nem o administrador do app.
 
-## 2. As abas da Produtividade
+## 2. As abas de Ordens de Serviço
 
 | Aba (para quem vê todos) | Aba (para quem vê só o próprio) | Para que serve |
 | --- | --- | --- |
@@ -116,8 +116,8 @@ Cada vez que você abre a tela, a consulta fica registrada no cofre financeiro (
 
 ## 9. Dúvidas comuns
 
-- **Não vejo os colegas na Produtividade**: é a regra para quem não tem a permissão produtividade.ver_todos.
-- **As horas extras da Produtividade e do Meu fechamento são diferentes**: são contas diferentes. Na Produtividade, extra é o que passa das horas do dia e todo fim de semana. No Meu fechamento, a regra é a da remuneração: só a modalidade CLT tem hora extra (o trecho depois das 18:00, pago em dobro); em PJ e COOP toda hora conta como normal.
+- **Não vejo os colegas em Ordens de Serviço**: é a regra para quem não tem a permissão produtividade.ver_todos.
+- **As horas extras de Ordens de Serviço e do Meu fechamento são diferentes**: são contas diferentes. Em Ordens de Serviço, extra é o que passa das horas do dia e todo fim de semana. No Meu fechamento, a regra é a da remuneração: só a modalidade CLT tem hora extra (o trecho depois das 18:00, pago em dobro); em PJ e COOP toda hora conta como normal.
 - **O gráfico sumiu ou mostra aviso de período**: reduza o intervalo para até 92 dias.
 - **Muita hora em "Sem tipo"**: as tarefas estão sem o campo Apontamento preenchido.
 - **Excel e PDF do Meu fechamento estão apagados**: toque em **Mostrar valores** primeiro, e confira se o período tem atendimentos.

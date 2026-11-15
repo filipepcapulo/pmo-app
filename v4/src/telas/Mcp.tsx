@@ -1,6 +1,8 @@
 // Sistema › IA (MCP) — F6, 0081. Para quem tem mcp.usar: gerar e revogar o token pessoal que liga uma IA (Claude etc.)
 // ao PMO. A IA age em nome da pessoa, com as permissões dela, só sobre dados operacionais; gravação pede confirmação.
 // O token aparece UMA vez, logo depois de gerar. Nada do Financeiro passa pelo MCP.
+// 4.4.0 (0088): no chat do Claude, Cowork, Desktop e celular a ligação é por CONECTOR (OAuth), sem token colado: a pessoa
+// cola só o endereço no Claude e autoriza na tela AutorizarMcp; a conexão aparece na lista como "Conector do Claude".
 import { useMemo, useState } from 'react';
 import {
   comoConectar, mcp, quando, ROTULO_SITUACAO, rotuloFerramenta, textoValidade, urlMcp, VALIDADES, type TokenGerado, type TokenMcp,
@@ -84,6 +86,21 @@ export function Mcp() {
         </section>)}
 
       {p && (
+        <section className="cartao" aria-label="Conector do Claude" data-testid="mcp-conector">
+          <h2 className="secao">No chat do Claude e no Cowork (conector)</h2>
+          <p>Para usar o PMO no chat comum do Claude, no Cowork, no Desktop ou no celular <strong>não precisa de token</strong>:</p>
+          <ol>
+            <li>No Claude, abra <strong>Configurações › Conectores</strong> e escolha <strong>Adicionar conector personalizado</strong>.</li>
+            <li>Dê o nome <strong>PMO BP-MS</strong> e cole este endereço:{' '}
+              <code data-testid="mcp-conector-url">{url}</code>{' '}
+              <Botao variante="secundario" onClick={() => void copiar(url, 'Endereço')}>Copiar</Botao></li>
+            <li>Toque em <strong>Conectar</strong>. O Claude abre o PMO: entre (se pedir) e toque em <strong>Autorizar</strong>.</li>
+          </ol>
+          <p className="ajuda"><small>A conexão vale 90 dias, aparece na lista abaixo como "Conector do Claude" e pode ser revogada como qualquer token.
+            Vencida ou revogada, é só conectar de novo no Claude. Até 3 conexões ativas por pessoa (a mais antiga cai).</small></p>
+        </section>)}
+
+      {p && (
         <section className="cartao" aria-label="Tokens">
           <h2 className="secao">{p.ver_todos ? 'Tokens do escritório' : 'Meus tokens'}</h2>
           {p.tokens.length === 0
@@ -96,7 +113,8 @@ export function Mcp() {
         <section className="cartao" aria-label="Endereço do servidor">
           <h2 className="secao">Endereço do servidor MCP</h2>
           <p><code data-testid="mcp-url">{url}</code> <Botao variante="secundario" onClick={() => void copiar(url, 'Endereço')}>Copiar</Botao></p>
-          <p className="ajuda"><small>Tipo: HTTP. Autenticação: cabeçalho <code>Authorization: Bearer &lt;seu token&gt;</code>.</small></p>
+          <p className="ajuda"><small>Tipo: HTTP. No Claude Code e em outros clientes que aceitam cabeçalho: <code>Authorization: Bearer &lt;seu token&gt;</code> (botão Gerar token).
+            No chat do Claude e no Cowork: conector, sem token (acima).</small></p>
         </section>)}
 
       <Popup aberto={!!novo} titulo="Gerar token de MCP" aoFechar={() => setNovo(null)}

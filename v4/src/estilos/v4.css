@@ -161,6 +161,8 @@ button.rg-nivel { cursor: pointer; }
 .rg-num b { font-weight: 600; }
 .rg-num small { font-size: 11px; font-weight: 700; }
 .renta-sem { color: var(--texto-2); }
+.rg-novo-tipo { margin-top: 12px; align-items: center; }
+.rg-novo-tipo input { flex: 1 1 220px; }
 .rg .gha-topo .segmentos { margin: 6px 0 0; border-bottom: 0; }
 
 /* ---------------------------------------------------------------- documentação técnica (0092): código e citação */

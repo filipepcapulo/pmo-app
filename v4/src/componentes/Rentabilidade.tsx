@@ -39,6 +39,7 @@ export function Rentabilidade({ tipo, id, geracao }: { tipo: TipoAlvo; id: strin
         <div className="indicadores" aria-label="Indicadores de rentabilidade">
           {!demanda && <div className="indicador"><small>Receita contratada{t.horas_pedidos !== null ? ` · ${horas(t.horas_pedidos)}` : ''}</small><strong data-testid="renta-receita">{reais(t.receita, oculto)}</strong></div>}
           <div className="indicador"><small>Receita das horas executadas · {horasDe(t.min)}</small><strong data-testid="renta-receita-exec">{reais(t.receita_exec, oculto)}</strong></div>
+          {!!t.min_nao_fatura && <div className="indicador"><small>Horas não faturadas (só custo)</small><strong data-testid="renta-nao-fatura">{horasDe(t.min_nao_fatura)}</strong></div>}
           <div className="indicador"><small>Custo das horas executadas</small><strong data-testid="renta-custo">{reais(t.custo, oculto)}</strong></div>
           <div className="indicador"><small>Margem</small><strong data-testid="renta-margem"><Margem i={t} oculto={oculto} /></strong></div>
           {!demanda && <div className="indicador"><small>Sobra do contrato (receita − custo)</small><strong data-testid="renta-sobra">{reais(t.sobra, oculto)}</strong></div>}
@@ -58,7 +59,8 @@ export function Rentabilidade({ tipo, id, geracao }: { tipo: TipoAlvo; id: strin
               <tr key={g.id}>
                 <td><a href={hashDe(caminhoEntidade(g.tipo, g.id))}>{g.nome}</a>
                   {g.pedidos_sem_valor > 0 && <> <span className="pilula pilula-neutra" title="Pedido de horas sem valor/hora informado">sem valor</span></>}
-                  {g.min_sem_custo > 0 && <> <span className="pilula pilula-neutra" title="Horas executadas sem período de remuneração vigente na data">sem custo</span></>}</td>
+                  {g.min_sem_custo > 0 && <> <span className="pilula pilula-neutra" title="Horas executadas sem período de remuneração vigente na data">sem custo</span></>}
+                  {!!g.min_nao_fatura && <> <span className="pilula pilula-neutra" title={`${horasDe(g.min_nao_fatura)} de tipo de OS que não conta no faturado: só custo`}>{g.min_nao_fatura >= g.min ? 'não fatura' : 'parte não fatura'}</span></>}</td>
                 {tipo === 'cliente' && <><td className="dir">{horas(g.horas_pedidos)}</td><td className="dir">{reais(g.receita, oculto)}</td></>}
                 <td className="dir">{horasDe(g.min)}</td><td className="dir">{reais(g.receita_exec, oculto)}</td><td className="dir">{reais(g.custo, oculto)}</td>
                 <td className="dir"><Margem i={g} oculto={oculto} /></td>

@@ -2,26 +2,33 @@
 // em uma tela só — por período, por cliente, por projeto e por consultor. Clicar em uma barra ou linha desce para o nível
 // de baixo (a escolha vira um item da trilha e todos os gráficos passam a mostrar só aquele recorte). Só para os papéis
 // Dono e Rentabilidade do cofre; os valores começam ocultos e cada consulta fica registrada no cofre.
+// Tipos de OS (0094): o campo Apontamento da tarefa diz se a hora é cobrada do cliente. O botão "Tipos de OS" abre o
+// cadastro (o que conta no faturado); o que não conta entra só com o custo e ganha o quadro "Por tipo de OS".
 import { useEffect, useMemo, useState } from 'react';
 import { reais } from '../api/financeiro';
 import { faixaMargem, horasDe, pctMargem } from '../api/rentabilidade';
 import {
-  agrupar, aplicarFiltro, filtrar, intervaloPadrao, nomeDe, planilhaGeral, proximoNivel, rentaGeral, ROTULO_DIMENSAO, somar,
-  type Agrupamento, type Dimensao, type FiltroGeral, type Grupo, type Soma,
+  agrupar, aplicarFiltro, filtrar, intervaloPadrao, nomeDe, planilhaGeral, proximoNivel, rentaGeral, ROTULO_DIMENSAO, soCusto, somar,
+  type Agrupamento, type Dimensao, type FiltroGeral, type Grupo, type Soma, type TipoOs,
 } from '../api/rentabilidadeGeral';
 import { hojeIso } from '../api/projeto';
+import { traduzirErro } from '../api/mensagens';
 import { Botao } from '../componentes/Botao';
+import { Popup } from '../componentes/Popup';
+import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { baixarXlsx } from '../util/xlsx';
 
 const semAcesso = (erro: string | null) => !!erro && /autorizados do Financeiro/.test(erro);
-const ORDEM_TRILHA: Dimensao[] = ['cliente', 'projeto', 'consultor', 'tempo'];
+const ORDEM_TRILHA: Dimensao[] = ['cliente', 'projeto', 'consultor', 'tipo', 'tempo'];
 const LIMITE = 8;
 
 function Margem({ g, oculto }: { g: Soma; oculto: boolean }) {
   if (!g.faturado && !g.custo) return <>—</>;
+  // tipo de OS que não conta no faturado: receita zero é a resposta certa, e a margem é o custo com sinal trocado
+  if (soCusto(g)) return <span className={oculto ? undefined : 'renta-negativa'} title="Tipo de OS que não conta no faturado: só o custo">{reais(g.margem, oculto)} <small>(só custo)</small></span>;
   const i = { margem: g.faturado ? g.margem : null, margem_pct: g.margem_pct };
   if (i.margem === null) return <span title="Sem valor/hora vendido: não há faturado para comparar">sem faturado</span>;
   return <span className={oculto ? undefined : `renta-${faixaMargem(i)}`}>{reais(g.margem, oculto)} <small>({pctMargem(g.margem_pct, oculto)})</small></span>;
@@ -71,13 +78,67 @@ function GraficoDimensao({ dim, grupos, escolhido, aoEscolher }: { dim: Dimensao
                   <i className="gha-c1" style={{ width: `${g.custo ? Math.max(1, Math.round(g.custo / max * 100)) : 0}%` }} />
                 </span>
                 <span className="rg-num"><b>{reais(g.faturado)}</b>
-                  <small className={`renta-${faixaMargem({ margem: g.faturado ? g.margem : null, margem_pct: g.margem_pct })}`}>{g.faturado ? pctMargem(g.margem_pct) : 'sem faturado'}</small></span>
+                  <small className={soCusto(g) ? 'renta-negativa' : `renta-${faixaMargem({ margem: g.faturado ? g.margem : null, margem_pct: g.margem_pct })}`}>{g.faturado ? pctMargem(g.margem_pct) : soCusto(g) ? 'só custo' : 'sem faturado'}</small></span>
               </button>
             </li>))}
         </ul>
       )}
       {grupos.length > LIMITE && <button type="button" className="link" onClick={() => setTodos(!todos)}>{todos ? `Mostrar só os ${LIMITE} maiores` : `Ver todos (${grupos.length})`}</button>}
     </section>
+  );
+}
+
+/** Cadastro: cada tipo de OS (campo Apontamento da tarefa) e se ele conta no faturado. Cada mudança grava na hora. */
+function CadastroTipos({ aoFechar }: { aoFechar: (mudou: boolean) => void }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const avisar = useToast();
+  const c = useCarga(() => rentaGeral.tipos(esc), [esc]);
+  const [mudou, setMudou] = useState(false);
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [novo, setNovo] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
+  const gravar = async (chave: string, fn: () => Promise<unknown>, msg: string) => {
+    setOcupado(chave); setErro(null);
+    try { await fn(); setMudou(true); avisar(msg, 'ok'); await c.recarregar(); }
+    catch (e) { setErro(traduzirErro(e).mensagem); }
+    setOcupado(null);
+  };
+  const marcar = (t: TipoOs, fatura: boolean) => gravar(t.chave, () => rentaGeral.tipoSalvar(esc, t.nome, fatura), fatura ? `${t.nome}: conta no faturado` : `${t.nome}: só custo, sem receita`);
+  const adicionar = () => {
+    const nome = novo.trim();
+    if (!nome) { setErro('Informe o nome do tipo.'); return; }
+    void gravar('novo', () => rentaGeral.tipoSalvar(esc, nome, false), `${nome}: cadastrado como só custo`).then(() => setNovo(''));
+  };
+  return (
+    <Popup aberto titulo="Tipos de OS: o que conta no faturado" aoFechar={() => aoFechar(mudou)} largura={640}
+      rodape={<Botao variante="primario" onClick={() => aoFechar(mudou)}>Fechar</Botao>}>
+      <p className="ajuda">O tipo é o campo <strong>Apontamento</strong> da tarefa (OS Experience, Faturado, Bonificado…). Desmarque os tipos que o cliente <strong>não paga</strong> (bonificado, trabalho interno): essas horas entram na rentabilidade só com o custo, sem receita. Vale para a Rentabilidade geral e para a aba Rentabilidade das fichas.</p>
+      {c.erro && <p className="msg-erro" role="alert">{c.erro}</p>}
+      {!c.dados && !c.erro && <p className="ajuda"><span className="giro" /> Carregando…</p>}
+      {c.dados && (
+        <div className="tabela-caixa"><table className="tabela" aria-label="Tipos de OS">
+          <thead><tr><th>Tipo de OS</th><th className="dir">Apontamentos</th><th>Conta no faturado</th><th /></tr></thead>
+          <tbody>{c.dados.map(t => (
+            <tr key={t.chave}>
+              <td><strong>{t.nome}</strong>{!t.do_campo && t.apontamentos === 0 && <> <span className="pilula pilula-neutra" title="Cadastrado aqui; não é uma opção do campo nem está em uso">cadastrado</span></>}</td>
+              <td className="dir">{t.apontamentos.toLocaleString('pt-BR')}</td>
+              <td><label className="check"><input type="checkbox" checked={t.fatura} disabled={ocupado !== null} aria-label={`${t.nome} conta no faturado`}
+                onChange={e => void marcar(t, e.target.checked)} /> {t.fatura ? 'Sim' : 'Não: só custo'}</label></td>
+              <td>{t.cadastrado && !t.do_campo && t.apontamentos === 0 && <button type="button" className="link" disabled={ocupado !== null}
+                onClick={() => void gravar(t.chave, () => rentaGeral.tipoRemover(esc, t.nome), `${t.nome}: removido`)}>Remover</button>}</td>
+            </tr>))}
+            {c.dados.length === 0 && <tr><td colSpan={4} className="ajuda">Nenhum tipo encontrado.</td></tr>}
+          </tbody>
+        </table></div>
+      )}
+      <div className="linha rg-novo-tipo">
+        <input type="text" value={novo} maxLength={80} placeholder="Outro tipo que não é faturado (ex.: Garantia)" aria-label="Nome do tipo novo"
+          onChange={e => setNovo(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); adicionar(); } }} />
+        <Botao carregando={ocupado === 'novo'} onClick={adicionar}>+ Adicionar como só custo</Botao>
+      </div>
+      {erro && <p className="msg-erro" role="alert">{erro}</p>}
+      <p className="ajuda">Tipo novo que aparecer no campo já entra contando no faturado, até ser desmarcado aqui. Cada mudança fica registrada no cofre.</p>
+    </Popup>
   );
 }
 
@@ -90,6 +151,7 @@ export function RentabilidadeGeral() {
   const [f, setF] = useState<FiltroGeral>({});
   const [oculto, setOculto] = useState(true);
   const [detalhe, setDetalhe] = useState<Dimensao | null>(null);   // null = segue o nível de baixo da trilha
+  const [tiposAberto, setTiposAberto] = useState(false);
   const c = useCarga(() => rentaGeral.ler(esc, intervalo.ini, intervalo.fim), [esc, intervalo.ini, intervalo.fim]);
   const d = c.dados;
 
@@ -101,6 +163,7 @@ export function RentabilidadeGeral() {
       if (n.cliente && !d.clientes.some(x => x.id === n.cliente)) delete n.cliente;
       if (n.projeto && !d.projetos.some(x => x.id === n.projeto)) delete n.projeto;
       if (n.consultor && !d.pessoas.some(x => x.id === n.consultor)) delete n.consultor;
+      if (n.tipo && !(d.tipos ?? []).some(x => x.id === n.tipo)) delete n.tipo;
       if (n.tempo && !d.celulas.some(x => (ag === 'mes' ? x.mes : String(x.periodo)) === n.tempo)) delete n.tempo;
       return Object.keys(n).length === Object.keys(a).length ? a : n;
     });
@@ -114,6 +177,7 @@ export function RentabilidadeGeral() {
   const porCliente = useMemo(() => de('cliente'), [d, f, ag]);   // eslint-disable-line react-hooks/exhaustive-deps
   const porProjeto = useMemo(() => de('projeto'), [d, f, ag]);   // eslint-disable-line react-hooks/exhaustive-deps
   const porConsultor = useMemo(() => de('consultor'), [d, f, ag]); // eslint-disable-line react-hooks/exhaustive-deps
+  const porTipo = useMemo(() => de('tipo'), [d, f, ag]);           // eslint-disable-line react-hooks/exhaustive-deps
   const dimDetalhe = detalhe ?? proximoNivel(f);
   const linhasDetalhe = useMemo(() => (d ? agrupar(d, recorte, dimDetalhe, ag) : []), [d, recorte, dimDetalhe, ag]);
 
@@ -130,8 +194,11 @@ export function RentabilidadeGeral() {
     <div className="pagina rg" data-testid="rentabilidade-geral">
       <header className="pagina-topo">
         <div><h1>Rentabilidade geral</h1>
-          <p className="ajuda">Faturado = horas executadas × valor/hora médio vendido do projeto. Custo = horas executadas × remuneração vigente na data. Clique em uma barra para descer de nível. Cada consulta fica registrada no cofre.</p></div>
-        <Botao onClick={() => setOculto(!oculto)} aria-pressed={!oculto}>{oculto ? 'Mostrar valores' : 'Ocultar valores'}</Botao>
+          <p className="ajuda">Faturado = horas executadas × valor/hora médio vendido do projeto. Custo = horas executadas × remuneração vigente na data. Tipo de OS que não conta no faturado (bonificado, interno) entra só com o custo. Clique em uma barra para descer de nível. Cada consulta fica registrada no cofre.</p></div>
+        <div className="linha">
+          <Botao onClick={() => setTiposAberto(true)}>Tipos de OS</Botao>
+          <Botao onClick={() => setOculto(!oculto)} aria-pressed={!oculto}>{oculto ? 'Mostrar valores' : 'Ocultar valores'}</Botao>
+        </div>
       </header>
 
       <div className="barra-filtros">
@@ -168,8 +235,9 @@ export function RentabilidadeGeral() {
             <div className="indicador"><small>Custo</small><strong data-testid="rg-custo">{reais(total.custo, oculto)}</strong></div>
             <div className="indicador"><small>Margem</small><strong data-testid="rg-margem"><Margem g={total} oculto={oculto} /></strong></div>
             <div className="indicador"><small>Horas executadas</small><strong data-testid="rg-horas">{horasDe(total.min)}</strong></div>
+            {total.min_nao_fatura > 0 && <div className="indicador"><small>Horas não faturadas (só custo)</small><strong data-testid="rg-nao-fatura">{horasDe(total.min_nao_fatura)}</strong></div>}
             <div className="indicador"><small>Faturado/hora · custo/hora</small>
-              <strong className="renta-menor">{reais(total.min - total.min_sem_valor > 0 ? total.faturado / ((total.min - total.min_sem_valor) / 60) : null, oculto)} · {reais(total.min - total.min_sem_custo > 0 ? total.custo / ((total.min - total.min_sem_custo) / 60) : null, oculto)}</strong></div>
+              <strong className="renta-menor">{reais(total.min - total.min_sem_valor - total.min_nao_fatura > 0 ? total.faturado / ((total.min - total.min_sem_valor - total.min_nao_fatura) / 60) : null, oculto)} · {reais(total.min - total.min_sem_custo > 0 ? total.custo / ((total.min - total.min_sem_custo) / 60) : null, oculto)}</strong></div>
           </div>
           {d.pendencias.length > 0 && <div className="fech-alerta" role="status"><strong>Atenção (intervalo inteiro):</strong><ul>{d.pendencias.map(p => <li key={p}>{p}</li>)}</ul></div>}
         </section>
@@ -186,6 +254,7 @@ export function RentabilidadeGeral() {
             <GraficoDimensao dim="cliente" grupos={porCliente} escolhido={f.cliente} aoEscolher={id => escolher('cliente', id)} />
             <GraficoDimensao dim="projeto" grupos={porProjeto} escolhido={f.projeto} aoEscolher={id => escolher('projeto', id)} />
             <GraficoDimensao dim="consultor" grupos={porConsultor} escolhido={f.consultor} aoEscolher={id => escolher('consultor', id)} />
+            <GraficoDimensao dim="tipo" grupos={porTipo} escolhido={f.tipo} aoEscolher={id => escolher('tipo', id)} />
           </div>
         </>}
 
@@ -194,7 +263,7 @@ export function RentabilidadeGeral() {
             <div className="gha-topo">
               <div><h2 className="secao">Detalhamento</h2>
                 <div className="segmentos" role="tablist" aria-label="Detalhar por">
-                  {(['cliente', 'projeto', 'consultor', 'tempo'] as Dimensao[]).map(dim => (
+                  {(['cliente', 'projeto', 'consultor', 'tipo', 'tempo'] as Dimensao[]).map(dim => (
                     <button key={dim} type="button" role="tab" aria-selected={dimDetalhe === dim} onClick={() => setDetalhe(dim)}>{ROTULO_DIMENSAO[dim]}</button>))}
                 </div></div>
               <Botao disabled={oculto} title={oculto ? 'Mostre os valores para exportar' : undefined}
@@ -206,7 +275,8 @@ export function RentabilidadeGeral() {
                 <tr key={g.id}>
                   <td><button type="button" className="link" onClick={() => escolher(dimDetalhe, g.id)} title="Descer para este nível">{g.nome}</button>
                     {g.min_sem_valor > 0 && <> <span className="pilula pilula-neutra" title="Horas em projeto sem valor/hora informado nos pedidos">sem valor</span></>}
-                    {g.min_sem_custo > 0 && <> <span className="pilula pilula-neutra" title="Horas sem período de remuneração vigente na data">sem custo</span></>}</td>
+                    {g.min_sem_custo > 0 && <> <span className="pilula pilula-neutra" title="Horas sem período de remuneração vigente na data">sem custo</span></>}
+                    {g.min_nao_fatura > 0 && <> <span className="pilula pilula-neutra" title={`${horasDe(g.min_nao_fatura)} de tipo de OS que não conta no faturado: só custo`}>{soCusto(g) ? 'não fatura' : 'parte não fatura'}</span></>}</td>
                   <td className="dir">{horasDe(g.min)}</td><td className="dir">{reais(g.faturado, oculto)}</td><td className="dir">{reais(g.custo, oculto)}</td>
                   <td className="dir"><Margem g={g} oculto={oculto} /></td>
                   <td>{(dimDetalhe === 'cliente' || dimDetalhe === 'projeto') && <a className="link" href={hashDe(caminhoEntidade(dimDetalhe, g.id))}>Abrir</a>}</td>
@@ -217,6 +287,7 @@ export function RentabilidadeGeral() {
           </section>
         )}
       </>}
+      {tiposAberto && <CadastroTipos aoFechar={mudou => { setTiposAberto(false); if (mudou) void c.recarregar(); }} />}
     </div>
   );
 }

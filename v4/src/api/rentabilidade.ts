@@ -11,7 +11,8 @@ export interface Indicadores {
   /** valor/hora médio vendido (ponderado pelas horas dos pedidos com valor) */
   vh_medio: number | null; pedidos_sem_valor: number;
   /** minutos executados; os que caíram fora de qualquer período de remuneração entram sem custo */
-  min: number; min_sem_custo: number; custo: number; custo_hora: number | null;
+  /** min_nao_fatura (0094): minutos de tipos de OS que não contam no faturado — entram só com o custo */
+  min: number; min_sem_custo: number; min_nao_fatura?: number; custo: number; custo_hora: number | null;
   /** horas executadas × valor/hora médio do projeto; margem = receita executada − custo */
   receita_exec: number | null; margem: number | null; margem_pct: number | null;
   /** receita dos pedidos − custo até agora */

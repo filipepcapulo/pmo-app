@@ -31,7 +31,9 @@ import { Sugestoes } from '../telas/Sugestoes';
 import { AceiteOs } from '../telas/AceiteOs';
 import { DemandaTela } from '../telas/DemandaTela';
 import { Demandas } from '../telas/Demandas';
+import { Ausencias } from '../telas/Ausencias';
 import { Consultor } from '../telas/Consultor';
+import { RentabilidadeGeral } from '../telas/RentabilidadeGeral';
 import { Desvios } from '../telas/Desvios';
 import { EnvioAgendas } from '../telas/EnvioAgendas';
 import { EmConstrucao, NaoEncontrada } from '../telas/EmConstrucao';
@@ -203,6 +205,8 @@ export function Casca() {
     if (r.modulo.id === 'agenda') return <AgendaEquipe />;
     if (r.modulo.id === 'chamados') return <Chamados ir={ir} parametro={r.parametro} />;
     if (r.modulo.id === 'consultor') return <Consultor />;
+    if (r.modulo.id === 'ausencias') return <Ausencias />;
+    if (r.modulo.id === 'rentabilidade-geral') return <RentabilidadeGeral />;
     if (r.modulo.id === 'desvios') return <Desvios />;
     if (r.modulo.id === 'envio-agendas') return <EnvioAgendas />;
     if (r.modulo.id === 'produtividade') return <Produtividade />;

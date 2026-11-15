@@ -60,7 +60,8 @@ describe('manuais: catálogo', () => {
       d.secoes.forEach((s, i) => expect(s.titulo, m.id).toMatch(new RegExp(`^${i + 1}\\. `)));
       expect(m.texto, m.id).not.toMatch(/^```|^>|^[ \t]+[-*] |<\/?(div|span|br|p|b|i|u|a|img|table|details|summary)\b/m);   // sem bloco de código, citação, lista aninhada ou HTML
     }
-    for (const id of ['consultor', 'gp']) expect(documento(MANUAIS.find(m => m.id === id)!.texto).secoes.length).toBe(9);
+    expect(documento(MANUAIS.find(m => m.id === 'consultor')!.texto).secoes.length).toBe(10);
+    expect(documento(MANUAIS.find(m => m.id === 'gp')!.texto).secoes.length).toBe(9);
   });
   it('sigilo: nenhum manual traz token, chave ou endereço do projeto', () => {
     for (const m of MANUAIS) {

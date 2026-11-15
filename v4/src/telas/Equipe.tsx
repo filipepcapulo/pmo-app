@@ -393,7 +393,7 @@ function AbaApp({ ficha }: { ficha: UsuarioFicha }) {
   );
 }
 
-function AbaContaSankhya({ ficha }: { ficha: UsuarioFicha }) {
+export function AbaContaSankhya({ ficha }: { ficha: { usuario: Pick<UsuarioFicha['usuario'], 'id' | 'nome'> } }) {
   const esc = useSessao().eu!.escritorio_id!;
   const proprio = useSessao().eu?.usuario.id === ficha.usuario.id;
   const avisar = useToast();

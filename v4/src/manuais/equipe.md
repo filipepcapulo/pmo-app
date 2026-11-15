@@ -101,6 +101,7 @@ Aparece na sua própria ficha e, para quem tem `integracao.gerenciar`, na ficha 
 - Em **Perfis**, marque os perfis que recebem a funcionalidade. Vale para todos daquele perfil.
 - Em **Pessoas**, marque ou desmarque uma pessoa para criar uma exceção. A linha mostra o perfil e a exceção.
 - O perfil Admin e as pessoas com perfil Admin ficam sempre marcados e travados.
+- **Documentação técnica**: a funcionalidade **Ler a documentação técnica do projeto** nasce desligada para todos os perfis. Para liberar, escolha a funcionalidade e marque a pessoa em **Pessoas**. Ela passa a ver a seção **Documentação técnica** em **Geral › Manuais**.
 
 ## 10. Visão App 2.x/APK
 

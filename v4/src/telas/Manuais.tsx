@@ -1,11 +1,15 @@
 // Manuais (#/manuais e #/manuais/<id>): os manuais da função (consultor vê os do consultor; as demais funções, todos) e
 // os dos módulos que a pessoa enxerga no menu; busca nos manuais e leitura com índice, destaque do que foi buscado e
-// impressão. O catálogo é src/manuais.
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+// impressão. O catálogo é src/manuais. Quem tem `doc_tecnica.ver` vê também a documentação técnica do projeto, que vem
+// do banco (#/manuais/tec-<id>) e não está no pacote da PWA.
+import { createContext, Fragment, useContext, useMemo, useState, type ReactNode } from 'react';
+import { caminhoDoLink, docsTecnicos, idTecnico, PERMISSAO_DOC_TECNICA, PREFIXO_TEC } from '../api/docsTecnicos';
 import { Botao } from '../componentes/Botao';
 import { Icone } from '../componentes/Icone';
 import { imagemManual, manuaisVisiveis, type Manual } from '../manuais';
 import { buscarNoDocumento, documento, normalizar, type Bloco, type Documento, type Trecho } from '../manuais/markdown';
+import { useCarga } from '../estado/carga';
+import { usePode } from '../estado/equipe';
 import { hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 
@@ -30,12 +34,21 @@ function marcar(texto: string, palavras: string[]): ReactNode {
   return out;
 }
 
+/** Na documentação técnica os links entre documentos ("banco.md") abrem o outro documento dentro do app. */
+const Tecnico = createContext(false);
+
 function Trechos({ ts, palavras }: { ts: Trecho[]; palavras: string[] }) {
+  const tecnico = useContext(Tecnico);
   return <>{ts.map((t, i) => {
     const v = marcar(t.v, palavras);
     if (t.t === 'negrito') return <strong key={i}>{v}</strong>;
     if (t.t === 'italico') return <em key={i}>{v}</em>;
     if (t.t === 'codigo') return <code key={i}>{v}</code>;
+    if (t.t === 'link' && tecnico) {
+      const caminho = caminhoDoLink(t.url);
+      if (caminho) return <a key={i} href={hashDe(caminho)}>{v}</a>;
+      if (!/^https?:/.test(t.url)) return <code key={i}>{v}</code>;   // arquivo fora da pasta: só o nome
+    }
     if (t.t === 'link') return <a key={i} href={t.url} target="_blank" rel="noopener noreferrer">{v}</a>;
     return <Fragment key={i}>{v}</Fragment>;
   })}</>;
@@ -58,6 +71,8 @@ function BlocoManual({ b, manual, palavras }: { b: Bloco; manual: string; palavr
     case 'imagem': return (
       <figure className="manual-figura"><img src={imagemManual(manual, b.src)} alt={b.legenda} /></figure>
     );
+    case 'codigo': return <pre className="manual-codigo"><code>{b.texto}</code></pre>;
+    case 'citacao': return <blockquote className="manual-citacao"><Trechos ts={b.trechos} palavras={palavras} /></blockquote>;
   }
 }
 
@@ -107,11 +122,49 @@ function Leitura({ manual, doc, termoInicial }: { manual: Manual; doc: Documento
   );
 }
 
+/** Um documento técnico: o texto vem do banco, que confere a permissão a cada leitura. */
+function DocTecnicoTela({ id }: { id: string }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const c = useCarga(() => docsTecnicos.ler(esc, id), [esc, id]);
+  const doc = useMemo(() => (c.dados ? documento(c.dados.texto) : null), [c.dados]);
+  if (c.erro) return <div className="vazio-tela"><h2>Documento não disponível</h2><p>{c.erro} <a href={hashDe('manuais')}>Ver os manuais</a></p></div>;
+  if (!c.dados || !doc) return <div className="carregando-tela"><span className="giro" /> Carregando…</div>;
+  const manual: Manual = { id: PREFIXO_TEC + c.dados.id, titulo: c.dados.titulo, resumo: c.dados.resumo, para: 'modulo', texto: c.dados.texto };
+  return <Tecnico.Provider value><Leitura manual={manual} doc={doc} termoInicial="" /></Tecnico.Provider>;
+}
+
+/** Cartões da documentação técnica na lista de manuais (só é montado para quem tem a permissão). */
+function SecaoTecnica() {
+  const esc = useSessao().eu!.escritorio_id!;
+  const c = useCarga(() => docsTecnicos.lista(esc), [esc]);
+  if (c.erro || (c.dados && c.dados.length === 0)) return null;
+  return (
+    <section aria-label="Documentação técnica" data-testid="docs-tecnicos">
+      <h2 className="secao">Documentação técnica</h2>
+      <p className="ajuda">Como o sistema foi construído. Acesso restrito: só aparece para quem o Admin liberou em Equipe › Acessos (funcionalidade "Ler a documentação técnica do projeto").</p>
+      {!c.dados ? <p className="ajuda"><span className="giro" /> Carregando…</p> : (
+        <div className="grade-atalhos">
+          {c.dados.map(d => (
+            <a key={d.id} className="atalho manual-atalho" href={hashDe(`manuais/${PREFIXO_TEC}${d.id}`)}>
+              <span className="atalho-icone"><Icone nome="cadeado" tam={24} /></span>
+              <span className="atalho-nome">{d.titulo}<small className="ajuda">{d.resumo}</small></span>
+              <Icone nome="seta" tam={18} className="atalho-seta" />
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function Manuais({ id }: { id?: string }) {
   const { eu } = useSessao();
+  const pode = usePode();
   const lista = useMemo(() => manuaisVisiveis(eu?.perfil, undefined, { permissoes: eu?.permissoes, fin: eu?.fin }), [eu?.perfil, eu?.permissoes, eu?.fin]);
   const docs = useMemo(() => new Map(lista.map(m => [m.id, documento(m.texto)])), [lista]);
   const [termo, setTermo] = useState('');
+  const tec = idTecnico(id);
+  if (tec) return <DocTecnicoTela id={tec} />;
   if (id) {
     const m = lista.find(x => x.id === id);
     if (!m) return <div className="vazio-tela"><h2>Manual não encontrado</h2><p>Este manual não existe ou é de um módulo que você não acessa. <a href={hashDe('manuais')}>Ver os manuais</a></p></div>;
@@ -122,7 +175,7 @@ export function Manuais({ id }: { id?: string }) {
   return (
     <div className="pagina">
       <header className="pagina-topo">
-        <div><h1>Manuais</h1><p className="ajuda">Como usar o PMO v3 na sua função. Abra um manual para ler com índice, buscar e imprimir.</p></div>
+        <div><h1>Manuais</h1><p className="ajuda">Como usar o PMO na sua função. Abra um manual para ler com índice, buscar e imprimir.</p></div>
       </header>
       <div className="barra-filtros">
         <input type="search" value={termo} onChange={e => setTermo(e.target.value)} placeholder="Buscar nos manuais" aria-label="Buscar nos manuais" />
@@ -157,6 +210,7 @@ export function Manuais({ id }: { id?: string }) {
                 </div>
               </section>
             ))}
+          {pode(PERMISSAO_DOC_TECNICA) && <SecaoTecnica />}
         </>
       )}
     </div>

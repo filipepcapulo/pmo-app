@@ -1,6 +1,7 @@
 // Markdown simples dos manuais → blocos (sem HTML cru: a tela monta os elementos, nada vai por innerHTML).
 // Aceita: # título, ## seção, ### subtítulo, parágrafo, - lista, 1. lista numerada, | tabela |, ![legenda](arquivo)
-// e, dentro do texto, **negrito**, *itálico*, `código` e [link](url).
+// e, dentro do texto, **negrito**, *itálico*, `código` e [link](url). Para a documentação técnica (que os manuais do
+// usuário não usam): bloco de código entre ``` e citação com >.
 
 export type Trecho = { t: 'texto' | 'negrito' | 'italico' | 'codigo'; v: string } | { t: 'link'; v: string; url: string };
 export type Bloco =
@@ -8,7 +9,9 @@ export type Bloco =
   | { tipo: 'paragrafo'; trechos: Trecho[] }
   | { tipo: 'lista'; numerada: boolean; itens: Trecho[][] }
   | { tipo: 'tabela'; cabecalho: Trecho[][]; linhas: Trecho[][][] }
-  | { tipo: 'imagem'; src: string; legenda: string };
+  | { tipo: 'imagem'; src: string; legenda: string }
+  | { tipo: 'codigo'; texto: string }
+  | { tipo: 'citacao'; trechos: Trecho[] };
 
 export interface Secao { id: string; titulo: string; blocos: Bloco[] }
 export interface Documento { titulo: string; abertura: Bloco[]; secoes: Secao[] }
@@ -45,8 +48,21 @@ export function blocos(md: string): Bloco[] {
   for (let i = 0; i < ls.length;) {
     const l = ls[i];
     if (!l.trim()) { i++; continue; }
-    const h = /^(#{1,3})\s+(.*)$/.exec(l);
-    if (h) { out.push({ tipo: 'titulo', nivel: h[1].length as 1 | 2 | 3, texto: h[2].trim(), id: idUnico(h[2].trim()) }); i++; continue; }
+    if (l.trim().startsWith('```')) {
+      const cod: string[] = [];
+      for (i++; i < ls.length && !ls[i].trim().startsWith('```'); i++) cod.push(ls[i]);
+      i++;
+      out.push({ tipo: 'codigo', texto: cod.join('\n') });
+      continue;
+    }
+    if (l.trim().startsWith('>')) {
+      const cit: string[] = [];
+      while (i < ls.length && ls[i].trim().startsWith('>')) cit.push(ls[i++].trim().replace(/^>\s?/, ''));
+      out.push({ tipo: 'citacao', trechos: trechos(cit.join(' ')) });
+      continue;
+    }
+    const h = /^(#{1,4})\s+(.*)$/.exec(l);
+    if (h) { out.push({ tipo: 'titulo', nivel: Math.min(h[1].length, 3) as 1 | 2 | 3, texto: h[2].trim(), id: idUnico(h[2].trim()) }); i++; continue; }
     const img = /^!\[(.*?)\]\((\S+?)\)\s*$/.exec(l.trim());
     if (img) { out.push({ tipo: 'imagem', legenda: img[1], src: img[2] }); i++; continue; }
     if (l.trim().startsWith('|')) {
@@ -65,7 +81,7 @@ export function blocos(md: string): Bloco[] {
       continue;
     }
     const par: string[] = [];
-    while (i < ls.length && ls[i].trim() && !/^(#{1,3}\s|!\[|\|)/.test(ls[i].trim()) && !(item.test(ls[i]) && !/^\*\S.*\*$/.test(ls[i].trim()))) par.push(ls[i++].trim());
+    while (i < ls.length && ls[i].trim() && !/^(#{1,4}\s|!\[|\||```|>)/.test(ls[i].trim()) && !(item.test(ls[i]) && !/^\*\S.*\*$/.test(ls[i].trim()))) par.push(ls[i++].trim());
     out.push({ tipo: 'paragrafo', trechos: trechos(par.join(' ')) });
   }
   return out;
@@ -92,6 +108,8 @@ export function textoBloco(b: Bloco): string {
     case 'lista': return b.itens.map(textoTrechos).join(' ');
     case 'tabela': return [b.cabecalho, ...b.linhas].map(l => l.map(textoTrechos).join(' ')).join(' ');
     case 'imagem': return b.legenda;
+    case 'codigo': return b.texto;
+    case 'citacao': return textoTrechos(b.trechos);
   }
 }
 

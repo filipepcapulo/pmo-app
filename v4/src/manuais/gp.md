@@ -26,6 +26,7 @@ Entre em **https://filipepcapulo.github.io/pmo-app/v3/** com o seu e-mail da San
 | "Fulano pediu mais X h de agenda: Demanda" | Um consultor pediu mais agenda numa demanda de projeto seu | Ver a seção 3 |
 | "Fulano informou desvio em dd/mm" | Um consultor atendeu um projeto seu no horário da agenda de outro | Ver a seção 4 |
 | "Desvio aprovado: dd/mm ficou sem atendimento em Demanda" | Outro GP aprovou um desvio e a agenda do seu projeto não foi cumprida | A demanda voltou ao seu backlog: reagende |
+| "Pedido de ausência — Fulano: dd/mm" | Alguém da equipe solicitou uma ausência | Abra **Execução › Ausências**, aba **Para aprovar**, e aprove ou recuse |
 
 O GP do projeto é o do cadastro do projeto; se o projeto não tiver GP, vale o GP do cliente.
 
@@ -84,6 +85,7 @@ Depois de decidido, o desvio não pode ser decidido de novo. Avisos: o consultor
 - **Mudar data ou consultor**: arraste a tarefa para outra célula. Com várias selecionadas, todas vão juntas e mantêm a distância entre os dias.
 - **Repetir uma agenda**: abra a agenda e use **+ Mais agenda** para criar outra igual com nova data e horário.
 - **Ausências**: **+ Ausência** (férias, folga, licença ou algumas horas). O dia de ausência inteira bloqueia a célula; ausência de algumas horas só desconta as horas.
+- **Pedidos de ausência**: o consultor solicita em **Execução › Ausências** e o pedido fica aguardando. Na aba **Para aprovar** você vê quem pediu, o período, o motivo e quantas tarefas a pessoa tem na agenda nesses dias. **Aprovar** lança a ausência na grade (as tarefas já agendadas não mudam: remaneje); **Recusar** pede o motivo, que a pessoa lê no sino e na tela dela.
 - No backlog, "agendas em aberto" mostra o que já tem agenda futura; use o filtro para esconder.
 - **GP responsável** (filtro do backlog): mostra só o que é seu — o responsável da demanda; sem responsável, o da demanda-mãe, o GP do projeto ou o do cliente.
 - **Kanban** (aba ao lado de Grade): só as agendas em aberto, em colunas por **consultor**, **cliente** ou **demanda/subdemanda** (escolha em "Agrupar por"). Por consultor, arraste o cartão para outra coluna para trocar o consultor (a data fica) ou solte uma demanda do backlog na coluna para agendar. O backlog fica do lado também aqui.

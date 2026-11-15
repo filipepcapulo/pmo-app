@@ -128,6 +128,7 @@ A tela lista os manuais da sua função. O consultor vê os manuais do consultor
 - **Buscar neste manual** destaca as palavras no texto e apaga do índice as seções que não têm o termo.
 - **Imprimir** abre a impressão do navegador (dá para salvar em PDF).
 - **‹ Manuais** volta para a lista.
+- **Documentação técnica**: seção no fim da lista, só para quem o administrador liberou. Traz como o sistema foi construído (arquitetura, banco, publicação, operação).
 
 ## 12. Sair
 

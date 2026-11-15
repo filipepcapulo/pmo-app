@@ -127,3 +127,44 @@ a.pil:hover { text-decoration: none; filter: brightness(.95); }
 }
 :root[data-tema="escuro"] .pst-nao_iniciado, :root[data-tema="escuro"] .loc-triagem { background: #3f3f46; color: #e4e4e7; }
 :root[data-tema="escuro"] .disp-cel.livre { background: #14532d; color: #dcfce7; }
+
+/* ---------------------------------------------------------------- rentabilidade geral (0091) */
+.rg-trilha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 10px; font-size: 13px; }
+.rg-nivel { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--linha);
+  background: var(--superficie); color: var(--texto-2); font: inherit; font-size: 13px; font-weight: 600; }
+button.rg-nivel { cursor: pointer; }
+.rg-nivel.atual { background: var(--verde-claro); color: var(--verde-texto); border-color: transparent; }
+.rg-nivel small { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; opacity: .75; }
+.rg-nivel button { border: 0; background: none; color: inherit; font: inherit; font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.rg-trilha .link { margin-left: 4px; }
+.rg-cartao { margin-top: 12px; }
+.rg-legenda { margin: 0; }
+.rg-colunas { display: flex; align-items: flex-end; gap: 4px; height: 240px; overflow-x: auto; padding-top: 8px; border-bottom: 1px solid var(--linha); }
+.rg-coluna { flex: 1 0 52px; max-width: 110px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px;
+  border: 0; border-radius: 8px 8px 0 0; background: none; font: inherit; color: inherit; cursor: pointer; padding: 0 2px; }
+.rg-coluna:hover, .rg-linha:hover { background: var(--superficie-2); }
+.rg-coluna.escolhido, .rg-linha.escolhido { background: var(--verde-claro); }
+.rg-coluna small { font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rg-par { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+.rg-par i { display: block; width: 38%; max-width: 26px; min-height: 1px; border-radius: 4px 4px 0 0; }
+.rg-rotulo { font-size: 10px; color: var(--texto-2); white-space: nowrap; padding-bottom: 3px; }
+.rg-coluna.escolhido .rg-rotulo { color: var(--verde-texto); font-weight: 700; }
+.rg-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; align-items: start; }
+.rg-linhas { list-style: none; margin: 8px 0 6px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.rg-linha { width: 100%; display: grid; grid-template-columns: minmax(80px, 36%) 1fr auto; gap: 8px; align-items: center; border: 0; border-radius: 8px;
+  background: none; font: inherit; font-size: 13px; color: inherit; text-align: left; cursor: pointer; padding: 5px 6px; }
+.rg-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rg-linha.escolhido .rg-nome { font-weight: 700; color: var(--verde-texto); }
+.rg-barras { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rg-barras i { display: block; height: 7px; border-radius: 0 4px 4px 0; }
+.rg-num { display: flex; flex-direction: column; align-items: flex-end; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.rg-num b { font-weight: 600; }
+.rg-num small { font-size: 11px; font-weight: 700; }
+.renta-sem { color: var(--texto-2); }
+.rg .gha-topo .segmentos { margin: 6px 0 0; border-bottom: 0; }
+
+/* ---------------------------------------------------------------- documentação técnica (0092): código e citação */
+.manual-codigo { background: var(--superficie-2); border: 1px solid var(--linha); border-radius: 8px; padding: 10px 12px; overflow-x: auto;
+  font-size: 12.5px; line-height: 1.45; margin: 10px 0; }
+.manual-codigo code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: none; padding: 0; white-space: pre; }
+.manual-citacao { margin: 10px 0; padding: 6px 12px; border-left: 3px solid var(--verde); background: var(--superficie-2); border-radius: 0 8px 8px 0; color: var(--texto-2); }

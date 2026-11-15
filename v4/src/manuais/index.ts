@@ -46,8 +46,8 @@ export interface Manual {
 export interface AcessoManual { permissoes?: string[]; fin?: string[] }
 
 export const MANUAIS: Manual[] = [
-  { id: 'consultor', titulo: 'Manual do apontamento', para: 'consultor', texto: consultor, modulos: ['consultor'],
-    resumo: 'Para os consultores: entrar, Minha agenda, apontar as horas, pedir mais agenda, informar desvio e o fechamento.' },
+  { id: 'consultor', titulo: 'Manual do consultor', para: 'consultor', texto: consultor, modulos: ['consultor', 'ausencias'],
+    resumo: 'Para os consultores: consultar a agenda, apontar as horas, comentar na demanda, informar desvio, solicitar ausência, ver as suas ordens de serviço e vincular a conta Sankhya.' },
   { id: 'gp', titulo: 'Manual do GP', para: 'gestao', texto: gp,
     resumo: 'Para os gerentes de projeto: avisos, pedidos de agenda, desvios, Agenda da equipe, Ociosidade, conferência e fechamento.' },
   { id: 'primeiros-passos', titulo: 'Primeiros passos', para: 'modulo', texto: primeirosPassos, modulos: ['inicio', 'manuais', 'notificacoes'],
@@ -84,8 +84,8 @@ export const MANUAIS: Manual[] = [
     resumo: 'O cofre financeiro: quem tem acesso, os papéis e a remuneração com vigência.' },
   { id: 'fechamento', titulo: 'Fechamento de produtividade', para: 'modulo', texto: fechamento, modulos: ['fechamento'],
     resumo: 'O fechamento do período 21–20: cálculo, ajustes, fechar, reabrir e exportar.' },
-  { id: 'rentabilidade', titulo: 'Rentabilidade', para: 'modulo', texto: rentabilidade, papeisCofre: ['dono', 'rentabilidade'],
-    resumo: 'A aba Rentabilidade das fichas de Cliente, Projeto e Demanda: receita, custo e margem.' },
+  { id: 'rentabilidade', titulo: 'Rentabilidade', para: 'modulo', texto: rentabilidade, modulos: ['rentabilidade-geral'], papeisCofre: ['dono', 'rentabilidade'],
+    resumo: 'A tela Rentabilidade geral (faturado × custo por período, cliente, projeto e consultor) e a aba Rentabilidade das fichas.' },
   { id: 'sync-experience', titulo: 'Sync com o Experience', para: 'modulo', texto: syncExperience, modulos: ['sync-experience'],
     resumo: 'Os lançamentos do Experience feitos pelas tarefas: simulação, execução e resultado.' },
   { id: 'sync-clickup', titulo: 'Sincronização com o ClickUp', para: 'modulo', texto: syncClickup, modulos: ['sync-clickup'],

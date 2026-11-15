@@ -17,11 +17,12 @@ import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Demandas } from './Demandas';
+import { AbaContaSankhya } from './Equipe';
 
-type Aba = 'agenda' | 'demandas' | 'apontamentos' | 'desvios';
+type Aba = 'agenda' | 'demandas' | 'apontamentos' | 'desvios' | 'sankhya';
 const ABAS: { id: Aba; rotulo: string }[] = [
   { id: 'agenda', rotulo: 'Minha agenda' }, { id: 'demandas', rotulo: 'Minhas demandas' }, { id: 'apontamentos', rotulo: 'Meus apontamentos' },
-  { id: 'desvios', rotulo: 'Meus desvios' },
+  { id: 'desvios', rotulo: 'Meus desvios' }, { id: 'sankhya', rotulo: 'Minha conta Sankhya' },
 ];
 const SITUACAO = { aberto: 'Aberto', atendido: 'Atendido', recusado: 'Recusado' };
 
@@ -127,9 +128,12 @@ function MeusDesvios() {
 
 export function Consultor() {
   const [aba, setAba] = useState<Aba>('agenda');
+  const { eu } = useSessao();
+  const pode = usePode();
   return (
     <div className="pagina">
-      <header className="pagina-topo"><div><h1>{ABAS.find(a => a.id === aba)!.rotulo}</h1></div></header>
+      <header className="pagina-topo"><div><h1>{ABAS.find(a => a.id === aba)!.rotulo}</h1></div>
+        {pode('ausencia.solicitar') && <a className="bt bt-secundario" href={hashDe('ausencias')}>Solicitar ausência</a>}</header>
       <div className="segmentos" role="tablist" aria-label="Visão do consultor">
         {ABAS.map(a => <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}>{a.rotulo}</button>)}
       </div>
@@ -137,6 +141,12 @@ export function Consultor() {
       {aba === 'demandas' && <Demandas minhas />}
       {aba === 'apontamentos' && <RelatorioApontamentos />}
       {aba === 'desvios' && <MeusDesvios />}
+      {aba === 'sankhya' && eu && (
+        <section className="cartao" aria-label="Minha conta Sankhya">
+          <p className="ajuda">O mesmo usuário e senha que você usa no Experience, no Sankhya OM e no Zendesk. Com a conta vinculada, o app consegue conferir as suas OS e ler os seus chamados no Portal. A senha é testada na Sankhya, gravada cifrada e nunca volta para a tela.</p>
+          <AbaContaSankhya ficha={{ usuario: { id: eu.usuario.id, nome: eu.usuario.nome } }} />
+        </section>
+      )}
     </div>
   );
 }

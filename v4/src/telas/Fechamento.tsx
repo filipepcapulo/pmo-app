@@ -5,10 +5,11 @@
 //   * #/meu-fechamento  Meu fechamento — cada pessoa vê só o próprio (não precisa de papel no cofre; ninguém mais vê).
 // O cálculo vem pronto da função (remuneração decifrada lá). Os valores começam ocultos (botão Mostrar valores) e a
 // exportação PDF/Excel só sai com eles à mostra.
+// V4 4.3.0: "PDFs por consultor" — escolhe os consultores (vários) e baixa um PDF de produtividade para cada um.
 import { useMemo, useState } from 'react';
 import { data } from '../api/cadastros';
 import {
-  erroIntervalo, fech, hm, pct, periodoEncerrado, planilhaFechamento, planilhaMeu, ROTULO_CAT, rotuloStatus, tabelaFechamento, textoTaxas, ultimosPeriodos, visiveis,
+  erroIntervalo, fech, hm, nomesArquivoRelatorio, pct, periodoEncerrado, planilhaFechamento, planilhaMeu, relatorioConsultor, ROTULO_CAT, rotuloRecorte, rotuloStatus, tabelaFechamento, textoTaxas, ultimosPeriodos, visiveis,
   type FechamentoPeriodo, type FiltroHistorico, type LinhaFech, type Periodo, type Recorte, type ResumoFech, type ResumoFechado,
 } from '../api/fechamentoFin';
 import { reais } from '../api/financeiro';
@@ -21,6 +22,7 @@ import { Popup } from '../componentes/Popup';
 import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
 import { useSessao } from '../estado/sessao';
+import { baixarDocumentoPdf } from '../util/documentoPdf';
 import { baixarTabelaPdf } from '../util/tabelaPdf';
 import { baixarXlsx } from '../util/xlsx';
 
@@ -89,6 +91,7 @@ export function Fechamento() {
   const [aba, setAba] = useState<'fechamento' | 'historico' | 'indicadores'>('fechamento');
   const [histInicial, setHistInicial] = useState<Partial<FiltroHistorico>>({});
   const [obsDe, setObsDe] = useState<{ id: string; nome: string; texto: string } | null>(null);
+  const [relatorios, setRelatorios] = useState(false);
   // intervalo personalizado (per = 0): só consulta — sem fechar, reabrir nem OBS
   const [ini, setIni] = useState(() => periodoEncerrado(periodos, dia).ini);
   const [fim, setFim] = useState(() => periodoEncerrado(periodos, dia).fim);
@@ -126,6 +129,7 @@ export function Fechamento() {
           {aba === 'fechamento' && <Botao disabled={oculto || !d} title={oculto ? 'Mostre os valores para exportar' : undefined} onClick={() => d && baixarXlsx(nome, planilhaFechamento(lista, d.T, obs))}>Excel</Botao>}
           {aba === 'fechamento' && <Botao disabled={oculto || !d} title={oculto ? 'Mostre os valores para exportar' : undefined}
             onClick={() => d && baixarTabelaPdf(nome, { titulo: `Fechamento de produtividade · ${rotulo}`, subtitulo: `${intervalo(d.periodo)} · ${d.intervalo ? 'Intervalo personalizado' : rotuloStatus(d.fechamento?.status ?? 'aberto')} · gerado em ${quando(new Date().toISOString())}`, ...tabelaFechamento(lista, d.T), destacarUltima: true })}>PDF</Botao>}
+          {aba === 'fechamento' && <Botao disabled={oculto || !d} title={oculto ? 'Mostre os valores para exportar' : 'Um PDF de produtividade para cada consultor escolhido, para enviar a ele'} onClick={() => setRelatorios(true)}>PDFs por consultor</Botao>}
         </div>
       </header>
       <div className="segmentos" role="tablist" aria-label="Seções do fechamento">
@@ -205,6 +209,7 @@ export function Fechamento() {
         </table></div>
         <p className="ajuda">Valor = horas normais × valor hora (planilha e app no valor hora interno, quando houver) + extras × 2 × valor hora. CLT: extra é o que passa das 18h; PJ e COOP não têm extra.
           O total nunca fica abaixo do mínimo (fixo). Meta = horas ÷ meta de horas de cada consultor.</p>
+        {relatorios && recorte && <RelatoriosConsultores esc={esc} dados={d} recorte={recorte} aoFechar={() => setRelatorios(false)} />}
         {aberto && recorte && <DetalheConsultor esc={esc} dados={d} recorte={recorte} consultor={aberto} oculto={oculto} aoFechar={() => setAberto(null)} aoMudar={c.recarregar} />}
         {obsDe && (
           <Popup aberto titulo={`OBS bonificação / meta · ${obsDe.nome} · ${d.periodo.label}`} aoFechar={() => setObsDe(null)} largura={560}
@@ -216,6 +221,59 @@ export function Fechamento() {
           </Popup>)}
       </>}
     </div>
+  );
+}
+
+/** Escolha dos consultores (vários) e geração de um PDF de produtividade para cada um — sempre um arquivo por consultor. */
+function RelatoriosConsultores({ esc, dados, recorte, aoFechar }: { esc: string; dados: FechamentoPeriodo; recorte: Recorte; aoFechar: () => void }) {
+  const avisar = useToast();
+  const [sel, setSel] = useState<string[]>([]);
+  const [andamento, setAndamento] = useState<string | null>(null);
+  const todos = dados.lista;
+  const comHoras = todos.filter(o => o.t_tot > 0).map(o => o.usuario_id);
+  const alternar = (id: string) => setSel(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id]));
+  const rotulo = rotuloRecorte(dados.periodo, dados.intervalo);
+  const gerar = async () => {
+    const escolhidos = todos.filter(o => sel.includes(o.usuario_id));
+    if (!escolhidos.length) return;
+    setAndamento('Buscando os atendimentos…');
+    try {
+      // um consultor: só os atendimentos dele; vários: uma consulta só, separada aqui por consultor
+      const r = await fech.recorte(esc, recorte, escolhidos.length === 1 ? { consultor: escolhidos[0].usuario_id } : { todos: true });
+      const nomes = nomesArquivoRelatorio(escolhidos.map(o => o.nome), rotulo);
+      const geradoEm = quando(new Date().toISOString());
+      for (const [i, e] of escolhidos.entries()) {
+        setAndamento(`Gerando ${i + 1} de ${escolhidos.length}: ${e.nome}…`);
+        await new Promise(ok => setTimeout(ok, 250));   // a tela mostra o andamento e o navegador aceita os downloads em sequência
+        const o = r.lista.find(x => x.usuario_id === e.usuario_id) ?? e;
+        const linhas = (r.detalhe ?? []).filter(l => escolhidos.length === 1 || l.usuario_id === e.usuario_id);
+        baixarDocumentoPdf(nomes[i], relatorioConsultor(o, linhas, r.periodo, { intervalo: r.intervalo, geradoEm }));
+      }
+      avisar(escolhidos.length === 1 ? 'PDF gerado' : `${escolhidos.length} PDFs gerados, um por consultor`, 'ok');
+      aoFechar();
+    } catch (e) { avisar((e as Error).message, 'erro'); }
+    setAndamento(null);
+  };
+  return (
+    <Popup aberto titulo={`PDFs de produtividade por consultor · ${rotulo}`} aoFechar={aoFechar} largura={560}
+      rodape={<><Botao onClick={aoFechar}>Cancelar</Botao>
+        <Botao variante="primario" disabled={!sel.length} carregando={!!andamento} onClick={gerar}>{sel.length > 1 ? `Gerar ${sel.length} PDFs` : 'Gerar PDF'}</Botao></>}>
+      <p className="ajuda">Escolha de quem gerar. Sai um PDF para cada consultor, com o resumo de horas e valores dele e os atendimentos do período. Se o navegador perguntar, permita baixar vários arquivos.</p>
+      <div className="linha">
+        <button type="button" className="link" onClick={() => setSel(todos.map(o => o.usuario_id))}>Todos</button>
+        <button type="button" className="link" onClick={() => setSel(comHoras)}>Só com horas ({comHoras.length})</button>
+        <button type="button" className="link" onClick={() => setSel([])}>Nenhum</button>
+      </div>
+      <div className="fech-escolha" role="group" aria-label="Consultores">
+        {todos.map(o => (
+          <label key={o.usuario_id} className="check">
+            <input type="checkbox" checked={sel.includes(o.usuario_id)} onChange={() => alternar(o.usuario_id)} /> {o.nome}
+            <small className="ajuda"> · {o.t_tot > 0 ? `${hm(o.t_tot)} h` : 'sem horas no período'}</small>
+          </label>))}
+        {todos.length === 0 && <p className="ajuda">Nenhum consultor neste período.</p>}
+      </div>
+      {andamento && <p className="ajuda" role="status"><span className="giro" /> {andamento}</p>}
+    </Popup>
   );
 }
 

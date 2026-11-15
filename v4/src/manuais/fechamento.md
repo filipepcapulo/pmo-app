@@ -115,6 +115,7 @@ No formulário do ajuste há dois atalhos: **Descontar 50% (apontamento retroati
 
 - **Excel**: horas em número decimal (planilha e OS separadas em normais e extras), valor hora, valor hora interno, fixo, meta, valores, a coluna "Pago pelo mínimo" e a OBS.
 - **PDF**: a mesma tabela da tela, com o período, a situação e a data em que foi gerado.
+- **PDFs por consultor**: o relatório de produtividade para enviar a cada consultor. Abre a lista de consultores do período (com as horas de cada um); marque um ou vários — há os atalhos **Todos**, **Só com horas** e **Nenhum** — e toque em **Gerar**. Sai sempre **um PDF por consultor** (`Relatorio Produtividade - Nome (PERÍODO).pdf`), nunca um arquivo com todos. Se o navegador perguntar, permita baixar vários arquivos. Cada PDF traz o resumo de horas (Planilha / app, OS e total), os valores, os atendimentos de OS e os apontamentos de planilha / app do período; atendimento ajustado sai com a observação do ajuste. A modalidade (CLT, PJ, COOP) não aparece; a coluna Fixo só entra para quem tem; quem tem valor hora interno ganha o quadro de valores por tipo de trabalho. Vale também no intervalo personalizado.
 
 Períodos antigos podem trazer a marca **histórico importado**: os atendimentos vieram do Produtividade SK. Nesses períodos o detalhe do consultor é só para consulta e não há **Ajustar**. A tela não tem botão de importação.
 

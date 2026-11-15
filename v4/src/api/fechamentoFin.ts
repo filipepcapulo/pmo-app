@@ -4,6 +4,7 @@
 import { sb, FalhaApi } from './cliente';
 import { reais } from './financeiro';
 import { traduzirErro } from './mensagens';
+import type { DocumentoPdf, TabelaDoc } from '../util/documentoPdf';
 import type { Planilha } from '../util/xlsx';
 
 export interface Periodo { key: number; label: string; ini: string; fim: string }
@@ -155,6 +156,84 @@ export function tabelaFechamento(lista: ResumoFech[], T: TotaisFech): { colunas:
     ],
   };
 }
+// ---------------------------------------------------------------- relatório de produtividade por consultor (4.3.0)
+const br = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+const corta = (t: string, n = 250) => { const x = t.replace(/\s+/g, ' ').trim(); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
+/** Rótulo do recorte para título e nome de arquivo: "SET-OUT26" ou "21-09-2026 a 20-10-2026" (intervalo). */
+export const rotuloRecorte = (p: Periodo, intervalo = false) => (intervalo || !p.label ? `${br(p.ini)} a ${br(p.fim)}`.replace(/\//g, '-') : p.label);
+/** Nome do arquivo de cada consultor: pelo primeiro nome; nome completo quando dois escolhidos têm o mesmo primeiro nome. */
+export function nomesArquivoRelatorio(nomes: string[], rotulo: string): string[] {
+  const limpo = (t: string) => t.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
+  const primeiro = (t: string) => limpo(t).split(' ')[0] || 'Consultor';
+  return nomes.map(n => {
+    const repetido = nomes.filter(x => primeiro(x).toLowerCase() === primeiro(n).toLowerCase()).length > 1;
+    return `Relatorio Produtividade - ${repetido ? limpo(n) : primeiro(n)} (${limpo(rotulo)})`;
+  });
+}
+/**
+ * Relatório de um consultor para enviar a ele (o que a skill "relatorio-produtividade-consultor" fazia pela planilha):
+ * resumo de horas (Planilha / OS / Total), valores, atendimentos de OS e apontamentos de planilha/app do período.
+ * A modalidade (CLT/PJ/COOP) não aparece. "Fixo" só entra para quem tem; quem tem mais de um valor hora nas horas
+ * normais (ex.: valor hora interno) ganha o quadro por tipo de trabalho no lugar das colunas Valor hora / Valor normal.
+ */
+export function relatorioConsultor(o: ResumoFech, linhas: LinhaFech[], p: Periodo, o2: { intervalo?: boolean; geradoEm?: string } = {}): DocumentoPdf {
+  const porData = (a: LinhaFech, b: LinhaFech) => a.data.localeCompare(b.data) || a.hi.localeCompare(b.hi);
+  const os = linhas.filter(l => l.orig === 'OS').sort(porData), pl = linhas.filter(l => l.orig === 'Planilha').sort(porData);
+  const tabelas: TabelaDoc[] = [{
+    titulo: 'Resumo de horas',
+    colunas: [{ titulo: 'Fonte' }, { titulo: 'Horas normais', dir: true }, { titulo: 'Horas extras', dir: true }, { titulo: 'Total', dir: true }],
+    linhas: [['Planilha / app', hm(o.p_hn), hm(o.p_he), hm(o.p_tot)], ['OS (Sankhya)', hm(o.o_hn), hm(o.o_he), hm(o.o_tot)], ['Total geral', hm(o.t_hn), hm(o.t_he), hm(o.t_tot)]],
+    destacarUltima: true,
+    nota: o.ajN ? `${o.ajN} atendimento(s) com ajuste de horas (${o.aj > 0 ? '+' : ''}${hm(o.aj)}); as horas acima já consideram os ajustes.` : undefined,
+  }];
+  // horas normais por fonte × valor hora aplicado (a remuneração pode ter valor hora interno ou mudar no meio do período)
+  const grupos = new Map<string, { orig: LinhaFech['orig']; rate: number; min: number }>();
+  for (const l of linhas) {
+    if (l.semVig || !l.hn) continue;
+    const k = `${l.orig}|${l.rate}`, g = grupos.get(k) ?? { orig: l.orig, rate: l.rate, min: 0 };
+    g.min += l.hn; grupos.set(k, g);
+  }
+  const taxas = new Set([...grupos.values()].map(g => g.rate));
+  const variasTaxas = taxas.size > 1;
+  if (variasTaxas) {
+    const interna = (r: number) => (o.taxas ?? []).some(t => t.int && t.vh === r) || (o.vhi > 0 && r === o.vhi);
+    const gs = [...grupos.values()].sort((a, b) => Number(a.orig === 'OS') - Number(b.orig === 'OS') || a.rate - b.rate);
+    tabelas.push({
+      titulo: 'Valores — valor hora diferente por tipo de trabalho',
+      colunas: [{ titulo: 'Fonte' }, { titulo: 'Horas normais', dir: true }, { titulo: 'Valor hora', dir: true }, { titulo: 'Valor', dir: true }],
+      linhas: [...gs.map(g => [g.orig === 'OS' ? 'OS (Sankhya / cliente)' : `Planilha / app${interna(g.rate) ? ' (interno)' : ''}`, hm(g.min), reais(g.rate), reais(Math.round(g.min / 60 * g.rate * 100) / 100)]),
+        ['Total normal', hm(gs.reduce((a, g) => a + g.min, 0)), '', reais(o.v_hn)]],
+      destacarUltima: true,
+      nota: 'O trabalho interno (planilha / app) é pago pelo valor hora interno, quando houver; o atendimento ao cliente (OS), pelo valor hora normal.',
+    });
+  }
+  const fixo = o.fixo > 0;
+  tabelas.push({
+    titulo: 'Valores',
+    colunas: [...(variasTaxas ? [] : [{ titulo: 'Valor hora', dir: true }]), ...(fixo ? [{ titulo: 'Fixo', dir: true }] : []), ...(variasTaxas ? [] : [{ titulo: 'Valor normal', dir: true }]),
+      { titulo: 'Valor extra', dir: true }, { titulo: 'Valor total', dir: true }, { titulo: 'Meta', dir: true }],
+    linhas: [[...(variasTaxas ? [] : [taxas.size === 1 ? reais([...taxas][0]) : textoTaxas(o) || reais(o.vh)]), ...(fixo ? [reais(o.fixo)] : []), ...(variasTaxas ? [] : [reais(o.v_hn)]),
+      reais(o.v_he), reais(o.total) + (o.minimo ? ' (mínimo)' : ''), pct(o.meta)]],
+    nota: o.semVig ? 'Há atendimento em data sem período de remuneração vigente (sem valor).' : undefined,
+  });
+  const desc = (l: LinhaFech) => corta([...new Set([l.serv, l.desc].map(x => (x ?? '').trim()).filter(Boolean))].join(' — ')) + (l.aj && l.ajobs ? ` [Ajuste: ${corta(l.ajobs, 120)}]` : '');
+  const soma = (ls: LinhaFech[]) => hm(ls.reduce((a, l) => a + l.hn + l.he, 0));
+  tabelas.push({
+    titulo: `Atendimentos — OS (Sankhya) · ${os.length}`, vazio: 'Nenhuma OS no período.', destacarUltima: true,
+    colunas: [{ titulo: 'Data' }, { titulo: 'Cliente' }, { titulo: 'Nº OS' }, { titulo: 'Horas', dir: true }, { titulo: 'Descrição', quebra: true }],
+    linhas: os.length ? [...os.map(l => [br(l.data), corta(l.cli, 38), l.os, hm(l.hn + l.he), desc(l)]), ['Total', '', '', soma(os), '']] : [],
+  }, {
+    titulo: `Apontamentos — Planilha / app · ${pl.length}`, vazio: 'Nenhum apontamento de planilha / app no período.', destacarUltima: true,
+    colunas: [{ titulo: 'Data' }, { titulo: 'Cliente' }, { titulo: 'Horas', dir: true }, { titulo: 'Descrição', quebra: true }],
+    linhas: pl.length ? [...pl.map(l => [br(l.data), corta(l.cli, 38), hm(l.hn + l.he), desc(l)]), ['Total', '', soma(pl), '']] : [],
+  });
+  return {
+    titulo: `Relatório de produtividade — ${o.nome}`,
+    subtitulo: `Período: ${br(p.ini)} a ${br(p.fim)}${o2.intervalo || !p.label ? '' : ` (${p.label})`}`,
+    tabelas, rodape: `PMO BP-MS${o2.geradoEm ? ` · gerado em ${o2.geradoEm}` : ''}`,
+  };
+}
+
 /** Planilha Excel do "Meu fechamento": os atendimentos do período. */
 export function planilhaMeu(linhas: LinhaFech[]): Planilha {
   return {

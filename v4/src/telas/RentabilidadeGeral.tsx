@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { reais } from '../api/financeiro';
 import { faixaMargem, horasDe, pctMargem } from '../api/rentabilidade';
 import {
-  agrupar, aplicarFiltro, filtrar, intervaloPadrao, nomeDe, minSemReceita, modoDoTipo, planilhaGeral, proximoNivel, rentaGeral, ROTULO_DIMENSAO, ROTULO_MODO, soCusto, somar,
+  acumular, agrupar, aplicarFiltro, filtrar, intervaloPadrao, nomeDe, minSemReceita, modoDoTipo, planilhaGeral, proximoNivel, rentaGeral, ROTULO_DIMENSAO, ROTULO_MODO, soCusto, somar,
   type Agrupamento, type Dimensao, type FiltroGeral, type Grupo, type ModoFatura, type Soma, type TipoOs,
 } from '../api/rentabilidadeGeral';
 import { hojeIso } from '../api/projeto';
@@ -24,6 +24,8 @@ import { baixarXlsx } from '../util/xlsx';
 const semAcesso = (erro: string | null) => !!erro && /autorizados do Financeiro/.test(erro);
 const ORDEM_TRILHA: Dimensao[] = ['cliente', 'projeto', 'consultor', 'tipo', 'tempo'];
 const LIMITE = 8;
+/** "Desde o início": data anterior a qualquer apontamento do app e do histórico importado. */
+const INICIO = '2020-01-01';
 
 function Margem({ g, oculto }: { g: Soma; oculto: boolean }) {
   if (!g.faturado && !g.custo) return <>—</>;
@@ -55,6 +57,70 @@ function GraficoPeriodo({ grupos, escolhido, aoEscolher }: { grupos: Grupo[]; es
           <span className="rg-rotulo">{g.nome}</span>
         </button>))}
     </div>
+  );
+}
+
+/** Valor curto para o eixo: 1.250.000 → "1,25 mi"; 50.000 → "50 mil". */
+const curto = (v: number) => (v >= 1e6 ? `${(v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mi` : v >= 1000 ? `${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil` : v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }));
+/** Topo e passo "redondos" do eixo (4 a 5 divisões). */
+function eixo(max: number) {
+  const bruto = Math.max(1, max) / 4, p = 10 ** Math.floor(Math.log10(bruto)), m = bruto / p;
+  const passo = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p;
+  return { passo, topo: Math.ceil(Math.max(1, max) / passo) * passo };
+}
+
+/** Linha do tempo acumulada: faturado e custo somados desde o início do intervalo. Onde as linhas se cruzam, o recorte
+ *  passa a dar lucro (faturado acima do custo) ou prejuízo. */
+function GraficoAcumulado({ grupos }: { grupos: Grupo[] }) {
+  const { pontos, cruzamentos } = useMemo(() => acumular(grupos), [grupos]);
+  if (pontos.length === 0) return <p className="ajuda">Sem horas no recorte.</p>;
+  const W = 720, H = 260, E = 58, D = 18, T = 16, B = 28, n = pontos.length;
+  const { passo, topo } = eixo(Math.max(...pontos.flatMap(p => [p.faturado, p.custo])));
+  const x = (i: number) => (n === 1 ? E + (W - E - D) / 2 : E + i * (W - E - D) / (n - 1));
+  const y = (v: number) => T + (1 - Math.max(0, v) / topo) * (H - T - B);
+  const caminho = (campo: 'faturado' | 'custo') => pontos.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(p[campo]).toFixed(1)}`).join(' ');
+  const cadaRotulo = Math.ceil(n / 12), ult = pontos[n - 1];
+  const marcas = Array.from({ length: Math.round(topo / passo) + 1 }, (_, i) => i * passo);
+  const nomeCruz = (c: { indice: number; t: number }) => (c.t === 0 ? pontos[c.indice - 1].nome : pontos[c.indice].nome);
+  return (
+    <>
+      <svg className="rg-acum" viewBox={`0 0 ${W} ${H}`} role="img"
+        aria-label={`Acumulado até ${ult.nome}: faturado ${reais(ult.faturado)}, custo ${reais(ult.custo)}, margem ${reais(ult.margem)}`}>
+        {marcas.map(v => (
+          <g key={v}><line className="rg-acum-grade" x1={E} x2={W - D} y1={y(v)} y2={y(v)} />
+            <text className="rg-acum-eixo" x={E - 6} y={y(v) + 4} textAnchor="end">{curto(v)}</text></g>))}
+        {pontos.map((p, i) => (i % cadaRotulo === 0 || i === n - 1) && (i === n - 1 || n - 1 - i >= cadaRotulo) && (
+          <text key={p.id} className="rg-acum-eixo" x={x(i)} y={H - 8} textAnchor={i === 0 && n > 1 ? 'start' : i === n - 1 && n > 1 ? 'end' : 'middle'}>{p.nome}</text>))}
+        <path className="rg-acum-linha rg-acum-fat" d={caminho('faturado')} />
+        <path className="rg-acum-linha rg-acum-custo" d={caminho('custo')} />
+        {pontos.map((p, i) => (
+          <g key={p.id} className="rg-acum-ponto">
+            <title>{`${p.nome} (acumulado)\nFaturado: ${reais(p.faturado)}\nCusto: ${reais(p.custo)}\nMargem: ${reais(p.margem)} (${pctMargem(p.margem_pct)})`}</title>
+            <rect x={x(i) - 12} y={T} width={24} height={H - T - B} fill="transparent" />
+            <circle className="gha-c1" cx={x(i)} cy={y(p.custo)} r={3.5} />
+            <circle className="gha-c0" cx={x(i)} cy={y(p.faturado)} r={3.5} />
+          </g>))}
+        {cruzamentos.map(c => {
+          const cx = x(c.indice - 1) + c.t * (x(c.indice) - x(c.indice - 1));
+          return (
+            <g key={c.indice} className={`rg-acum-cruz ${c.sentido}`}>
+              <title>{c.sentido === 'positivo' ? `Em ${nomeCruz(c)} o faturado acumulado passa o custo (${reais(c.valor)})` : `Em ${nomeCruz(c)} o custo acumulado passa o faturado (${reais(c.valor)})`}</title>
+              <line x1={cx} x2={cx} y1={T} y2={H - B} /><circle cx={cx} cy={y(c.valor)} r={6} />
+            </g>);
+        })}
+      </svg>
+      <p className="rg-acum-resumo" data-testid="rg-acum-resumo">
+        Acumulado até {ult.nome}: faturado <b>{reais(ult.faturado)}</b> · custo <b>{reais(ult.custo)}</b> · margem{' '}
+        <b className={`renta-${faixaMargem({ margem: ult.faturado ? ult.margem : null, margem_pct: ult.margem_pct })}`}>{reais(ult.margem)}{ult.faturado ? ` (${pctMargem(ult.margem_pct)})` : ''}</b>
+      </p>
+      <ul className="rg-acum-cruzes" data-testid="rg-acum-cruzamentos">
+        {cruzamentos.map(c => (
+          <li key={c.indice} className={c.sentido === 'positivo' ? 'renta-boa' : 'renta-negativa'}>
+            {c.sentido === 'positivo' ? `Em ${nomeCruz(c)} o faturado acumulado passa o custo: o recorte começa a dar lucro.` : `Em ${nomeCruz(c)} o custo acumulado passa o faturado: o recorte entra no prejuízo.`}</li>))}
+        {cruzamentos.length === 0 && <li className="ajuda">{ult.margem === 0 ? 'Faturado e custo acumulados estão empatados.'
+          : `As linhas não se cruzam no intervalo: o ${ult.margem > 0 ? 'faturado' : 'custo'} acumulado fica sempre acima do ${ult.margem > 0 ? 'custo' : 'faturado'}.`}</li>}
+      </ul>
+    </>
   );
 }
 
@@ -213,6 +279,7 @@ export function RentabilidadeGeral() {
           {[[3, 'Últimos 3 meses'], [6, 'Últimos 6'], [12, 'Últimos 12']].map(([n, t]) => (
             <button key={n} type="button" className="chip" onClick={() => ultimos(n as number)}>{t}</button>))}
           <button type="button" className="chip" onClick={() => aplicar({ ini: `${hoje.slice(0, 4)}-01-01`, fim: hoje })}>Este ano</button>
+          <button type="button" className="chip" title="Todo o histórico de horas (para o acumulado desde o primeiro apontamento)" onClick={() => aplicar({ ini: INICIO, fim: hoje })}>Desde o início</button>
         </span>
         <label className="periodo">Período por
           <select aria-label="Período por" value={ag} onChange={e => trocarAgrupamento(e.target.value as Agrupamento)}>
@@ -256,6 +323,11 @@ export function RentabilidadeGeral() {
             <div className="gha-topo"><div><h2 className="secao">Por período — faturado × custo</h2>
               <p className="ajuda">{ag === 'mes' ? 'Mês civil' : 'Período de fechamento (21 a 20)'} · o percentual em cima é a margem</p></div><Legenda /></div>
             <GraficoPeriodo grupos={porTempo} escolhido={f.tempo} aoEscolher={id => escolher('tempo', id)} />
+          </section>
+          <section className="cartao rg-cartao" data-testid="rg-acumulado">
+            <div className="gha-topo"><div><h2 className="secao">Acumulado{f.projeto ? ` de ${nomeDe(d, 'projeto', f.projeto, ag)}` : f.cliente ? ` de ${nomeDe(d, 'cliente', f.cliente, ag)}` : ''} — faturado × custo na linha do tempo</h2>
+              <p className="ajuda">Cada ponto soma tudo desde {porTempo[0]?.nome ?? 'o início do intervalo'}. Onde as linhas se cruzam, o acumulado vira lucro ou prejuízo.{!f.cliente && ' Escolha um cliente para ver o acumulado dele.'}</p></div><Legenda /></div>
+            <GraficoAcumulado grupos={porTempo} />
           </section>
           <div className="rg-grade">
             <GraficoDimensao dim="cliente" grupos={porCliente} escolhido={f.cliente} aoEscolher={id => escolher('cliente', id)} />

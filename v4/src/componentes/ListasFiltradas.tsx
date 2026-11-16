@@ -18,7 +18,7 @@ export function DemandasDoProjeto({ demandas, tarefas, vazio }: { demandas: Dema
   const { f, mudar, limpar, ativos } = useFiltroLista('projeto:demandas', PADRAO_DEMANDAS);
   const et = useEtapas();
   const consultores = useMemo(() => consultoresPorDemanda(tarefas), [tarefas]);
-  const comEtapa = useMemo(() => demandas.map(d => ({ ...d, etapa_app_id: et.idDe(d) })), [demandas, et]);
+  const comEtapa = useMemo(() => demandas.map(d => ({ ...d, etapa_app_id: et.idDe(d), etapa_nome: et.de(d)?.nome ?? d.etapa })), [demandas, et]);
   const itens = useMemo(() => filtrarDemandas(comEtapa, f, consultores), [comEtapa, f, consultores]);
   const ops = useMemo(() => ({
     etapas: [...et.lista.filter(e => comEtapa.some(d => d.etapa_app_id === e.id)).map(e => ({ valor: e.id, rotulo: e.nome })),

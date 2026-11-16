@@ -73,6 +73,10 @@ a.pil:hover { text-decoration: none; filter: brightness(.95); }
 .filtro-nivel-ops { display: inline-flex; background: var(--superficie); border-radius: 8px; padding: 2px; gap: 2px; }
 .filtro-nivel-ops button { border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--texto-2); padding: 4px 10px; border-radius: 6px; cursor: pointer; }
 .filtro-nivel-ops button[aria-pressed="true"] { background: var(--verde); color: #fff; }
+/* no backlog lateral (coluna estreita): rótulo em cima, opções ocupando a largura */
+.bl-nivel { display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin-left: 0; }
+.bl-nivel .filtro-nivel-ops { display: flex; flex-wrap: wrap; }
+.bl-nivel .filtro-nivel-ops button { flex: 1 1 auto; padding: 4px 6px; }
 
 /* ---------------------------------------------------------------- cadastro de etapas */
 .etapa-cartao { border-left: 6px solid var(--cor-etapa, var(--linha)); }

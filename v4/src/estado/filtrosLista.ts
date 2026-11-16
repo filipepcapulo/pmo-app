@@ -3,21 +3,15 @@
 // Lista vazia num filtro de vários = todos. SEM = "sem responsável / sem GP / sem etapa".
 import { useCallback, useEffect, useState } from 'react';
 import { semAlerta, statusV4 } from '../api/execucao';
-import { normal } from './filtro';
+import { temTexto } from './filtro';
+
+export { temTexto };
 
 export const SEM = '-';
 export interface Opcao { valor: string; rotulo: string }
 
 // ---------------------------------------------------------------- peças comuns
 const em = (sel: readonly string[], v: string | null | undefined) => sel.length === 0 || sel.includes(v || SEM);
-/** Todas as palavras do texto aparecem em algum dos campos (sem acento, sem caixa). */
-export function temTexto(texto: string, ...campos: (string | null | undefined)[]): boolean {
-  const palavras = normal(texto).split(/\s+/).filter(Boolean);
-  if (!palavras.length) return true;
-  const onde = normal(campos.filter(Boolean).join(' '));
-  return palavras.every(p => onde.includes(p));
-}
-
 const col = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
 /** Opções de pessoa a partir dos ids que aparecem na lista (nome pelo `nomeDe`); nulo vira "(sem …)" no fim. */
 export function opcoesPessoas(ids: (string | null | undefined)[], nomeDe: (id: string) => string | null | undefined, semRotulo = '(sem responsável)'): Opcao[] {
@@ -111,6 +105,8 @@ export interface DemandaFiltravel {
   responsavel_id?: string | null; etapa?: string | null; fase?: string; cliente_id?: string; cliente?: string; projeto?: string;
   /** V4: etapa do app (id); quando vem preenchida o filtro de etapa compara por ela, senão pelo texto. */
   etapa_app_id?: string | null;
+  /** Nome da etapa do app (a tela preenche); entra na busca por texto. Sem ele, vale o texto de `etapa`. */
+  etapa_nome?: string | null;
   totais?: { atrasada?: boolean; avulso_base?: boolean } | null; avulso_base?: boolean;
 }
 export const TIPOS_DEMANDA: Opcao[] = [
@@ -150,36 +146,39 @@ export function idsDoResponsavel(lista: DemandaFiltravel[], f: Pick<FiltroDemand
   return ids;
 }
 
-function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string> | null): boolean {
+const etapaDe = (d: DemandaFiltravel) => (d.etapa_app_id !== undefined ? d.etapa_app_id : d.etapa);
+/** `mae`: a demanda-mãe (quando está na lista) — o nome dela vale na busca por texto e a etapa dela vale (no texto e no filtro Etapa) para a subdemanda sem etapa própria, como no backlog da Agenda da Equipe. */
+function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string> | null, mae?: DemandaFiltravel): boolean {
   return (!doResp || doResp.has(d.id)) && em(f.status, statusV4(d.status)) && em(f.fases, d.fase)
-    && em(f.etapas, d.etapa_app_id !== undefined ? d.etapa_app_id : d.etapa)
+    && em(f.etapas, etapaDe(d) || (mae ? etapaDe(mae) : null))   // sem etapa própria vale a da mãe (como a Origem do backlog)
     && (f.tipos.length === 0 || f.tipos.includes(d.tipo ?? 'entregavel'))
     && (f.prioridades.length === 0 || f.prioridades.includes(d.prioridade ?? 'normal'))
     && (f.clientes.length === 0 || (!!d.cliente_id && f.clientes.includes(d.cliente_id)))
     && (f.projetos.length === 0 || (!!d.projeto_id && f.projetos.includes(d.projeto_id)))
     && (!f.atrasadas || (!!d.totais?.atrasada && !semAlerta(d)))
-    && temTexto(f.texto, d.nome, d.cliente, d.projeto);
+    && temTexto(f.texto, d.nome, mae?.nome, d.cliente, d.projeto, d.etapa_nome ?? d.etapa ?? mae?.etapa_nome ?? mae?.etapa);
 }
 /**
  * Demandas e subdemandas que passam no filtro, na ordem recebida. A mãe de uma subdemanda que passa vem junto
  * (para a árvore mostrar a subdemanda no lugar), mesmo sem passar ela mesma. Responsável: ver idsDoResponsavel.
  */
 export function filtrarDemandas<T extends DemandaFiltravel>(lista: T[], f: FiltroDemandas, consultores?: Map<string, Set<string>>): T[] {
+  const porId = new Map(lista.map(d => [d.id, d]));
+  const maeDe = (d: T) => (d.pai_id ? porId.get(d.pai_id) : undefined);
   if (f.nivel === 'demanda' || f.nivel === 'subdemanda') {
     // V4: o nível vale para todos os filtros. Responsável aqui é o do próprio item.
-    const ids = new Set(lista.map(d => d.id));
-    const ehSub = (d: T) => !!d.pai_id && ids.has(d.pai_id);
+    const ehSub = (d: T) => !!d.pai_id && porId.has(d.pai_id);
     const dele = f.responsaveis.length ? new Set(lista.filter(d => f.responsaveis.includes(d.responsavel_id || SEM)).map(d => d.id)) : null;
     if (f.nivel === 'demanda') {
       const maes = new Set(lista.filter(d => !ehSub(d) && demandaPassa(d, f, dele)).map(d => d.id));
       return lista.filter(d => maes.has(d.id) || (!!d.pai_id && maes.has(d.pai_id)));
     }
-    const subs = new Set(lista.filter(d => ehSub(d) && demandaPassa(d, f, dele)).map(d => d.id));
+    const subs = new Set(lista.filter(d => ehSub(d) && demandaPassa(d, f, dele, maeDe(d))).map(d => d.id));
     const contexto = new Set(lista.filter(d => subs.has(d.id)).map(d => d.pai_id!));
     return lista.filter(d => subs.has(d.id) || contexto.has(d.id));
   }
   const doResp = idsDoResponsavel(lista, f, consultores);
-  const passam = new Set(lista.filter(d => demandaPassa(d, f, doResp)).map(d => d.id));
+  const passam = new Set(lista.filter(d => demandaPassa(d, f, doResp, maeDe(d))).map(d => d.id));
   const maes = new Set(lista.filter(d => d.pai_id && passam.has(d.id)).map(d => d.pai_id!));
   return lista.filter(d => passam.has(d.id) || maes.has(d.id));
 }

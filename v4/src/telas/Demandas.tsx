@@ -46,7 +46,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
   const filtro = status.length === TODOS.length ? null : status;
   const c = useCarga(() => (minhas ? consultor.demandas(esc, filtro, null) : todasDemandas(esc, filtro)),
     [esc, minhas, status.join(), ed.geracao]);
-  const todas = useMemo(() => (c.dados?.itens ?? []).map(d => ({ ...d, etapa_app_id: et.idDe(d) })), [c.dados, et]);
+  const todas = useMemo(() => (c.dados?.itens ?? []).map(d => ({ ...d, etapa_app_id: et.idDe(d), etapa_nome: et.de(d)?.nome ?? d.etapa })), [c.dados, et]);
   const itens = useMemo(() => filtrarDemandas(todas, f), [todas, f]);
   useEffect(() => setMostrar(PROJETOS_POR_VEZ), [f, status]);
   const grupos = useMemo(() => {
@@ -87,7 +87,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
         </div>
       </header>}
       <BarraFiltros nome="demandas" n={c.dados ? itens.length : null} total={c.dados ? todas.length : null} ativos={ativos + (statusFora ? 1 : 0)} aoLimpar={limparTudo}>
-        <input type="search" value={f.texto} onChange={e => mudar({ texto: e.target.value })} placeholder="Buscar demanda, cliente ou projeto" aria-label="Buscar demanda" />
+        <input type="search" value={f.texto} onChange={e => mudar({ texto: e.target.value })} placeholder="Buscar demanda, cliente, projeto ou etapa" aria-label="Buscar demanda" />
         <details className="filtro-status">
           <summary>Status: {rotuloStatus(status)}</summary>
           <div className="filtro-status-caixa">

@@ -93,14 +93,29 @@ describe('demandas', () => {
   it('sem filtro devolve tudo, na ordem', () => expect(ids({})).toEqual(['d1', 'd2', 'd3', 'd4']));
   it('fase do projeto, etapa, tipo, prioridade, status, cliente e projeto', () => {
     expect(ids({ fases: ['P3', 'Sustentação'] })).toEqual(['d3', 'd4']);
-    expect(ids({ etapas: ['Homologação'] })).toEqual(['d1']);
-    expect(ids({ etapas: [SEM] })).toEqual(['d1', 'd2', 'd4']);   // d1 vem como mãe da d2
+    expect(ids({ etapas: ['Homologação'] })).toEqual(['d1', 'd2']);   // d2 não tem etapa: vale a da mãe (como a Origem do backlog)
+    expect(ids({ etapas: [SEM] })).toEqual(['d4']);
+    expect(ids({ etapas: ['Homologação'], nivel: 'subdemanda' })).toEqual(['d1', 'd2']);
+    // etapa própria vale mais que a da mãe
+    expect(filtrarDemandas(dem.map(d => (d.id === 'd2' ? { ...d, etapa: 'Execução' } : d)), { ...PADRAO_DEMANDAS, etapas: ['Homologação'] }).map(d => d.id)).toEqual(['d1']);
     expect(ids({ tipos: ['plano_acao', 'chamado'] })).toEqual(['d3', 'd4']);
     expect(ids({ prioridades: ['alta', 'urgente'] })).toEqual(['d1', 'd3']);
     expect(ids({ status: ['concluida'] })).toEqual(['d4']);
     expect(ids({ clientes: ['c2'] })).toEqual(['d4']);
     expect(ids({ projetos: ['p2'] })).toEqual(['d3']);
     expect(ids({ fases: ['P1'], prioridades: ['urgente'] })).toEqual([]);
+  });
+  it('texto: a mesma busca do backlog da Agenda — nome, nome da mãe, cliente, projeto e etapa (própria ou da mãe), sem acento', () => {
+    expect(ids({ texto: 'requisicoes' })).toEqual(['d1', 'd2']);          // a mãe vem de contexto
+    expect(ids({ texto: 'almoxarifado' })).toEqual(['d1', 'd2']);         // a subdemanda da demanda achada também aparece
+    expect(ids({ texto: 'homologacao' })).toEqual(['d1', 'd2']);          // etapa da d1; a d2 (sem etapa) herda a da mãe
+    expect(ids({ texto: 'execução' })).toEqual(['d3']);
+    expect(ids({ texto: 'fiscal almont' })).toEqual(['d3']);              // palavras em qualquer ordem, em campos diferentes
+    expect(ids({ texto: 'almoxarifado', nivel: 'subdemanda' })).toEqual(['d1', 'd2']);
+    // o nome da etapa do app (etapa_nome) vale mais que o texto antigo
+    const comNome = dem.map(d => (d.id === 'd3' ? { ...d, etapa_nome: 'Personalização / Customização' } : d));
+    expect(filtrarDemandas(comNome, { ...PADRAO_DEMANDAS, texto: 'personalizacao' }).map(d => d.id)).toEqual(['d3']);
+    expect(filtrarDemandas(comNome, { ...PADRAO_DEMANDAS, texto: 'execucao' }).map(d => d.id)).toEqual([]);
   });
   it('responsável: o da demanda; a mãe acompanha a subdemanda que passa; "(sem responsável)"', () => {
     expect(ids({ responsaveis: ['ana'] })).toEqual(['d1', 'd2', 'd4']);   // d2 é subdemanda da d1 (da Ana), delegada à Bia

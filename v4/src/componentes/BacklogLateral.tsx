@@ -6,12 +6,13 @@
 // responsável da demanda, senão o da mãe, o do projeto, o do cliente (gp_id vem do banco). "Relatório" (V13a-5, módulo 09
 // da Central) baixa o que está na tela, com os filtros, num HTML único para guardar, mandar ou imprimir.
 import { useEffect, useMemo, useState } from 'react';
-import { arvoreBacklog, doGp, ORIGENS, porProjeto, rotuloAgendas, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
+import { arvoreBacklog, ORIGENS, porProjeto, rotuloAgendas, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
 import { rotuloPrioridade } from '../api/execucao';
 import { relatorioBacklog } from '../api/relatorios';
 import { baixarRelatorioHtml } from '../util/relatorioHtml';
 import { useEdicao } from '../estado/edicao';
 import { gps, useEquipe, usePode } from '../estado/equipe';
+import { NIVEIS_FILTRO } from '../estado/filtrosLista';
 import { caminhoEntidade, hashDe, type Entidade } from '../estado/rotas';
 import { Icone } from './Icone';
 import { Resumo } from './Resumo';
@@ -57,10 +58,14 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
   const chaveStatus = `pmo4.backlog.status.${origemInicial ?? 'geral'}`;
   const [fora, setFora] = useState(() => lerFora(chaveStatus));
   const [soSemAgenda, setSoSemAgenda] = useState(false);
+  // "Aplicar filtros em": o mesmo da tela de Demandas (guardado no aparelho)
+  const chaveNivel = `pmo4.backlog.nivel.${origemInicial ?? 'geral'}`;
+  const [nivel, setNivel] = useState(() => { try { const v = localStorage.getItem(chaveNivel) ?? ''; return NIVEIS_FILTRO.some(n => n.valor === v) ? v : ''; } catch { return ''; } });
+  useEffect(() => { try { localStorage.setItem(chaveNivel, nivel); } catch { /* */ } }, [nivel, chaveNivel]);
   const { lista } = useEquipe();
   const [gp, setGp] = useState('');
   useEffect(() => { try { localStorage.setItem(chaveStatus, JSON.stringify([...fora])); } catch { /* */ } }, [fora, chaveStatus]);
-  const arvore = useMemo(() => arvoreBacklog(doGp(itens ?? [], gp).filter(i => !soSemAgenda || !i.agendas), origem, texto, fora), [itens, origem, texto, fora, soSemAgenda, gp]);
+  const arvore = useMemo(() => arvoreBacklog(itens ?? [], origem, texto, fora, { nivel, gp, soSemAgenda }), [itens, origem, texto, fora, soSemAgenda, gp, nivel]);
   // GPs possíveis + quem aparece como GP de algum item (responsável que não é GP também filtra)
   const opcoesGp = useMemo(() => {
     const ids = new Set([...gps(lista).map(m => m.id), ...(itens ?? []).map(i => i.gp_id).filter((x): x is string => !!x)]);
@@ -75,6 +80,7 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
       `Status: ${escolhidos.length === opcoesStatus.length ? 'todos' : escolhidos.map(o => o.rotulo).join(', ') || 'nenhum'}`,
       gp ? `GP: ${lista.find(m => m.id === gp)?.nome ?? ''}` : '', texto.trim() ? `Busca: ${texto.trim()}` : '',
       soSemAgenda ? 'Sem agenda em aberto' : '',
+      nivel ? `Nível dos filtros: ${NIVEIS_FILTRO.find(n => n.valor === nivel)?.rotulo ?? nivel}` : '',
     ].filter(Boolean);
     baixarRelatorioHtml(relatorioBacklog(arvore, f));
   }
@@ -106,7 +112,7 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
           <option value="">GP responsável: todos</option>
           {opcoesGp.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
         </select>
-        <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Cliente ou demanda…" aria-label="Buscar no backlog" />
+        <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Cliente, demanda ou etapa…" aria-label="Buscar no backlog" />
         <details className="bl-status">
           <summary>Status: {escolhidos.length === opcoesStatus.length ? 'todos' : `${escolhidos.length} de ${opcoesStatus.length}`}</summary>
           {opcoesStatus.map(o => (
@@ -114,6 +120,12 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
           ))}
         </details>
         <label className="check bl-so-sem"><input type="checkbox" checked={soSemAgenda} onChange={e => setSoSemAgenda(e.target.checked)} /> Esconder o que já tem agenda</label>
+        <span className="filtro-nivel bl-nivel" role="group" aria-label="Nível em que os filtros são aplicados" title="Vale para todos os filtros acima">
+          Aplicar filtros em
+          <span className="filtro-nivel-ops">
+            {NIVEIS_FILTRO.map(n => <button key={n.valor || 'todos'} type="button" aria-pressed={nivel === n.valor} onClick={() => setNivel(n.valor)}>{n.rotulo}</button>)}
+          </span>
+        </span>
         <button type="button" className="link bl-relatorio" disabled={!itens} onClick={relatorio}>Relatório HTML</button>
       </div>
       {erro && <p className="msg-erro">{erro}</p>}

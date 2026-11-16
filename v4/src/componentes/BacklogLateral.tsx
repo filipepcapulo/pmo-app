@@ -4,18 +4,22 @@
 // abrem o popup único de edição. O que já tem agenda em aberto fica marcado em verde ("2 agendas em aberto · próx. 05/11") e
 // pode ser escondido, para sobrar só o que ainda precisa de alocação. O filtro "GP responsável" (3.13.0) usa a regra da pílula:
 // responsável da demanda, senão o da mãe, o do projeto, o do cliente (gp_id vem do banco). "Relatório" (V13a-5, módulo 09
-// da Central) baixa o que está na tela, com os filtros, num HTML único para guardar, mandar ou imprimir.
+// da Central) baixa o que está na tela, com os filtros, num HTML único para guardar, mandar ou imprimir. Etapa e Tipo (4.11.0)
+// são os mesmos filtros da tela de Demandas, pelo mesmo cadastro de etapas; o backlog não tem mais "Origem".
 import { useEffect, useMemo, useState } from 'react';
-import { arvoreBacklog, ORIGENS, porProjeto, rotuloAgendas, statusBacklog, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
+import { arvoreBacklog, comEtapasBacklog, porProjeto, rotuloAgendas, statusBacklog, type ItemBacklog } from '../api/equipe';
 import { rotuloPrioridade } from '../api/execucao';
 import { relatorioBacklog } from '../api/relatorios';
 import { baixarRelatorioHtml } from '../util/relatorioHtml';
 import { useEdicao } from '../estado/edicao';
 import { gps, useEquipe, usePode } from '../estado/equipe';
-import { NIVEIS_FILTRO } from '../estado/filtrosLista';
+import { useEtapas } from '../estado/etapas';
+import { NIVEIS_FILTRO, SEM, TIPOS_DEMANDA } from '../estado/filtrosLista';
 import { caminhoEntidade, hashDe, type Entidade } from '../estado/rotas';
 import { Icone } from './Icone';
+import { PilulaEtapa } from './Pilulas';
 import { Resumo } from './Resumo';
+import { SelecaoMultipla } from './SelecaoMultipla';
 
 const lerFora = (k: string) => { try { return new Set<string>(JSON.parse(localStorage.getItem(k) || '[]')); } catch { return new Set<string>(); } };
 
@@ -41,6 +45,7 @@ function Linha({ item, marcado, sub, aoMarcar, aoArrastar }: {
         </label>
         <EditarDemanda id={item.id} nome={item.nome} />
       </div>
+      <PilulaEtapa reg={item} />
       <small>{item.horas > 0 ? `${item.horas} h` : ''}{item.prioridade !== 'normal' ? ` · ${rotuloPrioridade(item.prioridade)}` : ''}</small>
       {!!item.agendas && <small className="bl-agendas">{rotuloAgendas(item.agendas, item.agenda_prox)}</small>}
       {item.pedidos.map(p => <small key={p.id} className="bl-pedido">Pedido de agenda: {p.horas} h — {p.motivo}</small>)}
@@ -48,24 +53,31 @@ function Linha({ item, marcado, sub, aoMarcar, aoArrastar }: {
   );
 }
 
-export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, origemInicial, recolhido, aoRecolher }: {
+export function BacklogLateral({ itens: brutos, erro, marcados, aoMarcar, aoArrastar, recolhido, aoRecolher }: {
   itens: ItemBacklog[] | null; erro: string | null; marcados: Set<string>; aoMarcar: (id: string) => void; aoArrastar: (id: string) => void;
-  origemInicial?: OrigemBacklog; recolhido: boolean; aoRecolher: (r: boolean) => void;
+  recolhido: boolean; aoRecolher: (r: boolean) => void;
 }) {
-  const [origem, setOrigem] = useState<OrigemBacklog | ''>(origemInicial ?? '');
+  const et = useEtapas();
+  // etapa do app de cada item pelo mesmo cadastro e de/para da tela de Demandas
+  const itens = useMemo(() => (brutos ? comEtapasBacklog(brutos, et.idDe, id => et.porId.get(id)?.nome) : null), [brutos, et]);
+  const [etapas, setEtapas] = useState<string[]>([]);
+  const [tipos, setTipos] = useState<string[]>([]);
   const [texto, setTexto] = useState('');
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
-  const chaveStatus = `pmo4.backlog.status.${origemInicial ?? 'geral'}`;
+  const chaveStatus = 'pmo4.backlog.status.geral';
   const [fora, setFora] = useState(() => lerFora(chaveStatus));
   const [soSemAgenda, setSoSemAgenda] = useState(false);
   // "Aplicar filtros em": o mesmo da tela de Demandas (guardado no aparelho)
-  const chaveNivel = `pmo4.backlog.nivel.${origemInicial ?? 'geral'}`;
+  const chaveNivel = 'pmo4.backlog.nivel.geral';
   const [nivel, setNivel] = useState(() => { try { const v = localStorage.getItem(chaveNivel) ?? ''; return NIVEIS_FILTRO.some(n => n.valor === v) ? v : ''; } catch { return ''; } });
   useEffect(() => { try { localStorage.setItem(chaveNivel, nivel); } catch { /* */ } }, [nivel, chaveNivel]);
   const { lista } = useEquipe();
   const [gp, setGp] = useState('');
   useEffect(() => { try { localStorage.setItem(chaveStatus, JSON.stringify([...fora])); } catch { /* */ } }, [fora, chaveStatus]);
-  const arvore = useMemo(() => arvoreBacklog(itens ?? [], origem, texto, fora, { nivel, gp, soSemAgenda }), [itens, origem, texto, fora, soSemAgenda, gp, nivel]);
+  const arvore = useMemo(() => arvoreBacklog(itens ?? [], texto, fora, { nivel, gp, soSemAgenda, etapas, tipos }), [itens, etapas, tipos, texto, fora, soSemAgenda, gp, nivel]);
+  // as mesmas opções de Etapa da tela de Demandas: etapas ativas (ou em uso) do cadastro e "(sem etapa)"
+  const opcoesEtapa = useMemo(() => [...et.lista.filter(e => e.ativo || (itens ?? []).some(i => i.etapa_app_id === e.id)).map(e => ({ valor: e.id, rotulo: e.nome })),
+    ...((itens ?? []).some(i => !i.etapa_app_id) ? [{ valor: SEM, rotulo: '(sem etapa)' }] : [])], [et, itens]);
   // GPs possíveis + quem aparece como GP de algum item (responsável que não é GP também filtra)
   const opcoesGp = useMemo(() => {
     const ids = new Set([...gps(lista).map(m => m.id), ...(itens ?? []).map(i => i.gp_id).filter((x): x is string => !!x)]);
@@ -76,7 +88,8 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
   const visiveis = arvore.reduce((s, c) => s + c.total, 0);
   function relatorio() {
     const f = [
-      `Origem: ${ORIGENS.find(o => o.valor === origem)?.rotulo ?? 'tudo'}`,
+      etapas.length ? `Etapa: ${etapas.map(e => opcoesEtapa.find(o => o.valor === e)?.rotulo ?? e).join(', ')}` : '',
+      tipos.length ? `Tipo: ${tipos.map(t => TIPOS_DEMANDA.find(o => o.valor === t)?.rotulo ?? t).join(', ')}` : '',
       `Status: ${escolhidos.length === opcoesStatus.length ? 'todos' : escolhidos.map(o => o.rotulo).join(', ') || 'nenhum'}`,
       gp ? `GP: ${lista.find(m => m.id === gp)?.nome ?? ''}` : '', texto.trim() ? `Busca: ${texto.trim()}` : '',
       soSemAgenda ? 'Sem agenda em aberto' : '',
@@ -104,15 +117,13 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
         <button type="button" className="bl-recolher" aria-expanded aria-label="Recolher backlog" title="Recolher backlog" onClick={() => aoRecolher(true)}><Icone nome="baixo" tam={16} /></button>
       </div>
       <div className="bl-filtros">
-        <select value={origem} onChange={e => setOrigem(e.target.value as OrigemBacklog | '')} aria-label="Origem do backlog">
-          <option value="">Tudo</option>
-          {ORIGENS.map(o => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
-        </select>
+        <SelecaoMultipla rotulo="Etapa" opcoes={opcoesEtapa} sel={etapas} aoMudar={setEtapas} />
+        <SelecaoMultipla rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={tipos} aoMudar={setTipos} />
         <select value={gp} onChange={e => setGp(e.target.value)} aria-label="GP responsável">
           <option value="">GP responsável: todos</option>
           {opcoesGp.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
         </select>
-        <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Cliente, demanda ou etapa…" aria-label="Buscar no backlog" />
+        <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Buscar demanda, cliente, projeto ou etapa" aria-label="Buscar no backlog" />
         <details className="bl-status">
           <summary>Status: {escolhidos.length === opcoesStatus.length ? 'todos' : `${escolhidos.length} de ${opcoesStatus.length}`}</summary>
           {opcoesStatus.map(o => (

@@ -93,7 +93,7 @@ describe('demandas', () => {
   it('sem filtro devolve tudo, na ordem', () => expect(ids({})).toEqual(['d1', 'd2', 'd3', 'd4']));
   it('fase do projeto, etapa, tipo, prioridade, status, cliente e projeto', () => {
     expect(ids({ fases: ['P3', 'Sustentação'] })).toEqual(['d3', 'd4']);
-    expect(ids({ etapas: ['Homologação'] })).toEqual(['d1', 'd2']);   // d2 não tem etapa: vale a da mãe (como a Origem do backlog)
+    expect(ids({ etapas: ['Homologação'] })).toEqual(['d1', 'd2']);   // d2 não tem etapa: vale a da mãe (como no backlog da Agenda)
     expect(ids({ etapas: [SEM] })).toEqual(['d4']);
     expect(ids({ etapas: ['Homologação'], nivel: 'subdemanda' })).toEqual(['d1', 'd2']);
     // etapa própria vale mais que a da mãe

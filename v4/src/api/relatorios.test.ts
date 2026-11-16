@@ -23,17 +23,17 @@ describe('relatório HTML (V13a-5)', () => {
   });
   it('backlog: o que a árvore mostra, por cliente, com dias na fila, agendas e pedidos', () => {
     const itens = [
-      item({ id: 'd1', nome: 'Mãe', criado_em: '2026-11-01T10:00:00Z', horas: 4, agendas: 2, agenda_prox: '2026-11-12' }),
-      item({ id: 's1', pai_id: 'd1', pai: 'Mãe', nome: 'Filha', prioridade: 'alta', status: 'planejada',
+      item({ id: 'd1', nome: 'Mãe', etapa: 'Homologação', criado_em: '2026-11-01T10:00:00Z', horas: 4, agendas: 2, agenda_prox: '2026-11-12' }),
+      item({ id: 's1', pai_id: 'd1', pai: 'Mãe', nome: 'Filha', tipo: 'chamado', pai_etapa: 'Homologação', prioridade: 'alta', status: 'planejada',
         pedidos: [{ id: 'x', versao: 1, horas: 3, motivo: 'mais agenda', solicitante: 'A' }] }),
       item({ id: 'd2', nome: 'Fora', status: 'pausada' }),
     ];
-    const r = relatorioBacklog(arvoreBacklog(itens, '', '', new Set(['pausada'])), ['Status: x'], '2026-11-10');
+    const r = relatorioBacklog(arvoreBacklog(itens, '', new Set(['pausada'])), ['Status: x'], '2026-11-10');
     expect(r.secoes).toHaveLength(1);
     expect(r.secoes[0].titulo).toBe('Cliente');
     expect(r.secoes[0].linhas).toEqual([
-      ['P1', 'Mãe', '', 'Não iniciado', 'Normal', 'Demandas', 4, 9, '2 agendas em aberto · próx. 12/11', ''],
-      ['P1', 'Mãe', 'Filha', 'Não iniciado', 'Alta', 'Demandas', null, null, '', '3 h — mais agenda'],
+      ['P1', 'Mãe', '', 'Não iniciado', 'Normal', 'Homologação', 'Entregável', 4, 9, '2 agendas em aberto · próx. 12/11', ''],
+      ['P1', 'Mãe', 'Filha', 'Não iniciado', 'Alta', 'Homologação', 'Chamado', null, null, '', '3 h — mais agenda'],
     ]);
   });
   it('dias na fila', () => {

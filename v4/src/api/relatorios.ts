@@ -1,8 +1,9 @@
 // Relatórios HTML do backlog e das demandas (V13a-5, módulo 09 da Central: "Backlog Base" com filtro por status e
 // relatório HTML5). Montam o que a tela está mostrando — mesmos filtros, mesma ordem — e o util gera o arquivo.
-import { ORIGENS, porProjeto, rotuloAgendas, type ItemBacklog, type NoCliente } from './equipe';
+import { porProjeto, rotuloAgendas, type ItemBacklog, type NoCliente } from './equipe';
 import { rotuloPrioridade, rotuloStatusDemanda, STATUS_DEMANDA, type DemandaLinha } from './execucao';
 import { diaNum, hojeIso } from './projeto';
+import { TIPOS_DEMANDA } from '../estado/filtrosLista';
 import type { Relatorio, SecaoRelatorio } from '../util/relatorioHtml';
 
 const dataBr = (iso?: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
@@ -10,11 +11,11 @@ const dataBr = (iso?: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(
 export const diasNaFila = (criado?: string | null, hoje = hojeIso()) => (criado ? Math.max(0, diaNum(hoje) - diaNum(criado.slice(0, 10))) : null);
 const horas = (h?: number | null) => (h ? Number(h.toFixed(1)) : null);
 
-export const COLUNAS_BACKLOG = ['Projeto', 'Demanda', 'Subdemanda', 'Status', 'Prioridade', 'Origem', 'Horas', 'Dias na fila', 'Agendas', 'Pedidos de agenda'];
+export const COLUNAS_BACKLOG = ['Projeto', 'Demanda', 'Subdemanda', 'Status', 'Prioridade', 'Etapa', 'Tipo', 'Horas', 'Dias na fila', 'Agendas', 'Pedidos de agenda'];
 
 function linhaBacklog(i: ItemBacklog, projeto: string, demanda: string, hoje: string) {
   return [projeto, demanda, i.pai_id ? i.nome : '', rotuloStatusDemanda(i.status), rotuloPrioridade(i.prioridade),
-    ORIGENS.find(o => o.valor === i.origem)?.rotulo ?? i.origem, horas(i.horas), diasNaFila(i.criado_em, hoje),
+    i.etapa_nome ?? i.etapa ?? i.pai_etapa_nome ?? i.pai_etapa ?? '', TIPOS_DEMANDA.find(t => t.valor === (i.tipo || 'entregavel'))?.rotulo ?? i.tipo ?? '', horas(i.horas), diasNaFila(i.criado_em, hoje),
     rotuloAgendas(i.agendas ?? 0, i.agenda_prox), i.pedidos.map(p => `${p.horas} h — ${p.motivo}`).join('; ')];
 }
 

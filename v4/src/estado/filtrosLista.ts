@@ -147,6 +147,12 @@ export function idsDoResponsavel(lista: DemandaFiltravel[], f: Pick<FiltroDemand
 }
 
 const etapaDe = (d: DemandaFiltravel) => (d.etapa_app_id !== undefined ? d.etapa_app_id : d.etapa);
+/**
+ * Etapa para a busca por texto: o nome da etapa do app E o texto original (o de/para pode dar outro nome à etapa — ex.:
+ * "Personalização / Customização" aparece no app como "Backlog Personalização"); sem etapa própria, valem os da mãe.
+ */
+const etapasTexto = (d: DemandaFiltravel, mae?: DemandaFiltravel) =>
+  (d.etapa_nome || d.etapa ? [d.etapa_nome, d.etapa] : [mae?.etapa_nome, mae?.etapa]);
 /** `mae`: a demanda-mãe (quando está na lista) — o nome dela vale na busca por texto e a etapa dela vale (no texto e no filtro Etapa) para a subdemanda sem etapa própria, como no backlog da Agenda da Equipe. */
 function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string> | null, mae?: DemandaFiltravel): boolean {
   return (!doResp || doResp.has(d.id)) && em(f.status, statusV4(d.status)) && em(f.fases, d.fase)
@@ -156,7 +162,7 @@ function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string
     && (f.clientes.length === 0 || (!!d.cliente_id && f.clientes.includes(d.cliente_id)))
     && (f.projetos.length === 0 || (!!d.projeto_id && f.projetos.includes(d.projeto_id)))
     && (!f.atrasadas || (!!d.totais?.atrasada && !semAlerta(d)))
-    && temTexto(f.texto, d.nome, mae?.nome, d.cliente, d.projeto, d.etapa_nome ?? d.etapa ?? mae?.etapa_nome ?? mae?.etapa);
+    && temTexto(f.texto, d.nome, mae?.nome, d.cliente, d.projeto, ...etapasTexto(d, mae));
 }
 /**
  * Demandas e subdemandas que passam no filtro, na ordem recebida. A mãe de uma subdemanda que passa vem junto

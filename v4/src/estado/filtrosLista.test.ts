@@ -115,7 +115,8 @@ describe('demandas', () => {
     // o nome da etapa do app (etapa_nome) vale mais que o texto antigo
     const comNome = dem.map(d => (d.id === 'd3' ? { ...d, etapa_nome: 'Personalização / Customização' } : d));
     expect(filtrarDemandas(comNome, { ...PADRAO_DEMANDAS, texto: 'personalizacao' }).map(d => d.id)).toEqual(['d3']);
-    expect(filtrarDemandas(comNome, { ...PADRAO_DEMANDAS, texto: 'execucao' }).map(d => d.id)).toEqual([]);
+    // …mas o texto original continua valendo: o de/para pode dar outro nome à etapa
+    expect(filtrarDemandas(comNome, { ...PADRAO_DEMANDAS, texto: 'execucao' }).map(d => d.id)).toEqual(['d3']);
   });
   it('responsável: o da demanda; a mãe acompanha a subdemanda que passa; "(sem responsável)"', () => {
     expect(ids({ responsaveis: ['ana'] })).toEqual(['d1', 'd2', 'd4']);   // d2 é subdemanda da d1 (da Ana), delegada à Bia

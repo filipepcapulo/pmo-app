@@ -3,7 +3,8 @@
 // bloqueiam nada. Quem não aprova recebe sempre só os próprios pedidos.
 import { novaOperacao, rpc } from './cliente';
 import type { Gravado } from './cadastros';
-import { TIPOS_AUSENCIA, type TipoAusencia } from './equipe';
+import { faixaTarefa, segundaDe, TIPOS_AUSENCIA, type Ausencia, type TarefaGrade, type TipoAusencia } from './equipe';
+import { diaNum, somarDias } from './projeto';
 
 export type SituacaoPedido = 'pendente' | 'aprovada' | 'recusada' | 'cancelada';
 export interface PedidoAusencia {
@@ -55,4 +56,88 @@ export function erroPedido(d: { de: string; ate: string; motivo: string; parcial
 /** Dados do formulário → o que vai para o banco. */
 export function montarPedido(d: { de: string; ate: string; tipo: TipoAusencia; motivo: string; parcial: boolean; hora_ini: string; hora_fim: string }): NovoPedido {
   return { de: d.de, ate: d.parcial ? d.de : d.ate || d.de, tipo: d.tipo, motivo: d.motivo.trim(), ...(d.parcial ? { hora_ini: d.hora_ini, hora_fim: d.hora_fim } : {}) };
+}
+
+// ---------------------------------------------------------------- Gantt das ausências (4.10.0, só Admin e GP)
+// Linhas = pessoas da equipe; colunas = dias, semanas, quinzenas ou meses. Mostra as ausências aprovadas (as mesmas da
+// Agenda da equipe) e os pedidos que aguardam aprovação, e avisa quando há tarefa em aberto da pessoa no período.
+export type EscalaGantt = 'dia' | 'semana' | 'quinzena' | 'mes';
+export const ESCALAS_GANTT: { valor: EscalaGantt; rotulo: string; colunas: number; passo: number; pxDia: number }[] = [
+  { valor: 'dia', rotulo: 'Dias', colunas: 28, passo: 7, pxDia: 34 },
+  { valor: 'semana', rotulo: 'Semanas', colunas: 13, passo: 4, pxDia: 14 },
+  { valor: 'quinzena', rotulo: 'Quinzenas', colunas: 8, passo: 2, pxDia: 7 },
+  { valor: 'mes', rotulo: 'Meses', colunas: 12, passo: 3, pxDia: 3.4 },
+];
+export interface ColunaGantt { de: string; ate: string; rotulo: string; grupo: string }
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const mesDe = (iso: string, k: number) => {
+  const n = +iso.slice(0, 4) * 12 + (+iso.slice(5, 7) - 1) + k;
+  return `${Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, '0')}-01`;
+};
+const mesAno = (iso: string) => `${MESES[+iso.slice(5, 7) - 1]}/${iso.slice(2, 4)}`;
+
+/** Início da coluna que contém o dia. */
+export function inicioColuna(iso: string, e: EscalaGantt): string {
+  if (e === 'dia') return iso;
+  if (e === 'semana') return segundaDe(iso);
+  if (e === 'mes') return mesDe(iso, 0);
+  return iso.slice(0, 8) + (+iso.slice(8, 10) >= 16 ? '16' : '01');
+}
+/** Início da coluna `k` colunas depois (ou antes, com `k` negativo) da coluna que começa em `ini`. */
+export function andarColunas(ini: string, e: EscalaGantt, k: number): string {
+  if (e === 'dia') return somarDias(ini, k);
+  if (e === 'semana') return somarDias(ini, 7 * k);
+  if (e === 'mes') return mesDe(ini, k);
+  const q = (+ini.slice(8, 10) >= 16 ? 1 : 0) + k;
+  return mesDe(ini, Math.floor(q / 2)).slice(0, 8) + (((q % 2) + 2) % 2 ? '16' : '01');
+}
+/** `n` colunas a partir da coluna que contém `inicio`. Quinzena = 1–15 e 16–fim do mês. */
+export function colunasGantt(inicio: string, e: EscalaGantt, n: number): ColunaGantt[] {
+  const out: ColunaGantt[] = [];
+  let de = inicioColuna(inicio, e);
+  for (let i = 0; i < n; i++) {
+    const prox = andarColunas(de, e, 1), ate = somarDias(prox, -1);
+    const dd = de.slice(8, 10);
+    out.push({
+      de, ate, grupo: e === 'mes' ? de.slice(0, 4) : mesAno(de),
+      rotulo: e === 'dia' ? dd : e === 'semana' ? `${dd}/${de.slice(5, 7)}` : e === 'quinzena' ? `${dd}–${ate.slice(8, 10)}` : MESES[+de.slice(5, 7) - 1],
+    });
+    de = prox;
+  }
+  return out;
+}
+
+export interface BarraAusencia {
+  chave: string; consultor_id: string; de: string; ate: string; tipo: string; motivo: string | null;
+  hora_ini: string | null; hora_fim: string | null; pendente: boolean;
+  /** tarefas em aberto (não iniciada / em andamento) da pessoa dentro da ausência */
+  conflitos: TarefaGrade[];
+}
+const ABERTA = new Set(['planejada', 'em_andamento']);
+const hNum = (h: string) => Number(h.slice(0, 2)) + Number(h.slice(3, 5)) / 60;
+/** A tarefa conflita com a ausência? Ausência de parte do dia só conflita se os horários se cruzam (sem horário = conflita). */
+export function conflita(a: Pick<BarraAusencia, 'consultor_id' | 'de' | 'ate' | 'hora_ini' | 'hora_fim'>, t: TarefaGrade): boolean {
+  if (t.consultor_id !== a.consultor_id || !ABERTA.has(t.status) || t.data < a.de || t.data > a.ate) return false;
+  if (!a.hora_ini || !a.hora_fim) return true;
+  const f = faixaTarefa(t);
+  return !f || (f[0] < hNum(a.hora_fim) && f[1] > hNum(a.hora_ini));
+}
+/** Junta as ausências aprovadas (sem repetir a que veio em mais de uma janela) e os pedidos pendentes, já com os conflitos. */
+export function barrasAusencia(aprovadas: Ausencia[], pendentes: PedidoAusencia[], tarefas: TarefaGrade[]): BarraAusencia[] {
+  const m = new Map<string, BarraAusencia>();
+  const por = (b: Omit<BarraAusencia, 'conflitos'>) => { if (!m.has(b.chave)) m.set(b.chave, { ...b, conflitos: [] }); };
+  for (const a of aprovadas) por({ chave: ['a', a.id, a.consultor_id, a.de, a.ate, a.hora_ini ?? ''].join('|'), consultor_id: a.consultor_id, de: a.de, ate: a.ate,
+    tipo: a.tipo, motivo: a.motivo ?? null, hora_ini: a.hora_ini ?? null, hora_fim: a.hora_fim ?? null, pendente: false });
+  for (const p of pendentes) if (p.situacao === 'pendente') por({ chave: 'p|' + p.id, consultor_id: p.consultor_id, de: p.de, ate: p.ate, tipo: p.tipo, motivo: p.motivo,
+    hora_ini: p.hora_ini, hora_fim: p.hora_fim, pendente: true });
+  const vistos = new Map<string, TarefaGrade>(tarefas.map(t => [t.id, t]));
+  const l = [...m.values()].sort((a, b) => a.de.localeCompare(b.de));
+  for (const b of l) b.conflitos = [...vistos.values()].filter(t => conflita(b, t)).sort((x, y) => x.data.localeCompare(y.data));
+  return l;
+}
+/** Posição da barra na linha (em dias a partir do início da janela), cortada na janela; null = fora dela. */
+export function posicaoBarra(b: Pick<BarraAusencia, 'de' | 'ate'>, de: string, ate: string): { inicio: number; dias: number } | null {
+  if (b.ate < de || b.de > ate) return null;
+  const i = Math.max(diaNum(b.de), diaNum(de)), f = Math.min(diaNum(b.ate), diaNum(ate));
+  return { inicio: i - diaNum(de), dias: f - i + 1 };
 }

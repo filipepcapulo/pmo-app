@@ -8,6 +8,7 @@ import { traduzirErro } from '../api/mensagens';
 import { hojeIso } from '../api/projeto';
 import { Botao } from '../componentes/Botao';
 import { Campo, Formulario } from '../componentes/Campo';
+import { GanttAusencias } from '../componentes/GanttAusencias';
 import { Popup } from '../componentes/Popup';
 import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
@@ -91,7 +92,7 @@ function Decidir({ p, aprovar, aoFechar, aoGravar }: { p: PedidoAusencia; aprova
 export function Ausencias() {
   const esc = useSessao().eu!.escritorio_id!;
   const avisar = useToast();
-  const [aba, setAba] = useState<'meus' | 'aprovar'>('meus');
+  const [aba, setAba] = useState<'meus' | 'aprovar' | 'gantt'>('meus');
   const [soPendentes, setSoPendentes] = useState(true);
   const [novo, setNovo] = useState(false);
   const [acao, setAcao] = useState<{ p: PedidoAusencia; aprovar: boolean } | null>(null);
@@ -99,6 +100,7 @@ export function Ausencias() {
   const c = useCarga(() => ausencias.pedidos(esc, { todos, ...(todos && soPendentes ? { situacao: 'pendente' as const } : {}) }), [esc, todos, soPendentes]);
   const d = c.dados;
   const linhas = d?.linhas ?? [];
+  const gantt = aba === 'gantt' && !!d?.pode_aprovar; // só Admin e GP (quem aprova ausências)
 
   async function cancelar(p: PedidoAusencia) {
     if (!window.confirm(`Cancelar o pedido de ${periodoPedido(p)}?`)) return;
@@ -117,6 +119,7 @@ export function Ausencias() {
         <div className="segmentos" role="tablist" aria-label="Pedidos de ausência">
           <button type="button" role="tab" aria-selected={aba === 'meus'} onClick={() => setAba('meus')}>Minhas solicitações</button>
           <button type="button" role="tab" aria-selected={aba === 'aprovar'} onClick={() => setAba('aprovar')}>Para aprovar{d.pendentes ? ` (${d.pendentes})` : ''}</button>
+          <button type="button" role="tab" aria-selected={aba === 'gantt'} onClick={() => setAba('gantt')}>Gantt da equipe</button>
         </div>
       )}
       {todos && <div className="barra-filtros">
@@ -124,7 +127,8 @@ export function Ausencias() {
       </div>}
       {c.erro && <p className="msg-erro" role="alert">{c.erro}</p>}
       {c.carregando && !d && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}
-      {d && (linhas.length === 0
+      {gantt && <GanttAusencias />}
+      {d && !gantt && (linhas.length === 0
         ? <p className="ajuda">{todos ? 'Nenhum pedido de ausência para aprovar.' : 'Você ainda não pediu nenhuma ausência.'}</p>
         : (
           <div className="tabela-caixa"><table className="tabela" aria-label={todos ? 'Pedidos de ausência da equipe' : 'Minhas solicitações de ausência'}>

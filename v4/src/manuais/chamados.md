@@ -38,7 +38,7 @@ Toque em **+ Chamado**. O formulário tem quatro partes; preencha tudo o que a t
 - **Título (resumo em uma linha)**: mínimo de 10 caracteres.
 - **Tipo de solicitação**: Erro / incidente, Dúvida / orientação, Configuração / parametrização, Melhoria / personalização, Relatório / dashboard ou Integração / importação.
 - **Ambiente**: Produção, Teste / homologação ou Produção e teste.
-- **Etapa**: Atendimento avulso (Backlog Base) ou Personalização / Customização (Backlog Desenvolvimento). O app sugere pela escolha do tipo.
+- **Etapa**: Atendimento avulso (Backlog Consultores) ou Personalização / Customização (Backlog Personalização). O app sugere pela escolha do tipo.
 - **Descrição detalhada**: mínimo de 50 caracteres (o contador aparece abaixo).
 - **Onde ocorre / passos para reproduzir**: obrigatório quando o tipo é erro.
 - **Resultado esperado**.
@@ -87,7 +87,7 @@ Nas listas, a coluna **SLA** mostra a 1ª resposta enquanto ninguém respondeu; 
 
 - Busque por número, cliente, assunto, ticket, solicitante ou texto de interação e toque em **Buscar**.
 - **Situação**: **Abertos** (padrão), **SLA vencido**, **Todos** ou uma situação específica.
-- **Prioridade** e **Fila** (Backlog Base ou Desenvolvimento).
+- **Prioridade** e **Fila** (Backlog Consultores ou Backlog Personalização).
 - **Por página**: escolha quantos chamados ver por vez e use ‹ › para navegar.
 
 Toque no número ou no assunto para abrir a ficha. "com agenda" indica que o chamado já tem tarefa.

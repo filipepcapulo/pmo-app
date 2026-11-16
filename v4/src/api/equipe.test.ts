@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreBacklog, filtrarBacklog, blocosDia, colunasKanban, doGp, filtrarKanban, lerPrefKanban, opcoesKanban, faixaEscala, marcasEscala, PX_HORA, rotuloAgendas, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, rotuloAgenda, segundaDe, statusBacklog, turnoDe,
+import { arvoreBacklog, comEtapasBacklog, filtrarBacklog, blocosDia, colunasKanban, doGp, filtrarKanban, lerPrefKanban, opcoesKanban, faixaEscala, marcasEscala, PX_HORA, rotuloAgendas, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, rotuloAgenda, segundaDe, statusBacklog, turnoDe,
   type AgendaAberta, type Ausencia, type ItemBacklog, type TarefaGrade } from './equipe';
 
 const back = (o: Partial<ItemBacklog>): ItemBacklog => ({ id: 'd1', pai_id: null, pai: null, nome: 'D1', prioridade: 'normal', status: 'backlog', cliente_id: 'c1',
@@ -51,15 +51,49 @@ describe('backlog', () => {
     expect(sem.nome).toBe('Só a mãe');
   });
   it('cliente com pedido de agenda vem primeiro', () => expect(arvoreBacklog(itens)[0].nome).toBe('Zeta'));
-  it('filtra por origem e texto', () => {
-    expect(arvoreBacklog(itens, 'personalizacao').flatMap(c => c.demandas).map(d => d.id)).toEqual(['d2']);
-    expect(arvoreBacklog(itens, '', 'zeta')).toHaveLength(1);
+  it('filtra por texto', () => expect(arvoreBacklog(itens, 'zeta')).toHaveLength(1));
+  it('Etapa e Tipo: os mesmos filtros da tela de Demandas, pelo cadastro de etapas (de/para)', () => {
+    // cadastro: e_pers recebe o texto "Personalização / Customização"; e_av recebe "Atendimento avulso"; "Solta" não tem vínculo
+    const depara: Record<string, string> = { 'Personalização / Customização': 'e_pers', 'Atendimento avulso': 'e_av' };
+    const nomes: Record<string, string> = { e_pers: 'Personalização / Customização', e_av: 'Atendimento Avulso', e_hom: 'Homologação' };
+    const idDe = (r: { etapa_id?: string | null; etapa?: string | null }) => r.etapa_id ?? depara[r.etapa ?? ''] ?? null;
+    const its = comEtapasBacklog([
+      back({ id: 'm', nome: 'Mãe', tipo: 'entregavel', etapa: null, etapa_id: 'e_hom' }),                                   // escolhida no app
+      back({ id: 'f', pai_id: 'm', pai: 'Mãe', nome: 'Filha sem etapa', tipo: 'entregavel', etapa: null, pai_etapa_id: 'e_hom' }),
+      back({ id: 'ch', pai_id: 'av', pai: 'Atendimento Avulso da Base', nome: 'Chamado de personalização', tipo: 'chamado', origem: 'backlog_base',
+        etapa: 'Personalização / Customização', pai_etapa: 'Atendimento avulso' }),
+      back({ id: 'cb', pai_id: 'av', pai: 'Atendimento Avulso da Base', nome: 'Chamado da base', tipo: 'chamado', origem: 'backlog_base', etapa: null, pai_etapa: 'Atendimento avulso' }),
+      back({ id: 'pa', nome: 'Plano', tipo: 'plano_acao', etapa: 'Solta' }),
+      back({ id: 'se', nome: 'Sem etapa', tipo: null, etapa: null }),
+    ], idDe, id => nomes[id]);
+    const ids = (extra: Parameters<typeof filtrarBacklog>[3], texto = '') => filtrarBacklog(its, texto, new Set(), extra).map(i => i.id);
+    // o chamado com etapa Personalização entra na etapa dele, não na da mãe nem "na base"
+    expect(ids({ etapas: ['e_pers'] })).toEqual(['ch']);
+    expect(ids({ etapas: ['e_av'] })).toEqual(['cb']);                       // sem etapa própria vale a da mãe (mesmo com a mãe fora do backlog)
+    expect(ids({ etapas: ['e_hom'] })).toEqual(['m', 'f']);
+    expect(ids({ etapas: ['-'] })).toEqual(['pa', 'se']);                    // texto sem vínculo = (sem etapa), como em Demandas
+    expect(ids({ etapas: ['e_pers', 'e_av'] })).toEqual(['ch', 'cb']);
+    expect(ids({ tipos: ['chamado'] })).toEqual(['ch', 'cb']);
+    expect(ids({ tipos: ['entregavel'] })).toEqual(['m', 'f', 'se']);        // sem tipo = Entregável
+    expect(ids({ tipos: ['chamado'], etapas: ['e_pers'] })).toEqual(['ch']);
+    // texto: nome da etapa do app e texto original; sem etapa própria, os da mãe
+    expect(ids({}, 'personalizacao')).toEqual(['ch']);
+    expect(ids({}, 'homologacao')).toEqual(['m', 'f']);
+    expect(ids({}, 'solta')).toEqual(['pa']);
+    expect(its.find(i => i.id === 'ch')).toMatchObject({ etapa_app_id: 'e_pers', etapa_nome: 'Personalização / Customização', pai_etapa_app_id: 'e_av' });
+  });
+  it('banco antes da 0099 (sem tipo e etapa): a origem antiga vira etapa Personalização e tipo Chamado', () => {
+    const idDe = (r: { etapa?: string | null }) => (r.etapa === 'Personalização / Customização' ? 'e_pers' : null);
+    const its = comEtapasBacklog([back({ id: 'a' }), back({ id: 'b', origem: 'personalizacao' }), back({ id: 'c', origem: 'backlog_base' })], idDe, () => 'Personalização / Customização');
+    expect(filtrarBacklog(its, '', new Set(), { etapas: ['e_pers'] }).map(i => i.id)).toEqual(['b']);
+    expect(filtrarBacklog(its, '', new Set(), { tipos: ['chamado'] }).map(i => i.id)).toEqual(['c']);
+    expect(filtrarBacklog(its, 'personalizacao').map(i => i.id)).toEqual(['b']);
   });
   it('nível dos filtros, igual ao da tela de Demandas: demanda traz todas as subdemandas; subdemanda só as que passam', () => {
     const its = [back({ id: 'm', nome: 'Fiscal', gp_id: 'g1' }), back({ id: 'f1', pai_id: 'm', pai: 'Fiscal', nome: 'Notas', gp_id: 'g2', agendas: 1 }),
       back({ id: 'f2', pai_id: 'm', pai: 'Fiscal', nome: 'Livros', gp_id: 'g1', status: 'pausada' }), back({ id: 'o', nome: 'Outra', gp_id: 'g2' }),
       back({ id: 'orf', pai_id: 'fora', pai: 'Mãe fora', nome: 'Órfã', gp_id: 'g1' })];
-    const idsDe = (texto: string, extra: Parameters<typeof filtrarBacklog>[4], fora = new Set<string>()) => filtrarBacklog(its, '', texto, fora, extra).map(i => i.id);
+    const idsDe = (texto: string, extra: Parameters<typeof filtrarBacklog>[3], fora = new Set<string>()) => filtrarBacklog(its, texto, fora, extra).map(i => i.id);
     expect(idsDe('', {})).toEqual(['m', 'f1', 'f2', 'o', 'orf']);
     // todos os níveis: cada item por si (a subdemanda acha pelo nome da mãe)
     expect(idsDe('fiscal', {})).toEqual(['m', 'f1', 'f2']);
@@ -74,18 +108,18 @@ describe('backlog', () => {
     expect(idsDe('', { gp: 'g1', nivel: 'subdemanda' })).toEqual(['f2']);
     expect(idsDe('', { gp: 'g2', nivel: 'subdemanda' })).toEqual(['f1']);
     expect(idsDe('', { soSemAgenda: true, nivel: 'subdemanda' }, new Set(['pausada']))).toEqual([]);
-    const a = arvoreBacklog(its, '', '', new Set(), { gp: 'g2', nivel: 'subdemanda' });
+    const a = arvoreBacklog(its, '', new Set(), { gp: 'g2', nivel: 'subdemanda' });
     expect(a[0].demandas[0]).toMatchObject({ id: 'm', nome: 'Fiscal', item: null });
     expect(a[0].demandas[0].subs.map(x => x.id)).toEqual(['f1']);
   });
   it('texto: a mesma busca da tela de Demandas — sem acento, por palavras, com a mãe e a etapa', () => {
-    const idsDe = (t: string) => arvoreBacklog(itens, '', t).flatMap(c => c.demandas.flatMap(d => [...(d.item ? [d.item.id] : []), ...d.subs.map(x => x.id)]));
+    const idsDe = (t: string) => arvoreBacklog(comEtapasBacklog(itens, () => null, () => null), t).flatMap(c => c.demandas.flatMap(d => [...(d.item ? [d.item.id] : []), ...d.subs.map(x => x.id)]));
     expect(idsDe('so a mae')).toEqual(['s2']);                 // sem acento e pelo nome da mãe
     expect(idsDe('SÓ MÃE')).toEqual(['s2']);                   // palavras soltas
-    expect(idsDe('personalização')).toEqual(['s2']);           // etapa Personalização (origem do banco)
+    expect(idsDe('personalização')).toEqual(['s2']);           // etapa Personalização (banco antes da 0099)
     expect(idsDe('personalizacao')).toEqual(['s2']);
     expect(idsDe('pedido zeta')).toEqual(['x']);               // palavras em campos diferentes
-    expect(arvoreBacklog([back({ id: 'e', nome: 'Layout', etapa: 'Homologação' })], '', 'homologacao')).toHaveLength(1);
+    expect(arvoreBacklog([back({ id: 'e', nome: 'Layout', etapa: 'Homologação' })], 'homologacao')).toHaveLength(1);
   });
 });
 
@@ -151,12 +185,12 @@ describe('Kanban', () => {
 });
 
 describe('backlog de chamados', () => {
-  it('Backlog Base ordena por prioridade e antiguidade, inclusive entre clientes', () => {
+  it('só chamados (Tipo = Chamado) ordena por prioridade e antiguidade, inclusive entre clientes', () => {
     const a = arvoreBacklog([
-      back({ id: 'n', nome: 'Normal velho', origem: 'backlog_base', prioridade: 'normal', criado_em: '2026-01-01', cliente_id: 'c1', cliente: 'Almont' }),
-      back({ id: 'u2', nome: 'Urgente novo', origem: 'backlog_base', prioridade: 'urgente', criado_em: '2026-10-02', cliente_id: 'c2', cliente: 'Zeta' }),
-      back({ id: 'u1', nome: 'Urgente velho', origem: 'backlog_base', prioridade: 'urgente', criado_em: '2026-10-01', cliente_id: 'c2', cliente: 'Zeta' }),
-    ], 'backlog_base');
+      back({ id: 'n', nome: 'Normal velho', tipo: 'chamado', prioridade: 'normal', criado_em: '2026-01-01', cliente_id: 'c1', cliente: 'Almont' }),
+      back({ id: 'u2', nome: 'Urgente novo', tipo: 'chamado', prioridade: 'urgente', criado_em: '2026-10-02', cliente_id: 'c2', cliente: 'Zeta' }),
+      back({ id: 'u1', nome: 'Urgente velho', tipo: 'chamado', prioridade: 'urgente', criado_em: '2026-10-01', cliente_id: 'c2', cliente: 'Zeta' }),
+    ], '', new Set(), { tipos: ['chamado'] });
     expect(a.map(c => c.nome)).toEqual(['Zeta', 'Almont']);
     expect(a[0].demandas.map(d => d.nome)).toEqual(['Urgente velho', 'Urgente novo']);
   });
@@ -194,7 +228,7 @@ describe('agenda como no 2.x', () => {
     const it0 = { id: 'a', pai_id: null, pai: null, nome: 'A', prioridade: 'normal', status: 'planejada', cliente_id: 'c', cliente: 'C', projeto_id: 'p', projeto: 'P', origem: 'demanda', horas: 0, pedidos: [] } as ItemBacklog;
     const itens = [it0, { ...it0, id: 'b', status: 'backlog' }, { ...it0, id: 'c', status: 'backlog' }];
     expect(statusBacklog(itens).map(s => [s.valor, s.total])).toEqual([['backlog', 2], ['planejada', 1]]);
-    expect(arvoreBacklog(itens, '', '', new Set(['backlog']))[0].total).toBe(1);
+    expect(arvoreBacklog(itens, '', new Set(['backlog']))[0].total).toBe(1);
   });
 });
 

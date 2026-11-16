@@ -4,6 +4,7 @@ import { novaOperacao, rpc } from './cliente';
 import { STATUS_DEMANDA, type Autoria } from './execucao';
 import { diaNum, hojeIso, somarDias } from './projeto';
 import { temTexto } from '../estado/filtro';
+import { SEM } from '../estado/filtrosLista';
 
 // ---------------------------------------------------------------- tipos
 export interface TarefaGrade {
@@ -24,17 +25,20 @@ export interface Ausencia {
 }
 export interface Grade { tarefas: TarefaGrade[]; ausencias: Ausencia[] }
 export type OrigemBacklog = 'demanda' | 'backlog_base' | 'personalizacao';
-export const ORIGENS: { valor: OrigemBacklog; rotulo: string }[] = [
-  { valor: 'demanda', rotulo: 'Demandas' }, { valor: 'backlog_base', rotulo: 'Backlog Base' }, { valor: 'personalizacao', rotulo: 'Personalização' },
-];
-/** O banco marca `origem: 'personalizacao'` pela etapa que começa com "Personaliza"; na busca por texto vale este nome. */
+/**
+ * `origem` é a classificação antiga do banco (pelo texto cru da etapa). A tela não fala mais em origem: o backlog filtra por
+ * Etapa e Tipo, como a tela de Demandas (4.11.0). Só serve de reserva enquanto o banco não manda `tipo` e `etapa` (antes da
+ * 0099): 'personalizacao' vale esta etapa e 'backlog_base' vale o tipo Chamado.
+ */
 const ETAPA_PERSONALIZACAO = 'Personalização / Customização';
 export interface PedidoBacklog { id: string; versao: number; horas: number; motivo: string; solicitante: string }
 export interface ItemBacklog {
   id: string; pai_id: string | null; pai: string | null; nome: string; prioridade: string; status: string; cliente_id: string; cliente: string;
   projeto_id: string; projeto: string; origem: OrigemBacklog; horas: number; pedidos: PedidoBacklog[]; criado_em?: string;
-  /** Etapa (própria ou da mãe), quando o banco manda; entra na busca por texto. */
-  etapa?: string | null;
+  /** Tipo e etapa (texto e a escolhida no app) do item e a etapa da mãe: os mesmos campos da tela de Demandas (0099). */
+  tipo?: string | null; etapa?: string | null; etapa_id?: string | null; pai_etapa?: string | null; pai_etapa_id?: string | null;
+  /** A tela preenche (comEtapasBacklog): etapa do app, id e nome, do item e da mãe, pelo cadastro de etapas e o de/para. */
+  etapa_app_id?: string | null; etapa_nome?: string | null; pai_etapa_app_id?: string | null; pai_etapa_nome?: string | null;
   /** Agendas em aberto (planejada/em andamento, qualquer data) do item (com as das subdemandas) e da demanda-mãe; próxima data futura. */
   agendas?: number; agendas_pai?: number | null; agenda_prox?: string | null;
   /** GP pela regra da pílula (0047): responsável, senão o da mãe, o do projeto, o do cliente. */
@@ -85,21 +89,45 @@ export interface NoDemanda { id: string; nome: string; projeto_id: string; proje
 export interface NoProjeto { id: string; nome: string; demandas: NoDemanda[] }
 export interface NoCliente { id: string; nome: string; demandas: NoDemanda[]; total: number; pedidos: number }
 const RANK_PRIORIDADE = ['urgente', 'alta', 'normal', 'baixa'];
-/** Filtros do backlog além da origem, do texto e do status. `nivel`: o mesmo "Aplicar filtros em" da tela de Demandas. */
-export interface FiltroBacklogExtra { nivel?: string; gp?: string; soSemAgenda?: boolean }
 /**
- * Itens do backlog que passam nos filtros. Texto: a mesma regra da tela de Demandas (sem acento, por palavras; nome, mãe,
- * cliente, projeto e etapa). Nível, igual ao de Demandas e valendo para TODOS os filtros: '' (demandas e subdemandas, cada
+ * Filtros do backlog além do texto e do status. `etapas` e `tipos`: os mesmos filtros Etapa e Tipo da tela de Demandas
+ * (lista vazia = todos; SEM = sem etapa). `nivel`: o mesmo "Aplicar filtros em" de lá.
+ */
+export interface FiltroBacklogExtra { nivel?: string; gp?: string; soSemAgenda?: boolean; etapas?: readonly string[]; tipos?: readonly string[] }
+type RegEtapa = { etapa_id?: string | null; etapa?: string | null };
+/**
+ * Põe em cada item a etapa do app (dele e da mãe) pelo mesmo cadastro e de/para que a tela de Demandas usa — é o que faz as
+ * duas telas falarem a mesma língua. Banco antes da 0099 (sem `tipo`): a etapa e o tipo saem da `origem` antiga.
+ */
+export function comEtapasBacklog(itens: ItemBacklog[], idDe: (r: RegEtapa) => string | null, nomeDe: (id: string) => string | null | undefined): ItemBacklog[] {
+  return itens.map(i => {
+    const antigo = i.tipo === undefined;
+    const tipo = antigo ? (i.origem === 'backlog_base' ? 'chamado' : 'entregavel') : i.tipo || 'entregavel';
+    const etapa = antigo ? (i.origem === 'personalizacao' ? ETAPA_PERSONALIZACAO : null) : i.etapa ?? null;
+    const a = idDe({ etapa_id: i.etapa_id, etapa }), p = idDe({ etapa_id: i.pai_etapa_id, etapa: i.pai_etapa });
+    return { ...i, tipo, etapa, etapa_app_id: a, etapa_nome: (a && nomeDe(a)) || etapa,
+      pai_etapa_app_id: p, pai_etapa_nome: (p && nomeDe(p)) || i.pai_etapa || null };
+  });
+}
+/** Etapa para o filtro: a do app quando a tela preencheu, senão o texto — como em filtrosLista (etapaDe). */
+const etapaItem = (i: ItemBacklog) => (i.etapa_app_id !== undefined ? i.etapa_app_id : i.etapa);
+const etapaMae = (i: ItemBacklog) => (i.pai_etapa_app_id !== undefined ? i.pai_etapa_app_id : i.pai_etapa);
+/**
+ * Itens do backlog que passam nos filtros, pelas MESMAS regras da tela de Demandas. Texto: sem acento, por palavras; nome,
+ * mãe, cliente, projeto e etapa (nome da etapa do app e texto original). Etapa: a do item; sem etapa própria vale a da mãe.
+ * Tipo: o do próprio item (sem tipo = Entregável). Nível, valendo para TODOS os filtros: '' (demandas e subdemandas, cada
  * item por si), 'demanda' (a demanda que passa vem com todas as subdemandas) ou 'subdemanda' (só as subdemandas que passam;
  * a mãe fica de título). Subdemanda cuja mãe não está no backlog conta como demanda, como lá.
  */
-export function filtrarBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = '', statusFora: ReadonlySet<string> = new Set(),
-  { nivel = '', gp = '', soSemAgenda = false }: FiltroBacklogExtra = {}): ItemBacklog[] {
+export function filtrarBacklog(itens: ItemBacklog[], texto = '', statusFora: ReadonlySet<string> = new Set(),
+  { nivel = '', gp = '', soSemAgenda = false, etapas = [], tipos = [] }: FiltroBacklogExtra = {}): ItemBacklog[] {
   const ids = new Set(itens.map(i => i.id));
   const ehSub = (i: ItemBacklog) => !!i.pai_id && ids.has(i.pai_id);
-  const passa = (i: ItemBacklog) => !statusFora.has(i.status) && (!origem || i.origem === origem) && (!gp || i.gp_id === gp)
+  const passa = (i: ItemBacklog) => !statusFora.has(i.status) && (!gp || i.gp_id === gp)
+    && (etapas.length === 0 || etapas.includes(etapaItem(i) || etapaMae(i) || SEM))
+    && (tipos.length === 0 || tipos.includes(i.tipo || 'entregavel'))
     && (!soSemAgenda || !i.agendas)
-    && temTexto(texto, i.nome, i.pai, i.cliente, i.projeto, i.etapa ?? (i.origem === 'personalizacao' ? ETAPA_PERSONALIZACAO : null));
+    && temTexto(texto, i.nome, i.pai, i.cliente, i.projeto, ...(i.etapa_nome || i.etapa ? [i.etapa_nome, i.etapa] : [i.pai_etapa_nome, i.pai_etapa]));
   if (nivel === 'demanda') {
     const maes = new Set(itens.filter(i => !ehSub(i) && passa(i)).map(i => i.id));
     return itens.filter(i => maes.has(i.id) || (!!i.pai_id && maes.has(i.pai_id)));
@@ -107,8 +135,8 @@ export function filtrarBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' 
   if (nivel === 'subdemanda') return itens.filter(i => ehSub(i) && passa(i));
   return itens.filter(passa);
 }
-export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = '', statusFora: ReadonlySet<string> = new Set(), extra: FiltroBacklogExtra = {}): NoCliente[] {
-  const vis = filtrarBacklog(itens, origem, texto, statusFora, extra);
+export function arvoreBacklog(itens: ItemBacklog[], texto = '', statusFora: ReadonlySet<string> = new Set(), extra: FiltroBacklogExtra = {}): NoCliente[] {
+  const vis = filtrarBacklog(itens, texto, statusFora, extra);
   const clientes = new Map<string, NoCliente>();
   for (const i of vis) {
     const c = clientes.get(i.cliente_id) ?? { id: i.cliente_id, nome: i.cliente, demandas: [], total: 0, pedidos: 0 };
@@ -123,8 +151,8 @@ export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' =
     n.agendas = Math.max(n.agendas, (i.pai_id ? i.agendas_pai : i.agendas) ?? 0);
   }
   const lista = [...clientes.values()];
-  // chamados (Backlog Base): prioridade × antiguidade, inclusive entre clientes
-  if (origem === 'backlog_base') {
+  // só chamados (filtro Tipo = Chamado): prioridade × antiguidade, inclusive entre clientes
+  if (extra.tipos?.length === 1 && extra.tipos[0] === 'chamado') {
     const ordem = (n: NoDemanda) => n.item ?? n.subs[0];
     const compara = (a: NoDemanda, b: NoDemanda) => {
       const x = ordem(a), y = ordem(b);

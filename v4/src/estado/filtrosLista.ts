@@ -156,7 +156,7 @@ const etapasTexto = (d: DemandaFiltravel, mae?: DemandaFiltravel) =>
 /** `mae`: a demanda-mãe (quando está na lista) — o nome dela vale na busca por texto e a etapa dela vale (no texto e no filtro Etapa) para a subdemanda sem etapa própria, como no backlog da Agenda da Equipe. */
 function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string> | null, mae?: DemandaFiltravel): boolean {
   return (!doResp || doResp.has(d.id)) && em(f.status, statusV4(d.status)) && em(f.fases, d.fase)
-    && em(f.etapas, etapaDe(d) || (mae ? etapaDe(mae) : null))   // sem etapa própria vale a da mãe (como a Origem do backlog)
+    && em(f.etapas, etapaDe(d) || (mae ? etapaDe(mae) : null))   // sem etapa própria vale a da mãe (como no backlog da Agenda)
     && (f.tipos.length === 0 || f.tipos.includes(d.tipo ?? 'entregavel'))
     && (f.prioridades.length === 0 || f.prioridades.includes(d.prioridade ?? 'normal'))
     && (f.clientes.length === 0 || (!!d.cliente_id && f.clientes.includes(d.cliente_id)))

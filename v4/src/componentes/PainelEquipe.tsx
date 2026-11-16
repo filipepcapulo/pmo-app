@@ -2,7 +2,7 @@
 // único de tarefa; vários abrem a alocação em lote (uma tarefa por demanda). Pedido de agenda do item alocado fica atendido.
 // No Kanban não há dia: a alocação sugere hoje (no popup único dá para trocar a data).
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { equipe, TIPOS_AUSENCIA, type Ausencia, type ItemBacklog, type OrigemBacklog } from '../api/equipe';
+import { equipe, TIPOS_AUSENCIA, type Ausencia, type ItemBacklog } from '../api/equipe';
 import { exec, MODALIDADES, PERIODOS } from '../api/execucao';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
@@ -99,7 +99,7 @@ function FormAusencia({ alvo, aoFechar, aoGravar }: { alvo: Partial<Ausencia>; a
   );
 }
 
-export function PainelEquipe({ origemInicial, vista = 'grade' }: { origemInicial?: OrigemBacklog; vista?: 'grade' | 'kanban' }) {
+export function PainelEquipe({ vista = 'grade' }: { vista?: 'grade' | 'kanban' }) {
   const esc = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
   const avisar = useToast();
@@ -133,7 +133,7 @@ export function PainelEquipe({ origemInicial, vista = 'grade' }: { origemInicial
   };
   return (
     <div className={`painel-equipe${semBacklog ? ' sem-backlog' : ''}`}>
-      <BacklogLateral itens={b.dados} erro={b.erro} marcados={marcados} origemInicial={origemInicial} recolhido={semBacklog} aoRecolher={recolher} aoArrastar={id => { arrastado.current = id; }}
+      <BacklogLateral itens={b.dados} erro={b.erro} marcados={marcados} recolhido={semBacklog} aoRecolher={recolher} aoArrastar={id => { arrastado.current = id; }}
         aoMarcar={id => setMarcados(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
       {vista === 'kanban'
         ? <KanbanEquipe backlogMarcado={marcados.size > 0} aoSoltarBacklog={soltar} />

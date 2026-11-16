@@ -90,13 +90,15 @@ Lista o que há para agendar, em Cliente › Projeto › Demanda › Subdemanda.
 
 | Controle | O que faz |
 | --- | --- |
-| Origem | **Tudo**, **Demandas**, **Backlog Base** ou **Personalização**. |
+| **Etapa** | As mesmas etapas da tela de Demandas (Geral › Etapas). Marque uma ou várias. Subdemanda sem etapa própria vale a da demanda mãe. |
+| **Tipo** | **Entregável**, **Plano de ação** ou **Chamado**, como em Demandas. Só **Chamado** marcado ordena por prioridade e antiguidade. |
 | **GP responsável** | Mostra só os itens de um GP (o da demanda; se não houver, o da demanda mãe, do projeto ou do cliente). |
-| **Cliente ou demanda…** | Busca por texto; com busca, tudo abre. |
+| **Buscar demanda, cliente, projeto ou etapa** | Busca por texto, a mesma de Demandas; com busca, tudo abre. |
 | **Status** | Marque quais status aparecem. Fica guardado neste navegador. |
 | **Esconder o que já tem agenda** | Deixa só o que ainda não tem agenda em aberto. |
 | **Relatório HTML** | Baixa o backlog como está na tela, com os filtros. |
 
+- Pílula colorida abaixo do nome: a **etapa** do item, com o mesmo nome e cor da tela de Demandas.
 - Faixa **verde** na borda: já tem agenda em aberto ("2 agendas em aberto · próx. 05/11").
 - Faixa **laranja**: tem pedido de mais agenda ("Pedido de agenda: X h — motivo"). O cliente mostra "N pedido(s)".
 - O **lápis** do cliente e do projeto abre a tela deles; o da demanda abre a edição.
@@ -153,6 +155,6 @@ Em **Execução › Ausências** qualquer pessoa solicita a própria ausência. 
 | "Informe a pessoa e o período." | Na ausência, faltou a pessoa ou as datas (o fim não pode ser antes do início). |
 | "Informe a hora de início e a de fim (fim depois do início)." | Na ausência de algumas horas, corrija os horários. |
 | "Escolha a demanda atendida." / "Informe o motivo da recusa." | Complete o campo ao decidir o desvio. |
-| "Nada no backlog com esse filtro." | Confira Origem, GP, Status e a caixa de esconder o que já tem agenda. |
+| "Nada no backlog com esse filtro." | Confira Etapa, Tipo, GP, Status e a caixa de esconder o que já tem agenda. |
 
 Não consigo arrastar a tarefa: mover exige a permissão `tarefa.editar`; no Kanban, só agrupado por **Consultor**.

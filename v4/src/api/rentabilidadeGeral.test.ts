@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agrupar, aplicarFiltro, filtrar, intervaloPadrao, nomeDe, minSemReceita, modoDoTipo, planilhaGeral, proximoNivel, rotuloMes, soCusto, somar, type CelulaGeral, type RentaGeral } from './rentabilidadeGeral';
+import { acumular, agrupar, aplicarFiltro, filtrar, intervaloPadrao, nomeDe, minSemReceita, modoDoTipo, planilhaGeral, proximoNivel, rotuloMes, soCusto, somar, type CelulaGeral, type RentaGeral } from './rentabilidadeGeral';
 
 const cel = (mes: string, periodo: number, cliente: string, projeto: string, consultor: string, h: number, faturado: number, custo: number, x: Partial<CelulaGeral> = {}): CelulaGeral =>
   ({ mes, periodo, cliente_id: cliente, projeto_id: projeto, consultor_id: consultor, min: h * 60, faturado, custo, min_sem_valor: 0, min_sem_custo: 0, ...x });
@@ -96,5 +96,23 @@ describe('rentabilidade geral (0091)', () => {
     expect([modoDoTipo({ fatura: true }), modoDoTipo({ fatura: false }), modoDoTipo({ fatura: true, modo: 'pedido' })]).toEqual(['sim', 'nao', 'pedido']);
     const p = planilhaGeral('projeto', g, t);
     expect(p.linhas[p.linhas.length - 1].slice(0, 5)).toEqual(['Total', 16, 2, 8, 2]);
+  });
+  it('acumulado (4.9.0): soma faturado e custo no tempo e acha onde as linhas se cruzam', () => {
+    const g = (id: string, faturado: number, custo: number) => ({ id, nome: rotuloMes(id), ...somar([cel(id, 0, 'c1', 'p1', 'u1', 1, faturado, custo)]) });
+    const a = acumular([g('2026-07', 0, 1000), g('2026-08', 500, 1000), g('2026-09', 3000, 500), g('2026-10', 500, 500), g('2026-11', 0, 2000)]);
+    expect(a.pontos.map(p => [p.nome, p.faturado, p.custo, p.margem])).toEqual([
+      ['jul/26', 0, 1000, -1000], ['ago/26', 500, 2000, -1500], ['set/26', 3500, 2500, 1000], ['out/26', 4000, 3000, 1000], ['nov/26', 4000, 5000, -1000]]);
+    expect(a.pontos[0].margem_pct).toBeNull();
+    expect(a.pontos[2].margem_pct).toBeCloseTo(1000 / 3500);
+    // ago→set: margem de −1500 para +1000 → cruza a 60% do caminho, com 500 + 0,6 × 3000 = 2300 acumulados
+    expect(a.cruzamentos).toEqual([{ indice: 2, t: 0.6, sentido: 'positivo', valor: 2300 }, { indice: 4, t: 0.5, sentido: 'negativo', valor: 4000 }]);
+  });
+  it('acumulado: sem troca de sinal não há cruzamento; encostar no zero e voltar também não', () => {
+    const g = (id: string, faturado: number, custo: number) => ({ id, nome: id, ...somar([cel(id, 0, 'c1', 'p1', 'u1', 1, faturado, custo)]) });
+    expect(acumular([]).pontos).toEqual([]);
+    expect(acumular([g('2026-10', 1000, 400), g('2026-11', 1000, 900)]).cruzamentos).toEqual([]);
+    expect(acumular([g('2026-09', 1000, 400), g('2026-10', 0, 600), g('2026-11', 500, 0)]).cruzamentos).toEqual([]);
+    // zero no meio e sinal trocado depois: o cruzamento é no ponto do zero (t = 0 do trecho seguinte)
+    expect(acumular([g('2026-09', 1000, 400), g('2026-10', 0, 600), g('2026-11', 0, 500)]).cruzamentos).toEqual([{ indice: 2, t: 0, sentido: 'negativo', valor: 1000 }]);
   });
 });

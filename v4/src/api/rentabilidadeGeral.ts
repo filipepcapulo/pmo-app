@@ -102,6 +102,32 @@ export function agrupar(d: Pick<RentaGeral, 'clientes' | 'projetos' | 'pessoas' 
     : grupos.sort((a, b) => b.faturado - a.faturado || b.custo - a.custo || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
+/** Ponto da linha do tempo acumulada: faturado e custo somados do início do intervalo até este período. */
+export interface PontoAcumulado { id: string; nome: string; faturado: number; custo: number; margem: number; margem_pct: number | null }
+/** Cruzamento das duas linhas: acontece entre o ponto `indice − 1` e o ponto `indice`, na fração `t` (0–1) do caminho.
+ *  `sentido`: 'positivo' = o faturado acumulado passa o custo; 'negativo' = o custo acumulado passa o faturado. */
+export interface Cruzamento { indice: number; t: number; sentido: 'positivo' | 'negativo'; valor: number }
+export interface Acumulado { pontos: PontoAcumulado[]; cruzamentos: Cruzamento[] }
+
+/** Acumula faturado e custo na ordem do tempo (os grupos já vêm em ordem cronológica de `agrupar(…, 'tempo')`) e acha
+ *  onde as linhas se cruzam (a margem acumulada troca de sinal; passar por zero sem trocar não é cruzamento). */
+export function acumular(grupos: Grupo[]): Acumulado {
+  const pontos: PontoAcumulado[] = [], cruzamentos: Cruzamento[] = [];
+  let fat = 0, custo = 0, sinal = 0;
+  grupos.forEach((g, i) => {
+    const antes = { fat, margem: r2(fat - custo) };
+    fat = r2(fat + g.faturado); custo = r2(custo + g.custo);
+    const margem = r2(fat - custo), s = Math.sign(margem);
+    if (s && sinal && s !== sinal) {
+      const t = Math.abs(antes.margem) / (Math.abs(antes.margem) + Math.abs(margem));
+      cruzamentos.push({ indice: i, t, sentido: s > 0 ? 'positivo' : 'negativo', valor: r2(antes.fat + t * (fat - antes.fat)) });
+    }
+    if (s) sinal = s;
+    pontos.push({ id: g.id, nome: g.nome, faturado: fat, custo, margem, margem_pct: fat ? margem / fat : null });
+  });
+  return { pontos, cruzamentos };
+}
+
 /** O "nível de baixo" natural da navegação: geral → clientes → projetos → consultores (consultor escolhido: os projetos dele). */
 export function proximoNivel(f: FiltroGeral): Dimensao {
   if (f.projeto) return f.consultor ? 'tempo' : 'consultor';

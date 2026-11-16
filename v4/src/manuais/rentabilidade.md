@@ -129,7 +129,7 @@ Nas tabelas de quebra, as marcas **sem valor** (pedido sem valor/hora) e **sem c
 
 Como usar:
 
-1. Escolha o intervalo em **De** / **Até** ou use os atalhos (**Últimos 3 meses**, **Últimos 6**, **Últimos 12**, **Este ano**). A tela abre com os últimos 6 meses.
+1. Escolha o intervalo em **De** / **Até** ou use os atalhos (**Últimos 3 meses**, **Últimos 6**, **Últimos 12**, **Este ano**, **Desde o início**). A tela abre com os últimos 6 meses.
 2. Em **Período por**, escolha **Mês** (mês civil) ou **Fechamento (21–20)**.
 3. Toque em **Mostrar valores**. Os gráficos só aparecem com os valores à mostra.
 
@@ -137,6 +137,7 @@ Como usar:
 | --- | --- |
 | Indicadores | Faturado, Custo, Margem, Horas executadas e faturado/hora · custo/hora do recorte |
 | **Por período — faturado × custo** | Duas colunas por mês ou período (verde = faturado, azul = custo), com a margem em % em cima |
+| **Acumulado — faturado × custo na linha do tempo** | Duas linhas (verde = faturado, azul = custo) somando tudo desde o início do intervalo. Onde elas **se cruzam**, o acumulado vira lucro ou prejuízo (círculo verde ou vermelho e a frase embaixo do gráfico). Escolha um **cliente** (ou projeto) para ver o acumulado dele; use **Desde o início** para pegar todo o histórico |
 | **Por cliente**, **Por projeto**, **Por consultor** | Barras de faturado e custo de cada um, do maior faturado para o menor, com a margem em % |
 | **Detalhamento** | A tabela do nível de baixo, com horas, faturado, custo e margem, e o botão **Excel** |
 

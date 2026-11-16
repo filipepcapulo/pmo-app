@@ -14,8 +14,8 @@ export const TIPOS: Op[] = [
   { valor: 'Integração / importação', rotulo: 'Integração / importação', detalhe: 'Integração com outro sistema ou carga de dados' },
 ];
 export const ETAPAS: Op[] = [
-  { valor: 'Atendimento avulso', rotulo: 'Atendimento avulso', detalhe: 'Backlog Base' },
-  { valor: 'Personalização / Customização', rotulo: 'Personalização / Customização', detalhe: 'Backlog Desenvolvimento' },
+  { valor: 'Atendimento avulso', rotulo: 'Atendimento avulso', detalhe: 'Backlog Consultores' },
+  { valor: 'Personalização / Customização', rotulo: 'Personalização / Customização', detalhe: 'Backlog Personalização' },
 ];
 const ETAPA_SUGERIDA: Record<string, string> = {
   'Melhoria / personalização': 'Personalização / Customização', 'Relatório / dashboard': 'Personalização / Customização',
@@ -33,7 +33,8 @@ export const URGENCIAS: Op[] = [
   { valor: 'alta', rotulo: 'Alta', detalhe: 'Precisa hoje' }, { valor: 'media', rotulo: 'Média', detalhe: 'Nesta semana' }, { valor: 'baixa', rotulo: 'Baixa', detalhe: 'Pode aguardar' },
 ];
 export const FORMAS: Op[] = [{ valor: 'remoto', rotulo: 'Remoto' }, { valor: 'interno', rotulo: 'Interno' }, { valor: 'presencial', rotulo: 'Presencial no cliente' }];
-export const FILAS: Op[] = [{ valor: 'base', rotulo: 'Backlog Base' }, { valor: 'dev', rotulo: 'Desenvolvimento' }];
+// Mesmos nomes da localização do fluxo (chamadosV4 LOCAIS) e do cadastro de etapas: uma língua só (4.11.1).
+export const FILAS: Op[] = [{ valor: 'base', rotulo: 'Backlog Consultores' }, { valor: 'dev', rotulo: 'Backlog Personalização' }];
 export const CANAIS: Op[] = [{ valor: 'whatsapp', rotulo: 'WhatsApp' }, { valor: 'email', rotulo: 'E-mail' }, { valor: 'telefone', rotulo: 'Telefone' }, { valor: 'interno', rotulo: 'Interno' }];
 export const SITUACOES: Op[] = [
   { valor: 'nova', rotulo: 'Nova' }, { valor: 'em_triagem', rotulo: 'Em triagem' }, { valor: 'em_atendimento', rotulo: 'Em atendimento' },

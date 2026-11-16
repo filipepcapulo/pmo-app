@@ -183,3 +183,36 @@ button.rg-nivel { cursor: pointer; }
   font-size: 12.5px; line-height: 1.45; margin: 10px 0; }
 .manual-codigo code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: none; padding: 0; white-space: pre; }
 .manual-citacao { margin: 10px 0; padding: 6px 12px; border-left: 3px solid var(--verde); background: var(--superficie-2); border-radius: 0 8px 8px 0; color: var(--texto-2); }
+
+/* Gantt das ausências (4.10.0): nomes fixos à esquerda, períodos rolando à direita */
+.ga .gantt-barra { margin-bottom: 8px; }
+.ga-legenda { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-2); margin-left: auto; flex-wrap: wrap; }
+.ga-cor { display: inline-block; width: 14px; height: 10px; border-radius: 3px; background: var(--verde-escuro); margin-left: 8px; }
+.ga-cor.pendente { background: repeating-linear-gradient(135deg, var(--superficie) 0 3px, color-mix(in srgb, var(--verde) 45%, var(--superficie)) 3px 6px); outline: 1px dashed var(--verde); }
+.ga-cor.conflito { background: #c62f28; }
+.ga-corpo { display: flex; border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; margin-top: 10px; background: var(--superficie); }
+.ga-nomes { flex: none; width: 200px; border-right: 1px solid var(--linha); }
+.ga-rolagem { flex: 1; min-width: 0; overflow-x: auto; }
+.ga-cab { height: 44px; border-bottom: 1px solid var(--linha); font-size: 12px; font-weight: 600; color: var(--texto-2); }
+.ga-nomes .ga-cab { display: flex; align-items: flex-end; padding: 0 10px 6px; }
+.ga-grupos, .ga-colunas { display: flex; height: 22px; }
+.ga-grupos span, .ga-colunas span { flex: none; box-sizing: border-box; border-left: 1px solid var(--linha); padding: 3px 4px; overflow: hidden; white-space: nowrap; }
+.ga-colunas span { text-align: center; font-weight: 400; padding: 3px 0; }
+.ga-colunas span.fds { color: var(--texto-3, var(--texto-2)); background: color-mix(in srgb, var(--texto-2) 7%, transparent); }
+.ga-colunas span.hoje { color: var(--verde); font-weight: 700; }
+.ga-nome, .ga-linha { height: 34px; border-bottom: 1px solid var(--linha); box-sizing: border-box; }
+.ga-nome { padding: 8px 10px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ga-nomes > :last-child, .ga-rolagem .ga-linha:last-child { border-bottom: 0; }
+.ga-linha { position: relative; background-image: linear-gradient(to right, var(--linha) 1px, transparent 1px); background-size: 0 0; }
+.ga-fds { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--texto-2) 7%, transparent); }
+.ga-div { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--linha); }
+.ga-hoje { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--verde); opacity: .55; }
+.ga-barra { position: absolute; top: 6px; height: 22px; box-sizing: border-box; border-radius: 6px; background: var(--verde-escuro); color: #fff; font-size: 11px; font-weight: 600;
+  line-height: 22px; padding: 0 5px; overflow: hidden; white-space: nowrap; display: flex; gap: 3px; cursor: default; }
+.ga-barra > span { overflow: hidden; text-overflow: ellipsis; }
+.ga-barra.parcial { top: 10px; height: 14px; line-height: 14px; font-size: 10px; }
+.ga-barra.pendente { background: repeating-linear-gradient(135deg, var(--superficie) 0 5px, color-mix(in srgb, var(--verde) 30%, var(--superficie)) 5px 10px); color: var(--texto); border: 1px dashed var(--verde); line-height: 20px; }
+.ga-barra.conflito { background: #c62f28; color: #fff; border: 0; }
+.ga-barra.conflito.pendente { background: repeating-linear-gradient(135deg, #c62f28 0 5px, #a82620 5px 10px); border: 1px dashed #fff; }
+.ga-barra:focus-visible { outline: 2px solid var(--texto); outline-offset: 1px; }
+@media (max-width: 700px) { .ga-nomes { width: 120px; } .ga-legenda { margin-left: 0; } }

@@ -107,7 +107,7 @@ Toque em **+ Tarefa**.
 
 1. Confira o cliente e a demanda e informe o **Título** (obrigatórios).
 2. Monte a agenda: **Consultor**, **Data**, **Período** e **Tipo de agenda**. Toque em **+ Adicionar combinação**. Repita para outras pessoas, dias ou horários; **+ dia útil** repete no dia útil seguinte. Cada combinação vira uma tarefa (até 100 por vez).
-3. Se quiser: **Status**, **Etapa**, **Apontamento**, **Agendamento**, **Experience** e **Detalhamento**.
+3. Se quiser: **Status**, **Etapa**, **Apontamento**, **Agendamento**, **Experience** e **Detalhamento**. A tarefa nova já vem com a sugestão **Apontamento = OS Experience**, **Agendamento = Agendar** e **Experience = Não lançado** (troque se for outro caso); a **Etapa** é a do cadastro de Etapas do app.
 4. Toque em **Gravar** (ou **Criar N tarefas**).
 
 Períodos: Manhã (08h-12h), Tarde (14h-18h), Dia (08h-18h), Noite (18h-22h) ou **Horário livre**. No horário livre, informe **Início** e **Fim** em hora cheia.

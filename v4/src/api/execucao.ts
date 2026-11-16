@@ -27,6 +27,9 @@ export const statusV4 = (s: string) => STATUS_V4.find(x => (x.banco as string[])
 export const opcoesStatusDemanda = (atual?: string | null): Op[] =>
   STATUS_V4.map(x => ({ valor: x.valor === 'nao_iniciado' ? (atual === 'planejada' ? 'planejada' : 'backlog') : x.banco[0], rotulo: x.rotulo }));
 export type StatusTarefa = 'planejada' | 'em_andamento' | 'concluida' | 'cancelada' | 'nao_executada';
+/** Sugestão padrão dos campos de uma tarefa nova (nomes das opções dos campos do ClickUp). */
+export const PADRAO_TAREFA: { apontamento: string; agendamento: string; experience: string } =
+  { apontamento: 'OS Experience', agendamento: 'Agendar', experience: 'Não lançado' };
 export const STATUS_TAREFA: Op<StatusTarefa>[] = [
   { valor: 'planejada', rotulo: 'Não iniciada' }, { valor: 'em_andamento', rotulo: 'Em andamento' }, { valor: 'concluida', rotulo: 'Concluída' },
   { valor: 'cancelada', rotulo: 'Cancelada' }, { valor: 'nao_executada', rotulo: 'Não executada' },
@@ -67,7 +70,7 @@ export interface Demanda {
 export interface Tarefa {
   id: string; demanda_id: string; responsavel_id: string; nome: string; data: string; periodo: string; hora_ini: string | null; hora_fim: string | null;
   horas_previstas: number | null; modalidade: string | null; status: StatusTarefa; motivo_status: string | null; detalhamento: string | null;
-  etapa: string | null; agendamento: string | null; experience: string | null; apontamento: string | null; grupo_criacao: string | null;
+  etapa: string | null; etapa_id?: string | null; agendamento: string | null; experience: string | null; apontamento: string | null; grupo_criacao: string | null;
   versao: number; clickup_id: string | null; horas_reais: number | null; apontamentos: number;
   usuario_cliente_id?: string | null;
 }

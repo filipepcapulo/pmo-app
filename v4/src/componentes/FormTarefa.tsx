@@ -7,8 +7,10 @@
 // Usuário do cliente (0051): contato do cliente da demanda, escolhido da lista ou cadastrado na hora; vai para todas as combinações.
 // Antes de gravar, os choques de horário (agenda, ausência, o próprio lote) aparecem para confirmar ou voltar ao lançamento.
 import { useEffect, useState } from 'react';
+import { etapasApi } from '../api/etapas';
+import { useEtapas } from '../estado/etapas';
 import { horas } from '../api/cadastros';
-import { AVISO_HORARIO, exec, horarioInvalido, MODALIDADES, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
+import { AVISO_HORARIO, exec, horarioInvalido, MODALIDADES, PADRAO_TAREFA, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
 import type { AlvoTarefa } from '../estado/edicao';
 import { usePode, useEquipe } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
@@ -34,12 +36,14 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
   const pode = usePode();
   const avisar = useToast();
   const { lista: equipe, porId } = useEquipe();
+  const et = useEtapas();
   const [orig, setOrig] = useState<Tarefa | null>(null);
   const [caixa, setCaixa] = useState<{ local: string; nome: string } | null>(null);
   const [cliente, setCliente] = useState<string | null>(null);
   const dataInicial = alvo.data ?? hojeLocal();
-  const [f, setF] = useState({ demanda: alvo.demanda_id ?? '', nome: '', modalidade: '', status: 'planejada', detalhamento: '', etapa: '',
-    agendamento: '', experience: '', apontamento: '', periodo: 'manha', ini: '', fim: '', data: dataInicial, resp: '', usuario: '' });
+  const [f, setF] = useState({ demanda: alvo.demanda_id ?? '', nome: '', modalidade: '', status: 'planejada', detalhamento: '', etapa: '', etapaApp: '',
+    // tarefa nova já vem com a sugestão padrão (pedido do Filipe, 16/11); editar mostra o que está gravado
+    ...(alvo.id ? { agendamento: '', experience: '', apontamento: '' } : PADRAO_TAREFA), periodo: 'manha', ini: '', fim: '', data: dataInicial, resp: '', usuario: '' });
   const umResp = alvo.responsaveis?.length === 1 ? alvo.responsaveis[0] : '';
   const [mont, setMont] = useState<Combinacao>({ resp: umResp, data: dataInicial, periodo: 'manha', ini: '', fim: '', modalidade: 'remoto' });
   const [combos, setCombos] = useState<Combinacao[]>(
@@ -58,14 +62,22 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
       const t = r.tarefa;
       setOrig(t);
       setF({ demanda: t.demanda_id, nome: t.nome, periodo: t.periodo, ini: t.hora_ini?.slice(0, 5) ?? '', fim: t.hora_fim?.slice(0, 5) ?? '',
-        modalidade: t.modalidade ?? '', status: t.status, detalhamento: t.detalhamento ?? '', etapa: t.etapa ?? '', agendamento: t.agendamento ?? '',
+        modalidade: t.modalidade ?? '', status: t.status, detalhamento: t.detalhamento ?? '', etapa: t.etapa ?? '', etapaApp: et.idDe(t) ?? '', agendamento: t.agendamento ?? '',
         experience: t.experience ?? '', apontamento: t.apontamento ?? '', data: t.data, resp: t.responsavel_id, usuario: t.usuario_cliente_id ?? '' });
       setCaixa({ local: local(r), nome: r.demanda.nome });
       setCliente(r.cliente.id);
     }).catch(e => setErro((e as Error).message));
     else if (alvo.demanda_id) exec.demanda(esc, alvo.demanda_id).then(r => { setCaixa({ local: local(r), nome: r.demanda.nome }); setCliente(r.cliente.id); })
       .catch(() => setCaixa(null));
-  }, [alvo, esc]);
+  }, [alvo, esc]);  // eslint-disable-line react-hooks/exhaustive-deps
+  // as etapas do app podem chegar depois da tarefa: a escolha é preenchida quando o cadastro carrega
+  useEffect(() => { if (orig) setF(x => (x.etapaApp ? x : { ...x, etapaApp: et.idDe(orig) ?? '' })); }, [orig, et.lista]);  // eslint-disable-line react-hooks/exhaustive-deps
+  // V4: a etapa escolhida é a do app (0083); o texto de etapa do ClickUp acompanha pelo cadastro. Falha aqui não desfaz a tarefa.
+  const definirEtapa = async (ids: string[], etapaId: string | null) => {
+    try { for (const id of ids) await etapasApi.definir(esc, 'tarefa', id, etapaId); }
+    catch (e) { avisar(`Tarefa gravada, mas a etapa não foi definida: ${(e as Error).message}`, 'erro'); }
+  };
+  const idsCriadas = (r: unknown) => ((r as { tarefas?: { id: string }[] })?.tarefas ?? []).map(t => t.id);
 
   const montadorPronto = !!mont.resp && !!mont.data && !horarioInvalido(mont);
   const adicionar = (c: Combinacao = mont) => {
@@ -112,7 +124,8 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
     const forcar = ignorarAusencia ? { ignorar_ausencia: true } : {};
     setGravando(true);
     const comuns = { nome: f.nome.trim(), modalidade: f.modalidade || null, status: f.status, detalhamento: f.detalhamento.trim() || null,
-      etapa: f.etapa || null, agendamento: f.agendamento || null, experience: f.experience || null, apontamento: f.apontamento || null,
+      // etapa tirada no formulário: o texto do ClickUp sai junto (senão o de/para traria a etapa de volta)
+      etapa: (!f.etapaApp && et.idDe(orig) ? null : f.etapa || null), agendamento: f.agendamento || null, experience: f.experience || null, apontamento: f.apontamento || null,
       usuario_cliente_id: f.usuario || null };
     const horario = (c: { periodo: string; ini: string; fim: string }) =>
       ({ periodo: c.periodo, hora_ini: c.periodo === 'livre' ? c.ini : null, hora_fim: c.periodo === 'livre' ? c.fim : null });
@@ -120,8 +133,9 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
       let feitas = 0;
       try {
         for (const c of lista) {
-          await exec.tarefasSalvar(esc, { demanda_id: f.demanda, ...comuns, ...horario(c), modalidade: c.modalidade || null, responsaveis: [c.resp], datas: [c.data], ...forcar });
+          const r = await exec.tarefasSalvar(esc, { demanda_id: f.demanda, ...comuns, ...horario(c), modalidade: c.modalidade || null, responsaveis: [c.resp], datas: [c.data], ...forcar });
           feitas++;
+          if (f.etapaApp) await definirEtapa(idsCriadas(r), f.etapaApp);
         }
         avisar(`${feitas} tarefa(s) criada(s)`, 'ok');
         aoGravar();
@@ -136,6 +150,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
     try {
       await exec.tarefasSalvar(esc, { id: alvo.id, versao: orig!.versao,
         ...(excluir ? { excluir: true } : { ...comuns, ...horario(f), responsavel_id: f.resp, data: f.data, ...forcar }) });
+      if (!excluir && (f.etapaApp || null) !== et.idDe(orig)) await definirEtapa([alvo.id!], f.etapaApp || null);
       avisar(excluir ? 'Tarefa excluída' : 'Tarefa gravada', 'ok');
       // V4: concluir a tarefa de um chamado não conclui o chamado — o app pergunta
       if (!excluir && f.status === 'concluida' && orig?.status !== 'concluida') aoConcluir?.(f.demanda);
@@ -156,10 +171,11 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
     setGravando(true);
     try {
       // a nova nasce planejada e sem Experience lançado; o resto vem da agenda já lançada (não do que foi editado e não gravado)
-      await exec.tarefasSalvar(esc, { demanda_id: orig.demanda_id, nome: orig.nome, modalidade: orig.modalidade, detalhamento: orig.detalhamento,
+      const r = await exec.tarefasSalvar(esc, { demanda_id: orig.demanda_id, nome: orig.nome, modalidade: orig.modalidade, detalhamento: orig.detalhamento,
         etapa: orig.etapa, agendamento: orig.agendamento, apontamento: orig.apontamento, usuario_cliente_id: orig.usuario_cliente_id ?? null, status: 'planejada',
         periodo: mais.periodo, hora_ini: mais.periodo === 'livre' ? mais.ini : null, hora_fim: mais.periodo === 'livre' ? mais.fim : null,
         responsaveis: [orig.responsavel_id], datas: [mais.data], ...(ignorarAusencia ? { ignorar_ausencia: true } : {}) });
+      if (orig.etapa_id) await definirEtapa(idsCriadas(r), orig.etapa_id);
       avisar(`Agenda adicionada em ${dataCurta(mais.data)}`, 'ok');
       aoGravar();
     } catch (e) { setErro((e as Error).message); }
@@ -244,7 +260,9 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
 
         <EscolhaChips rotulo="Status" valor={f.status} aoMudar={v => setF({ ...f, status: v })} opcoes={STATUS_TAREFA} />
         <div className="grade-campos dupla">
-          <Campo rotulo="Etapa" tipo="select" valor={f.etapa} aoMudar={v => setF({ ...f, etapa: v })} opcoes={opcoesDe(opcoes?.etapas, f.etapa)} />
+          <Campo rotulo="Etapa" tipo="select" valor={f.etapaApp} aoMudar={v => setF({ ...f, etapaApp: v })}
+            opcoes={[{ valor: '', rotulo: '—' }, ...et.lista.filter(e => e.ativo || e.id === f.etapaApp).map(e => ({ valor: e.id, rotulo: e.nome }))]}
+            ajuda={f.etapa && !f.etapaApp ? `No ClickUp: ${f.etapa} (sem vínculo no cadastro de etapas)` : undefined} />
           <Campo rotulo="Apontamento" tipo="select" valor={f.apontamento} aoMudar={v => setF({ ...f, apontamento: v })} opcoes={opcoesDe(opcoes?.apontamento, f.apontamento)} />
           <Campo rotulo="Agendamento" tipo="select" valor={f.agendamento} aoMudar={v => setF({ ...f, agendamento: v })} opcoes={opcoesDe(opcoes?.agendamento, f.agendamento)} />
           <Campo rotulo="Experience" tipo="select" valor={f.experience} aoMudar={v => setF({ ...f, experience: v })} opcoes={opcoesDe(opcoes?.experience, f.experience)} />

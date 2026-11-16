@@ -11,6 +11,17 @@ export const OPS_NUMERO: [Operador, string][] = [['eq', 'Igual a'], ['ne', 'Dife
 
 export const normal = (t: unknown) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
+/**
+ * Busca por texto, a MESMA em todas as telas (Demandas, backlog da Agenda da Equipe, Kanban…): todas as palavras
+ * digitadas aparecem em algum dos campos, sem acento e sem caixa, em qualquer ordem.
+ */
+export function temTexto(texto: string, ...campos: (string | null | undefined)[]): boolean {
+  const palavras = normal(texto).split(/\s+/).filter(Boolean);
+  if (!palavras.length) return true;
+  const onde = normal(campos.filter(Boolean).join(' '));
+  return palavras.every(p => onde.includes(p));
+}
+
 /** '1.234,5' | '1234.5' → 1234.5; vazio/inválido → null. */
 export function numeroBR(t: unknown): number | null {
   if (typeof t === 'number') return Number.isFinite(t) ? t : null;

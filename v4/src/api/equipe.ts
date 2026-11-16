@@ -3,6 +3,7 @@
 import { novaOperacao, rpc } from './cliente';
 import { STATUS_DEMANDA, type Autoria } from './execucao';
 import { diaNum, hojeIso, somarDias } from './projeto';
+import { temTexto } from '../estado/filtro';
 
 // ---------------------------------------------------------------- tipos
 export interface TarefaGrade {
@@ -26,10 +27,14 @@ export type OrigemBacklog = 'demanda' | 'backlog_base' | 'personalizacao';
 export const ORIGENS: { valor: OrigemBacklog; rotulo: string }[] = [
   { valor: 'demanda', rotulo: 'Demandas' }, { valor: 'backlog_base', rotulo: 'Backlog Base' }, { valor: 'personalizacao', rotulo: 'Personalização' },
 ];
+/** O banco marca `origem: 'personalizacao'` pela etapa que começa com "Personaliza"; na busca por texto vale este nome. */
+const ETAPA_PERSONALIZACAO = 'Personalização / Customização';
 export interface PedidoBacklog { id: string; versao: number; horas: number; motivo: string; solicitante: string }
 export interface ItemBacklog {
   id: string; pai_id: string | null; pai: string | null; nome: string; prioridade: string; status: string; cliente_id: string; cliente: string;
   projeto_id: string; projeto: string; origem: OrigemBacklog; horas: number; pedidos: PedidoBacklog[]; criado_em?: string;
+  /** Etapa (própria ou da mãe), quando o banco manda; entra na busca por texto. */
+  etapa?: string | null;
   /** Agendas em aberto (planejada/em andamento, qualquer data) do item (com as das subdemandas) e da demanda-mãe; próxima data futura. */
   agendas?: number; agendas_pai?: number | null; agenda_prox?: string | null;
   /** GP pela regra da pílula (0047): responsável, senão o da mãe, o do projeto, o do cliente. */
@@ -81,9 +86,9 @@ export interface NoProjeto { id: string; nome: string; demandas: NoDemanda[] }
 export interface NoCliente { id: string; nome: string; demandas: NoDemanda[]; total: number; pedidos: number }
 const RANK_PRIORIDADE = ['urgente', 'alta', 'normal', 'baixa'];
 export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = '', statusFora: ReadonlySet<string> = new Set()): NoCliente[] {
-  const t = texto.trim().toLowerCase();
+  // texto: a mesma regra da tela de Demandas (sem acento, por palavras; nome, mãe, cliente, projeto e etapa)
   const vis = itens.filter(i => !statusFora.has(i.status) && (!origem || i.origem === origem)
-    && (!t || [i.nome, i.pai ?? '', i.cliente, i.projeto].some(x => x.toLowerCase().includes(t))));
+    && temTexto(texto, i.nome, i.pai, i.cliente, i.projeto, i.etapa ?? (i.origem === 'personalizacao' ? ETAPA_PERSONALIZACAO : null)));
   const clientes = new Map<string, NoCliente>();
   for (const i of vis) {
     const c = clientes.get(i.cliente_id) ?? { id: i.cliente_id, nome: i.cliente, demandas: [], total: 0, pedidos: 0 };

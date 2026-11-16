@@ -106,7 +106,7 @@ export function BacklogLateral({ itens, erro, marcados, aoMarcar, aoArrastar, or
           <option value="">GP responsável: todos</option>
           {opcoesGp.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
         </select>
-        <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Cliente ou demanda…" aria-label="Buscar no backlog" />
+        <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Cliente, demanda ou etapa…" aria-label="Buscar no backlog" />
         <details className="bl-status">
           <summary>Status: {escolhidos.length === opcoesStatus.length ? 'todos' : `${escolhidos.length} de ${opcoesStatus.length}`}</summary>
           {opcoesStatus.map(o => (

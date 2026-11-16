@@ -55,6 +55,15 @@ describe('backlog', () => {
     expect(arvoreBacklog(itens, 'personalizacao').flatMap(c => c.demandas).map(d => d.id)).toEqual(['d2']);
     expect(arvoreBacklog(itens, '', 'zeta')).toHaveLength(1);
   });
+  it('texto: a mesma busca da tela de Demandas — sem acento, por palavras, com a mãe e a etapa', () => {
+    const idsDe = (t: string) => arvoreBacklog(itens, '', t).flatMap(c => c.demandas.flatMap(d => [...(d.item ? [d.item.id] : []), ...d.subs.map(x => x.id)]));
+    expect(idsDe('so a mae')).toEqual(['s2']);                 // sem acento e pelo nome da mãe
+    expect(idsDe('SÓ MÃE')).toEqual(['s2']);                   // palavras soltas
+    expect(idsDe('personalização')).toEqual(['s2']);           // etapa Personalização (origem do banco)
+    expect(idsDe('personalizacao')).toEqual(['s2']);
+    expect(idsDe('pedido zeta')).toEqual(['x']);               // palavras em campos diferentes
+    expect(arvoreBacklog([back({ id: 'e', nome: 'Layout', etapa: 'Homologação' })], '', 'homologacao')).toHaveLength(1);
+  });
 });
 
 describe('mover', () => {

@@ -93,8 +93,11 @@ describe('demandas', () => {
   it('sem filtro devolve tudo, na ordem', () => expect(ids({})).toEqual(['d1', 'd2', 'd3', 'd4']));
   it('fase do projeto, etapa, tipo, prioridade, status, cliente e projeto', () => {
     expect(ids({ fases: ['P3', 'Sustentação'] })).toEqual(['d3', 'd4']);
-    expect(ids({ etapas: ['Homologação'] })).toEqual(['d1']);
-    expect(ids({ etapas: [SEM] })).toEqual(['d1', 'd2', 'd4']);   // d1 vem como mãe da d2
+    expect(ids({ etapas: ['Homologação'] })).toEqual(['d1', 'd2']);   // d2 não tem etapa: vale a da mãe (como a Origem do backlog)
+    expect(ids({ etapas: [SEM] })).toEqual(['d4']);
+    expect(ids({ etapas: ['Homologação'], nivel: 'subdemanda' })).toEqual(['d1', 'd2']);
+    // etapa própria vale mais que a da mãe
+    expect(filtrarDemandas(dem.map(d => (d.id === 'd2' ? { ...d, etapa: 'Execução' } : d)), { ...PADRAO_DEMANDAS, etapas: ['Homologação'] }).map(d => d.id)).toEqual(['d1']);
     expect(ids({ tipos: ['plano_acao', 'chamado'] })).toEqual(['d3', 'd4']);
     expect(ids({ prioridades: ['alta', 'urgente'] })).toEqual(['d1', 'd3']);
     expect(ids({ status: ['concluida'] })).toEqual(['d4']);

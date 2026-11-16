@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreBacklog, blocosDia, colunasKanban, doGp, filtrarKanban, lerPrefKanban, opcoesKanban, faixaEscala, marcasEscala, PX_HORA, rotuloAgendas, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, rotuloAgenda, segundaDe, statusBacklog, turnoDe,
+import { arvoreBacklog, filtrarBacklog, blocosDia, colunasKanban, doGp, filtrarKanban, lerPrefKanban, opcoesKanban, faixaEscala, marcasEscala, PX_HORA, rotuloAgendas, ausenciaEm, ausenciasNoDia, diaInteiro, horasAusentes, rotuloAusenciaDia, ordenarDia, porProjeto, diasEntre, faixaTarefa, horasTexto, itensMover, janelaInicial, nivelCarga, rotuloAgenda, segundaDe, statusBacklog, turnoDe,
   type AgendaAberta, type Ausencia, type ItemBacklog, type TarefaGrade } from './equipe';
 
 const back = (o: Partial<ItemBacklog>): ItemBacklog => ({ id: 'd1', pai_id: null, pai: null, nome: 'D1', prioridade: 'normal', status: 'backlog', cliente_id: 'c1',
@@ -54,6 +54,29 @@ describe('backlog', () => {
   it('filtra por origem e texto', () => {
     expect(arvoreBacklog(itens, 'personalizacao').flatMap(c => c.demandas).map(d => d.id)).toEqual(['d2']);
     expect(arvoreBacklog(itens, '', 'zeta')).toHaveLength(1);
+  });
+  it('nível dos filtros, igual ao da tela de Demandas: demanda traz todas as subdemandas; subdemanda só as que passam', () => {
+    const its = [back({ id: 'm', nome: 'Fiscal', gp_id: 'g1' }), back({ id: 'f1', pai_id: 'm', pai: 'Fiscal', nome: 'Notas', gp_id: 'g2', agendas: 1 }),
+      back({ id: 'f2', pai_id: 'm', pai: 'Fiscal', nome: 'Livros', gp_id: 'g1', status: 'pausada' }), back({ id: 'o', nome: 'Outra', gp_id: 'g2' }),
+      back({ id: 'orf', pai_id: 'fora', pai: 'Mãe fora', nome: 'Órfã', gp_id: 'g1' })];
+    const idsDe = (texto: string, extra: Parameters<typeof filtrarBacklog>[4], fora = new Set<string>()) => filtrarBacklog(its, '', texto, fora, extra).map(i => i.id);
+    expect(idsDe('', {})).toEqual(['m', 'f1', 'f2', 'o', 'orf']);
+    // todos os níveis: cada item por si (a subdemanda acha pelo nome da mãe)
+    expect(idsDe('fiscal', {})).toEqual(['m', 'f1', 'f2']);
+    expect(idsDe('', { gp: 'g1' })).toEqual(['m', 'f2', 'orf']);
+    // demanda: a que passa vem com TODAS as subdemandas (de outro GP, com agenda, de outro status); mãe fora = conta como demanda
+    expect(idsDe('', { gp: 'g1', nivel: 'demanda' })).toEqual(['m', 'f1', 'f2', 'orf']);
+    expect(idsDe('', { gp: 'g2', nivel: 'demanda' })).toEqual(['o']);
+    expect(idsDe('notas', { nivel: 'demanda' })).toEqual([]);
+    expect(idsDe('', { soSemAgenda: true, nivel: 'demanda' })).toEqual(['m', 'f1', 'f2', 'o', 'orf']);
+    expect(idsDe('', { nivel: 'demanda' }, new Set(['pausada']))).toEqual(['m', 'f1', 'f2', 'o', 'orf']);
+    // subdemanda: só as subdemandas que passam (a mãe vira título na árvore)
+    expect(idsDe('', { gp: 'g1', nivel: 'subdemanda' })).toEqual(['f2']);
+    expect(idsDe('', { gp: 'g2', nivel: 'subdemanda' })).toEqual(['f1']);
+    expect(idsDe('', { soSemAgenda: true, nivel: 'subdemanda' }, new Set(['pausada']))).toEqual([]);
+    const a = arvoreBacklog(its, '', '', new Set(), { gp: 'g2', nivel: 'subdemanda' });
+    expect(a[0].demandas[0]).toMatchObject({ id: 'm', nome: 'Fiscal', item: null });
+    expect(a[0].demandas[0].subs.map(x => x.id)).toEqual(['f1']);
   });
   it('texto: a mesma busca da tela de Demandas — sem acento, por palavras, com a mãe e a etapa', () => {
     const idsDe = (t: string) => arvoreBacklog(itens, '', t).flatMap(c => c.demandas.flatMap(d => [...(d.item ? [d.item.id] : []), ...d.subs.map(x => x.id)]));

@@ -85,10 +85,30 @@ export interface NoDemanda { id: string; nome: string; projeto_id: string; proje
 export interface NoProjeto { id: string; nome: string; demandas: NoDemanda[] }
 export interface NoCliente { id: string; nome: string; demandas: NoDemanda[]; total: number; pedidos: number }
 const RANK_PRIORIDADE = ['urgente', 'alta', 'normal', 'baixa'];
-export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = '', statusFora: ReadonlySet<string> = new Set()): NoCliente[] {
-  // texto: a mesma regra da tela de Demandas (sem acento, por palavras; nome, mãe, cliente, projeto e etapa)
-  const vis = itens.filter(i => !statusFora.has(i.status) && (!origem || i.origem === origem)
-    && temTexto(texto, i.nome, i.pai, i.cliente, i.projeto, i.etapa ?? (i.origem === 'personalizacao' ? ETAPA_PERSONALIZACAO : null)));
+/** Filtros do backlog além da origem, do texto e do status. `nivel`: o mesmo "Aplicar filtros em" da tela de Demandas. */
+export interface FiltroBacklogExtra { nivel?: string; gp?: string; soSemAgenda?: boolean }
+/**
+ * Itens do backlog que passam nos filtros. Texto: a mesma regra da tela de Demandas (sem acento, por palavras; nome, mãe,
+ * cliente, projeto e etapa). Nível, igual ao de Demandas e valendo para TODOS os filtros: '' (demandas e subdemandas, cada
+ * item por si), 'demanda' (a demanda que passa vem com todas as subdemandas) ou 'subdemanda' (só as subdemandas que passam;
+ * a mãe fica de título). Subdemanda cuja mãe não está no backlog conta como demanda, como lá.
+ */
+export function filtrarBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = '', statusFora: ReadonlySet<string> = new Set(),
+  { nivel = '', gp = '', soSemAgenda = false }: FiltroBacklogExtra = {}): ItemBacklog[] {
+  const ids = new Set(itens.map(i => i.id));
+  const ehSub = (i: ItemBacklog) => !!i.pai_id && ids.has(i.pai_id);
+  const passa = (i: ItemBacklog) => !statusFora.has(i.status) && (!origem || i.origem === origem) && (!gp || i.gp_id === gp)
+    && (!soSemAgenda || !i.agendas)
+    && temTexto(texto, i.nome, i.pai, i.cliente, i.projeto, i.etapa ?? (i.origem === 'personalizacao' ? ETAPA_PERSONALIZACAO : null));
+  if (nivel === 'demanda') {
+    const maes = new Set(itens.filter(i => !ehSub(i) && passa(i)).map(i => i.id));
+    return itens.filter(i => maes.has(i.id) || (!!i.pai_id && maes.has(i.pai_id)));
+  }
+  if (nivel === 'subdemanda') return itens.filter(i => ehSub(i) && passa(i));
+  return itens.filter(passa);
+}
+export function arvoreBacklog(itens: ItemBacklog[], origem: OrigemBacklog | '' = '', texto = '', statusFora: ReadonlySet<string> = new Set(), extra: FiltroBacklogExtra = {}): NoCliente[] {
+  const vis = filtrarBacklog(itens, origem, texto, statusFora, extra);
   const clientes = new Map<string, NoCliente>();
   for (const i of vis) {
     const c = clientes.get(i.cliente_id) ?? { id: i.cliente_id, nome: i.cliente, demandas: [], total: 0, pedidos: 0 };

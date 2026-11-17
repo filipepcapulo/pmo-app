@@ -24,8 +24,48 @@ import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { PilulaSituacao } from './Chamados';
 import { Resumo } from '../componentes/Resumo';
+import { gerarImagemChamado, modeloImagem } from '../util/chamadoImagem';
+import { baixarArquivo } from '../util/csv';
 
 type Aba = 'interacoes' | 'tarefas' | 'anexos' | 'relacionados' | 'portal';
+
+/** Imagem do chamado para o grupo interno (4.12.0): prévia do PNG e as saídas que o aparelho oferece (compartilhar, copiar, baixar). */
+function ImagemChamado({ f, aoFechar }: { f: FichaChamado; aoFechar: () => void }) {
+  const { porId } = useEquipe();
+  const avisar = useToast();
+  const [img, setImg] = useState<{ blob: Blob; url: string } | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const responsavel = porId.get(f.demanda.responsavel_id ?? '')?.nome ?? null;
+  useEffect(() => {
+    let vivo = true;
+    gerarImagemChamado(modeloImagem(f, responsavel)).then(i => { if (vivo) setImg(i); }).catch(e => { if (vivo) setErro((e as Error).message); });
+    return () => { vivo = false; };
+  }, [f, responsavel]);
+  const nome = `Chamado_${f.chamado.numero}.png`;
+  const arquivo = img && typeof File !== 'undefined' ? new File([img.blob], nome, { type: 'image/png' }) : null;
+  const podeCompartilhar = !!arquivo && !!navigator.canShare?.({ files: [arquivo] });
+  const podeCopiar = typeof ClipboardItem !== 'undefined' && !!navigator.clipboard?.write;
+  const compartilhar = async () => {
+    try { await navigator.share({ files: [arquivo!], title: `Chamado #${f.chamado.numero}` }); }
+    catch (e) { if ((e as Error).name !== 'AbortError') avisar('Não deu para compartilhar: baixe a imagem.', 'erro'); }
+  };
+  const copiar = async () => {
+    try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': img!.blob })]); avisar('Imagem copiada.', 'ok'); }
+    catch { avisar('Não deu para copiar: baixe a imagem.', 'erro'); }
+  };
+  return (
+    <Popup aberto titulo={`Imagem do chamado #${f.chamado.numero}`} aoFechar={aoFechar} largura={440}
+      rodape={<><Botao onClick={aoFechar}>Fechar</Botao>
+        {podeCopiar && <Botao disabled={!img} onClick={copiar}>Copiar</Botao>}
+        <Botao variante={podeCompartilhar ? undefined : 'primario'} disabled={!img} onClick={() => baixarArquivo(nome, img!.blob)}>Baixar PNG</Botao>
+        {podeCompartilhar && <Botao variante="primario" onClick={compartilhar}>Compartilhar</Botao>}</>}>
+      <p className="ajuda">Para o grupo interno: o que a triagem precisa para definir prioridade, backlog e responsável. O telefone do contato não entra.</p>
+      {erro && <p className="msg-erro" role="alert">{erro}</p>}
+      {!img && !erro && <p className="ajuda"><span className="giro" /> Gerando…</p>}
+      {img && <img className="chamado-imagem" src={img.url} alt={`Resumo do chamado #${f.chamado.numero}: ${f.demanda.nome}`} data-testid="chamado-imagem" />}
+    </Popup>
+  );
+}
 
 function Triagem({ f, opcoes, aoFechar, aoGravar }: { f: FichaChamado; opcoes: OpcoesChamado | null; aoFechar: () => void; aoGravar: () => void }) {
   const esc = useSessao().eu!.escritorio_id!;
@@ -167,6 +207,7 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   const [recusa, setRecusa] = useState(false);
   const [alocar, setAlocar] = useState(false);
   const [extrato, setExtrato] = useState(false);
+  const [imagem, setImagem] = useState(false);
   useEffect(() => { cham.opcoes(esc).then(setOpcoes).catch(() => setOpcoes(null)); }, [esc]);
   const f = c.dados;
   const numero = f?.chamado.numero;
@@ -213,6 +254,7 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
         <div className="linha">
           <BotaoFavorito entidade="chamado" id={ch.id} />
           <Botao onClick={() => setExtrato(true)}>Extrato</Botao>
+          <Botao onClick={() => setImagem(true)}>Imagem</Botao>
           {!fechado && (
             <select className="kb-mover" aria-label="Mover o chamado" value="" onChange={e => { if (e.target.value) moverPara(e.target.value as Local); }}>
               <option value="">Mover para…</option>
@@ -269,6 +311,7 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
       {recusa && <Recusar numero={ch.numero} aoFechar={() => setRecusa(false)} aoConfirmar={async m => {
         try { await cham.triar(esc, { id: ch.id, versao: ch.versao, acao: 'recusar', motivo: m }); setRecusa(false); await c.recarregar(); } catch (e) { avisar((e as Error).message, 'erro'); }
       }} />}
+      {imagem && <ImagemChamado f={f} aoFechar={() => setImagem(false)} />}
       {extrato && <Popup aberto titulo={`Extrato do chamado #${ch.numero}`} aoFechar={() => setExtrato(false)}
         rodape={<><Botao onClick={() => setExtrato(false)}>Fechar</Botao><Botao variante="primario" onClick={copiar}>Copiar</Botao></>}>
         <p className="ajuda">Para colar no WhatsApp do cliente. Interações internas não entram.</p>

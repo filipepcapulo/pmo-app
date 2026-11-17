@@ -107,6 +107,7 @@ Botões:
 
 - **☆ Favoritar**: põe o chamado nos favoritos do menu lateral.
 - **Extrato**: monta o texto para colar no WhatsApp do cliente (situação, prioridade, agenda e histórico visível). Toque em **Copiar**. Interações internas não entram.
+- **Imagem**: gera um PNG no formato de tela de celular para mandar no grupo interno, com o que a triagem precisa para decidir: prioridade, backlog e responsável em destaque, urgência e impacto, ambiente, prazo e motivo, SLA de solução, descrição, onde ocorre e resultado esperado. Use **Compartilhar** (celular), **Copiar** ou **Baixar PNG**. O telefone do contato não entra.
 - **+ Tarefa**: agenda o atendimento (chamado aberto).
 - **Triagem**, **Recusar** e **Reabrir**: veja a seção 8.
 

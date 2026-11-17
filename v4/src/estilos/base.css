@@ -751,6 +751,7 @@ table.eq-grade { border-collapse: separate; border-spacing: 0; table-layout: fix
 .sla-vencido { color: var(--vermelho); }
 .msg-cliente { border-left: 3px solid var(--verde); padding-left: 8px; }
 .extrato { width: 100%; font: inherit; resize: vertical; }
+.chamado-imagem { display: block; width: 100%; max-width: 360px; margin: 8px auto 0; border: 1px solid var(--linha); border-radius: var(--raio); }
 .ind-linha { display: grid; grid-template-columns: minmax(90px, 200px) 1fr 40px; gap: 8px; align-items: center; padding: 3px 0; font-size: 13px; }
 .ind-barra { height: 8px; border-radius: 4px; background: var(--superficie-2); overflow: hidden; }
 .ind-barra i { display: block; height: 100%; background: var(--verde); }

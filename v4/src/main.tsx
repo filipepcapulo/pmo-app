@@ -23,6 +23,9 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
 }
 
+// Build do ambiente de teste local (VITE_AMBIENTE=teste; testes/v4_teste_local.js): faixa fixa para ninguém confundir com a produção.
+const TESTE = import.meta.env.VITE_AMBIENTE === 'teste';
+
 // Conector do Claude (0088): o Claude abre o app com ?mcp_autorizar=1&…; depois do login a tela é só a de autorizar.
 const PEDIDO_CONECTOR = lerPedido(location.search);
 
@@ -37,6 +40,7 @@ function App() {
 
 createRoot(document.getElementById('raiz')!).render(
   <StrictMode>
+    {TESTE && <div className="faixa-teste" role="status">AMBIENTE DE TESTE — banco local, nada aqui vai para a produção</div>}
     <ProvedorToasts>
       <ProvedorSessao><App /></ProvedorSessao>
     </ProvedorToasts>

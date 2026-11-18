@@ -100,7 +100,7 @@ Na ficha de uma tarefa com Apontamento "OS Experience" ou "Hora Dobrada" aparece
 
 No menu (☰): **Execução › Tarefas Pendentes no Experience**. Aparece para quem tem `sync_experience.gerenciar`.
 
-É o painel de acompanhamento: mostra as agendas do período que ainda pedem uma ação no Experience.
+É o painel de acompanhamento: mostra as agendas do período que ainda pedem uma ação no Experience, não importa se a tarefa veio de chamado, demanda ou subdemanda. Tarefa que gera OS no Experience precisa ter o lançamento lá.
 
 | Pendência | Campo Experience da tarefa | O que falta |
 | --- | --- | --- |
@@ -111,7 +111,7 @@ No menu (☰): **Execução › Tarefas Pendentes no Experience**. Aparece para 
 - A grade traz **Pendência**, **Consultor executante**, **Data da agenda**, **Período** (com o horário), **Apontamento**, Cliente, FAP, **Demanda** e Subdemanda, Tarefa, Experience, Lançamento, **Atenção** e Último sync.
 - Filtros: **De** e **Até** (padrão: 31 dias para trás e 31 para a frente; no máximo 125 dias), **Consultor**, **Apontamento** e os botões Todas, Abertura, Ajustes e Exclusão.
 - **Atenção** avisa o que precisa ser visto antes: projeto sem FAP no nome (o sync não trata), projeto inativo, tarefa que já tem OS no Sankhya, último sync com erro ou bloqueado e agenda que já passou sem lançamento.
-- **Sincronizar** roda o sync só daquela tarefa, no modo do escritório (em modo real pede confirmação). Feito no modo real, a tarefa sai da lista.
+- A tela só acompanha, não lança nada. Para lançar, use **Sistema › Sync com o Experience** (botão no topo da tela) ou **Sincronizar esta tarefa** na ficha da tarefa (toque no nome dela). Feito no modo real, a tarefa sai da lista.
 - Entram as mesmas tarefas da seção 2 e ficam fora as da seção 3.
 
 ## 10. Se algo der errado

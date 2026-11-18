@@ -1,35 +1,33 @@
-// Execução › Tarefas Pendentes no Experience (4.14.0, 0105): painel de acompanhamento e sincronização das agendas que ainda
-// pedem uma ação no Experience — Abertura (criar o lançamento), Ajuste (alterar) ou Exclusão (Lixeira). Mesma permissão do
-// Sync com o Experience (sync_experience.gerenciar); "Sincronizar" roda o sync só da tarefa, no modo do escritório.
+// Execução › Tarefas Pendentes no Experience (4.14.0, 0105): painel de acompanhamento das agendas que ainda pedem uma ação
+// no Experience — Abertura (criar o lançamento), Ajuste (alterar) ou Exclusão (Lixeira) —, venham de chamado, demanda ou
+// subdemanda. Mesma permissão do Sync com o Experience (sync_experience.gerenciar). 4.14.1 (pedido do Filipe): a tela é só
+// monitoramento; quem sincroniza é a tela Sync com o Experience ou a ficha da tarefa.
 import { useMemo, useState } from 'react';
 import { hojeIso } from '../api/projeto';
 import {
   avisosPendente, COR_PENDENCIA, erroPeriodoPendentes, experiencePendentes, filtrarPendentes, janelaPendente, opcoesPendentes, periodoPendentes,
   ROTULO_PENDENCIA, totaisPendentes, type LinhaPendente,
 } from '../api/experiencePendentes';
-import { dataBr, ROTULO_MODO, syncExperience, textoResultado, type AcaoSync } from '../api/syncExperience';
-import { Botao } from '../componentes/Botao';
+import { dataBr, ROTULO_MODO, type AcaoSync } from '../api/syncExperience';
 import { Tabela, type Coluna } from '../componentes/Tabela';
-import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 
 const REGRAS = 'Entram as agendas com Apontamento "OS Experience" ou "Hora Dobrada" cujo campo Experience ainda pede uma ação: vazio ou "Não lançado" = '
-  + 'Abertura, "Alterar" = Ajuste, "Lixeira" = Exclusão. Depois de sincronizada no modo real a tarefa sai daqui. Ficam fora: Agenda "Planejamento", '
+  + 'Abertura, "Alterar" = Ajuste, "Lixeira" = Exclusão — não importa se a tarefa veio de chamado, demanda ou subdemanda. Depois de sincronizada no modo real '
+  + '(tela Sync com o Experience ou ficha da tarefa) ela sai daqui. Ficam fora: Agenda "Planejamento", '
   + '1-BP-MS, Horas Cruzadas, Planos de Ação e clientes inativos — as mesmas regras do Sync com o Experience.';
 
 export function ExperiencePendentes() {
   const escritorio = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
-  const avisar = useToast();
   const hoje = hojeIso();
   const [periodo, setPeriodo] = useState(() => periodoPendentes(hoje));
   const [acao, setAcao] = useState<AcaoSync | ''>('');
   const [consultor, setConsultor] = useState('');
   const [apontamento, setApontamento] = useState('');
-  const [rodando, setRodando] = useState<string | null>(null);
   const erroP = erroPeriodoPendentes(periodo.de, periodo.ate);
   const c = useCarga(() => (erroP ? Promise.resolve(null) : experiencePendentes.painel(escritorio, periodo.de, periodo.ate)),
     [escritorio, periodo.de, periodo.ate, erroP, ed.geracao]);
@@ -40,17 +38,6 @@ export function ExperiencePendentes() {
   const semAcao = useMemo(() => filtrarPendentes(linhas, { acao: '', consultor, apontamento }), [linhas, consultor, apontamento]);
   const t = totaisPendentes(semAcao);
   const vistas = useMemo(() => (acao ? semAcao.filter(l => l.acao === acao) : semAcao), [semAcao, acao]);
-
-  async function sincronizar(l: LinhaPendente) {
-    if (d?.modo === 'real' && !window.confirm(`O modo é REAL: ${ROTULO_PENDENCIA[l.acao].toLowerCase()} do lançamento de "${l.tarefa}" será gravada no Experience. Continuar?`)) return;
-    setRodando(l.id);
-    try {
-      const r = await syncExperience.rodar(escritorio, { de: l.data, ate: l.data, tarefa: l.id });
-      avisar(textoResultado(r), r.ok ? 'ok' : 'erro');
-      if (r.ok) ed.mudou();
-    } catch (e) { avisar((e as Error).message, 'erro'); }
-    setRodando(null);
-  }
 
   const colunas = useMemo<Coluna<LinhaPendente>[]>(() => [
     { chave: 'acao', titulo: 'Pendência', valor: l => l.acao, texto: l => ROTULO_PENDENCIA[l.acao],
@@ -70,10 +57,7 @@ export function ExperiencePendentes() {
     { chave: 'avisos', titulo: 'Atenção', texto: l => avisosPendente(l, hoje).join(' · '),
       render: l => { const a = avisosPendente(l, hoje); return a.length ? <span className="msg-erro">{a.join(' · ')}</span> : ''; } },
     { chave: 'observacao', titulo: 'Último sync', texto: l => [l.observacao, l.sync_em ? dataBr(l.sync_em.slice(0, 10)) : ''].filter(Boolean).join(' · ') },
-    { chave: 'sincronizar', titulo: '', fixa: true,
-      render: l => <Botao onClick={() => void sincronizar(l)} carregando={rodando === l.id} disabled={!!rodando || !l.fap}>Sincronizar</Botao> },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [hoje, rodando, d?.modo]);
+  ], [hoje]);
 
   const chip = (a: AcaoSync | '', rotulo: string, n: number) => (
     <button type="button" className={`chip${acao === a ? ' sel' : ''}`} aria-pressed={acao === a} onClick={() => setAcao(a)}>{rotulo} <small>{n}</small></button>);
@@ -85,7 +69,7 @@ export function ExperiencePendentes() {
         <div className="linha"><a className="bt bt-secundario" href={hashDe('sync-experience')}>Sync com o Experience</a></div>
       </header>
       <section className="cartao" aria-label="Filtros das pendências">
-        <p className="ajuda" data-testid="pendentes-modo">Modo do sync: <strong>{d ? ROTULO_MODO[d.modo] : '…'}</strong>. “Sincronizar” roda o sync só da tarefa, nesse modo.</p>
+        <p className="ajuda" data-testid="pendentes-modo">Modo do sync: <strong>{d ? ROTULO_MODO[d.modo] : '…'}</strong>. Esta tela só acompanha: para lançar, use o Sync com o Experience ou a ficha da tarefa.</p>
         <div className="barra-filtros">
           <label className="ajuda">De <input type="date" aria-label="Data inicial" value={periodo.de} onChange={e => setPeriodo(p => ({ ...p, de: e.target.value }))} /></label>
           <label className="ajuda">Até <input type="date" aria-label="Data final" value={periodo.ate} onChange={e => setPeriodo(p => ({ ...p, ate: e.target.value }))} /></label>

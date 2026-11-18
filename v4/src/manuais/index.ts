@@ -29,6 +29,7 @@ import syncExperience from './sync-experience.md?raw';
 import syncClickup from './sync-clickup.md?raw';
 import mcp from './mcp.md?raw';
 import etapas from './etapas.md?raw';
+import paineis from './paineis.md?raw';
 
 export type PublicoManual = 'consultor' | 'gestao' | 'modulo';
 
@@ -76,6 +77,8 @@ export const MANUAIS: Manual[] = [
     resumo: 'Os prazos e os períodos de férias da equipe.' },
   { id: 'reembolso', titulo: 'Reembolso KM', para: 'modulo', texto: reembolso, modulos: ['reembolso'],
     resumo: 'Registrar os deslocamentos e montar o relatório de reembolso de quilometragem.' },
+  { id: 'paineis', titulo: 'Painéis (relatórios dinâmicos)', para: 'modulo', texto: paineis, modulos: ['paineis'],
+    resumo: 'Monte tabelas com agrupamento, linhas do tempo e gráficos com os dados do app; cada pessoa vê só o que já pode ver.' },
   { id: 'portfolio', titulo: 'Portfólio', para: 'modulo', texto: portfolio, modulos: ['portfolio'],
     resumo: 'A visão geral dos projetos: fases, GPs, situação e planos de ação.' },
   { id: 'produtividade', titulo: 'Ordens de Serviço e Meu fechamento', para: 'modulo', texto: produtividade, modulos: ['produtividade', 'meu-fechamento'],

@@ -67,7 +67,12 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
       setCaixa({ local: local(r), nome: r.demanda.nome });
       setCliente(r.cliente.id);
     }).catch(e => setErro((e as Error).message));
-    else if (alvo.demanda_id) exec.demanda(esc, alvo.demanda_id).then(r => { setCaixa({ local: local(r), nome: r.demanda.nome }); setCliente(r.cliente.id); })
+    else if (alvo.demanda_id) exec.demanda(esc, alvo.demanda_id).then(r => {
+      setCaixa({ local: local(r), nome: r.demanda.nome }); setCliente(r.cliente.id);
+      // tarefa nova: a etapa sugerida é a da demanda (sem ela, o banco busca a do nível acima na inserção — 0102)
+      const sugerida = et.idDe(r.demanda);
+      if (sugerida) setF(x => (x.etapaApp ? x : { ...x, etapaApp: sugerida }));
+    })
       .catch(() => setCaixa(null));
   }, [alvo, esc]);  // eslint-disable-line react-hooks/exhaustive-deps
   // as etapas do app podem chegar depois da tarefa: a escolha é preenchida quando o cadastro carrega
@@ -262,7 +267,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
         <div className="grade-campos dupla">
           <Campo rotulo="Etapa" tipo="select" valor={f.etapaApp} aoMudar={v => setF({ ...f, etapaApp: v })}
             opcoes={[{ valor: '', rotulo: '—' }, ...et.lista.filter(e => e.ativo || e.id === f.etapaApp).map(e => ({ valor: e.id, rotulo: e.nome }))]}
-            ajuda={f.etapa && !f.etapaApp ? `No ClickUp: ${f.etapa} (sem vínculo no cadastro de etapas)` : undefined} />
+            ajuda={f.etapa && !f.etapaApp ? `No ClickUp: ${f.etapa} (sem vínculo no cadastro de etapas)` : novo && !f.etapaApp ? 'Vazia, vale a etapa da demanda.' : undefined} />
           <Campo rotulo="Apontamento" tipo="select" valor={f.apontamento} aoMudar={v => setF({ ...f, apontamento: v })} opcoes={opcoesDe(opcoes?.apontamento, f.apontamento)} />
           <Campo rotulo="Agendamento" tipo="select" valor={f.agendamento} aoMudar={v => setF({ ...f, agendamento: v })} opcoes={opcoesDe(opcoes?.agendamento, f.agendamento)} />
           <Campo rotulo="Experience" tipo="select" valor={f.experience} aoMudar={v => setF({ ...f, experience: v })} opcoes={opcoesDe(opcoes?.experience, f.experience)} />

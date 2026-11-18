@@ -22,6 +22,12 @@ const ETAPA_SUGERIDA: Record<string, string> = {
   'Integração / importação': 'Personalização / Customização',
 };
 export const etapaSugerida = (tipo: string) => ETAPA_SUGERIDA[tipo] ?? 'Atendimento avulso';
+/** Etapa do cadastro sugerida para o chamado (0102): só entre as marcadas "vale para chamado". Tipo de personalização →
+ *  Backlog Personalização; os demais → Backlog Consultores; sem elas, a primeira da lista. */
+export function etapaChamadoSugerida(tipo: string, etapas: { id: string; codigo: string }[]): string {
+  const cod = ETAPA_SUGERIDA[tipo] ? 'backlog_personalizacao' : 'backlog_consultores';
+  return (etapas.find(e => e.codigo === cod) ?? etapas[0])?.id ?? '';
+}
 const lista = (v: string[]): Op[] => v.map(x => ({ valor: x, rotulo: x }));
 export const AMBIENTES = lista(['Produção', 'Teste / homologação', 'Produção e teste']);
 export const ABRANGENCIAS = lista(['Um usuário', 'Um setor / equipe', 'Toda a empresa', 'Clientes / fornecedores']);
@@ -55,6 +61,8 @@ export interface ChamadoLinha {
 export interface Chamado extends ChamadoLinha {
   contato: string | null; origem: string | null; os_sankhya: string | null; ambiente: string | null; abrangencia: string | null; forma_atendimento: string | null;
   passos: string | null; esperado: string | null; prazo: string | null; motivo_prazo: string | null; sem_anexo: string | null; motivo_recusa: string | null;
+  /** V4: lugar no fluxo (0085) e quem triou (0102). */
+  localizacao?: string | null; triado_por?: string | null; triado_em?: string | null;
 }
 export interface Interacao { id: string; autor_id: string; canal: string; texto: string; visivel_cliente: boolean; criado_em: string }
 export interface Relacionado { relacao_id: string; versao: number; tipo: 'relacionado' | 'duplicado'; duplicado_deste: boolean; id: string; numero: number; titulo: string; situacao: string }
@@ -101,6 +109,9 @@ export const cham = {
   /** Repetir com o mesmo `op` devolve o mesmo chamado (rede caiu depois de gravar). */
   abrir: (esc: string, d: Record<string, unknown>, op: string) =>
     rpc<{ ok: true; id: string; numero: number; demanda_id: string }>('v1_chamado_abrir', { p_escritorio: esc, p_dados: d, p_id_operacao: op }),
+  /** V4 (0102): a etapa vem do cadastro (`etapa_id`, só as marcadas para chamado). */
+  abrirV4: (esc: string, d: Record<string, unknown>, op: string) =>
+    rpc<{ ok: true; id: string; numero: number; demanda_id: string }>('v4_chamado_abrir', { p_escritorio: esc, p_dados: d, p_id_operacao: op }),
   triar: (esc: string, d: Record<string, unknown>) => salvar('v1_chamado_triar', esc, d),
   interagir: (esc: string, d: Record<string, unknown>) => salvar('v1_chamado_interacao_salvar', esc, d),
   relacionar: (esc: string, d: Record<string, unknown>) => salvar('v1_chamado_relacionar', esc, d),
@@ -189,7 +200,7 @@ export function slaDaLinha(c: ChamadoLinha, agora: number): EstadoSla {
 }
 
 const dataBr = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '');
-const dataHoraBr = (iso: string) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Cuiaba' });
+export const dataHoraBr = (iso: string) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Cuiaba' });
 
 /** Texto para colar no WhatsApp do cliente: só o que é visível ao cliente, nunca interação interna. */
 export function extratoChamado(f: Pick<FichaChamado, 'chamado' | 'demanda' | 'tarefas' | 'interacoes'>): string {

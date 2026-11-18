@@ -14,6 +14,12 @@ export function PilulaEtapa({ reg, id }: { reg?: RegEtapa | null; id?: string | 
   return <span className="pil pil-etapa" data-etapa={e.codigo} style={{ background: e.cor, color: corTexto(e.cor) }} title={`Etapa: ${e.nome}`}>{e.nome}</span>;
 }
 
+/** Etapa na ficha: sempre a do app (cadastro); sem etapa, um traço. */
+export function EtapaFicha({ reg }: { reg?: RegEtapa | null }) {
+  const et = useEtapas();
+  return et.de(reg) || reg?.etapa ? <PilulaEtapa reg={reg} /> : <>—</>;
+}
+
 export function PilulaStatus({ status }: { status: string }) {
   return <span className={`pil pil-status pst-${statusV4(status)}`} title={`Status: ${rotuloStatusDemanda(status)}`}>{rotuloStatusDemanda(status)}</span>;
 }

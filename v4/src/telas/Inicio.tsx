@@ -1,6 +1,7 @@
 // Início: saudação, card de favoritos agrupado por cliente (V6, com a barra de horas), atalhos por área e os manuais da função.
 import { data } from '../api/cadastros';
 import { exec } from '../api/execucao';
+import { rpc } from '../api/cliente';
 import { StatusPilula } from '../componentes/ArvoreDemandas';
 import { BarraHoras } from '../componentes/BarraHoras';
 import { Icone } from '../componentes/Icone';
@@ -13,6 +14,9 @@ import { AREAS, caminhoEntidade, hashDe, modulosVisiveis } from '../estado/rotas
 import { Resumo } from '../componentes/Resumo';
 import { manuaisVisiveis } from '../manuais';
 
+/** Cartões de indicadores do topo (0103): cada um só aparece para quem pode abrir a tela de destino. */
+interface Indicadores { dia: string; chamados_triagem: number; chamados_backlog: number; ociosos: number | null }
+
 const PERFIS: Record<string, string> = { admin: 'Admin', gp: 'GP', lider_tech: 'Líder Tech', consultor: 'Consultor', triagem: 'Triagem' };
 
 export function Inicio() {
@@ -21,7 +25,13 @@ export function Inicio() {
   const ed = useEdicao();
   const escId = eu?.escritorio_id ?? null;
   const home = useCarga(() => (escId ? exec.favoritosHome(escId) : Promise.resolve([])), [escId, fav.lista.length, ed.geracao]);
+  const ind = useCarga(() => (escId ? rpc<Indicadores>('v4_inicio_indicadores', { p_escritorio: escId }) : Promise.resolve(null)), [escId, ed.geracao]);
   if (!eu) return null;
+  const cartoes = ind.dados ? [
+    { id: 'triagem', rotulo: 'Chamados em triagem', valor: ind.dados.chamados_triagem, href: hashDe('chamados/triagem'), alerta: ind.dados.chamados_triagem > 0 },
+    { id: 'backlog', rotulo: 'Chamados no backlog', valor: ind.dados.chamados_backlog, href: hashDe('chamados/backlog'), alerta: false },
+    ...(ind.dados.ociosos !== null ? [{ id: 'ociosos', rotulo: 'Consultores com ociosidade hoje', valor: ind.dados.ociosos, href: hashDe('ociosidade'), alerta: ind.dados.ociosos > 0 }] : []),
+  ] : [];
   const soltos = fav.lista.filter(f => f.entidade === 'cliente' || f.entidade === 'chamado');
   const esc = eu.escritorios.find(e => e.id === eu.escritorio_id);
   const hora = new Date().getHours();
@@ -34,6 +44,15 @@ export function Inicio() {
           <p className="ajuda">{esc?.nome ?? 'Sem escritório'}{eu.perfil ? ` · ${PERFIS[eu.perfil] ?? eu.perfil}` : ''}</p>
         </div>
       </header>
+      {cartoes.length > 0 && (
+        <section aria-label="Indicadores" className="inicio-indicadores">
+          {cartoes.map(k => (
+            <a key={k.id} className={`cartao inicio-ind${k.alerta ? ' inicio-ind-alerta' : ''}`} href={k.href} data-testid={`ind-${k.id}`}>
+              <strong>{k.valor}</strong><span>{k.rotulo}</span>
+            </a>
+          ))}
+        </section>
+      )}
       {(home.dados?.length ?? 0) > 0 && (
         <section>
           <h2 className="secao">Favoritos por cliente</h2>

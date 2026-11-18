@@ -159,6 +159,8 @@ export const exec = {
   tarefa: (esc: string, id: string) => rpc<FichaTarefa>('v1_tarefa', { p_escritorio: esc, p_tarefa: id }),
   opcoes: (esc: string) => rpc<OpcoesExecucao>('v1_opcoes_execucao', { p_escritorio: esc }),
   demandaSalvar: (esc: string, d: Record<string, unknown>) => salvar<Demanda>('v1_demanda_salvar', esc, d),
+  /** V4 (0102): exige a etapa na demanda (raiz) e aceita `etapa_id`; subdemanda sem etapa herda a da demanda no banco. */
+  demandaSalvarV4: (esc: string, d: Record<string, unknown>) => salvar<Demanda>('v4_demanda_salvar', esc, d),
   tarefasSalvar: (esc: string, d: Record<string, unknown>) => salvar<Tarefa>('v1_tarefas_salvar', esc, d),
   /** Contatos do cliente para o campo "Usuário do cliente" (0051). */
   contatos: (esc: string, cliente: string) => rpc<ContatoCliente[]>('v1_cliente_contatos', { p_escritorio: esc, p_cliente: cliente }),

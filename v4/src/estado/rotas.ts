@@ -54,6 +54,8 @@ export const MODULOS: Modulo[] = [
   // V11d-1: módulo pessoal (só o Admin por padrão); #/reembolso/relatorio abre direto na aba (link do aviso do dia 1º)
   { id: 'reembolso', titulo: 'Reembolso KM', area: 'execucao', icone: 'carro', permissao: 'reembolso.usar', parametro: true },
   { id: 'portfolio', titulo: 'Portfólio', area: 'relatorios', icone: 'grade', permissao: 'portfolio.ver' },
+  // 4.13.0 (0103): relatórios montados pelo usuário (tabela, linha do tempo, gráficos); os dados seguem o que a pessoa já vê
+  { id: 'paineis', titulo: 'Painéis', area: 'relatorios', icone: 'grafico', permissao: 'relatorio_dinamico.ver' },
   // todos entram; sem produtividade.ver_todos o banco devolve só o próprio (0045)
   { id: 'produtividade', titulo: 'Ordens de Serviço', area: 'relatorios', icone: 'grafico' },
   // F3 (0071): cofre financeiro; só os autorizados nominais veem (os demais: "Sem acesso")

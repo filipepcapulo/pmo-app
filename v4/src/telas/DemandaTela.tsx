@@ -12,6 +12,7 @@ import { BotaoFavorito } from '../componentes/BotaoFavorito';
 import { Checklist } from '../componentes/Checklist';
 import { Comentarios } from '../componentes/Comentarios';
 import { NomePessoa } from '../componentes/NomePessoa';
+import { EtapaFicha } from '../componentes/Pilulas';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
@@ -72,7 +73,7 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
           <div><dt>% concluído</dt><dd>{t?.perc != null ? `${t.perc}%` : '—'}{d.perc_manual != null && <small className="ajuda"> (manual)</small>}</dd></div>
           <div><dt>Prioridade</dt><dd>{rotuloPrioridade(d.prioridade)}</dd></div>
           <div><dt>Responsável</dt><dd><NomePessoa id={d.responsavel_id} comAvatar /></dd></div>
-          <div><dt>Etapa</dt><dd>{d.etapa ?? '—'}</dd></div>
+          <div><dt>Etapa</dt><dd><EtapaFicha reg={d} /></dd></div>
           <div><dt>ClickUp</dt><dd>{d.clickup_id ? <a href={`https://app.clickup.com/t/${d.clickup_id}`} target="_blank" rel="noopener">{d.clickup_id}</a> : '—'}</dd></div>
         </dl>
         {d.descricao && <p className="descricao">{d.descricao}</p>}

@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { api, horas, type ProjetoLinha } from '../api/cadastros';
 import { FalhaApi } from '../api/cliente';
 import { exec, opcoesStatusDemanda, PRIORIDADES, type Demanda, type OpcoesExecucao } from '../api/execucao';
-import { etapasApi } from '../api/etapas';
 import { useEtapas } from '../estado/etapas';
 import type { AlvoDemanda } from '../estado/edicao';
 import { usePode, useEquipe } from '../estado/equipe';
@@ -23,7 +22,7 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
   const et = useEtapas();
   const [orig, setOrig] = useState<Demanda | null>(null);
   const [projetos, setProjetos] = useState<ProjetoLinha[]>([]);
-  const [maes, setMaes] = useState<{ id: string; nome: string }[]>([]);
+  const [maes, setMaes] = useState<{ id: string; nome: string; etapa: string | null }[]>([]);
   const [caixa, setCaixa] = useState<{ local: string; nome: string } | null>(null);
   const [gpCliente, setGpCliente] = useState<string | null>(null);
   const [f, setF] = useState({ projeto: alvo.projeto_id ?? '', pai: alvo.pai_id ?? '', nome: '', status: 'backlog', prioridade: 'normal',
@@ -62,14 +61,19 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
   useEffect(() => {
     if (!f.projeto) { setMaes([]); return; }
     exec.demandas(esc, { projeto: f.projeto, limite: 500 })
-      .then(r => setMaes(r.itens.filter(d => !d.pai_id && d.id !== alvo.id).map(d => ({ id: d.id, nome: d.nome }))))
+      .then(r => setMaes(r.itens.filter(d => !d.pai_id && d.id !== alvo.id).map(d => ({ id: d.id, nome: d.nome, etapa: et.idDe(d) }))))
       .catch(() => setMaes([]));
   }, [f.projeto, esc, alvo.id]);
+
+  // subdemanda nova: a etapa sugerida é a da demanda (o banco faz o mesmo na inserção se ficar vazia — 0102)
+  const etapaMae = f.pai ? maes.find(m => m.id === f.pai)?.etapa ?? null : null;
+  useEffect(() => { if (novo && etapaMae) setF(x => (x.etapaApp ? x : { ...x, etapaApp: etapaMae })); }, [novo, etapaMae]);
 
   const enviar = async (excluir = false) => {
     setErro(null);
     if (!excluir) {
       if (!f.projeto || !f.nome.trim()) { setErro('Projeto e nome são obrigatórios.'); return; }
+      if (!f.pai && !f.avulso && !f.etapaApp && !f.etapa && orig?.tipo !== 'chamado') { setErro('Informe a etapa da demanda.'); return; }
       if (f.inicio && f.fim && f.fim < f.inicio) { setErro('O fim não pode ser antes do início.'); return; }
       if (f.perc && (Number(f.perc) < 0 || Number(f.perc) > 100)) { setErro('O % manual vai de 0 a 100.'); return; }
     }
@@ -77,14 +81,14 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
     try {
       const campos = { nome: f.nome.trim(), status: f.status, prioridade: f.prioridade, inicio: f.inicio || null, fim: f.fim || null,
         horas_previstas: f.horas === '' ? null : Number(f.horas), perc_manual: f.perc === '' ? null : Number(f.perc),
-        responsavel_id: f.resp || null, etapa: f.etapa || null, modulo_id: f.modulo || null, descricao: f.descricao.trim() || null,
+        responsavel_id: f.resp || null, modulo_id: f.modulo || null, descricao: f.descricao.trim() || null,
+        // a etapa escolhida é a do app (etapa_id); tirada no formulário, o texto do ClickUp sai junto (senão o de/para a traria de volta)
+        etapa_id: f.etapaApp || null, etapa: (!f.etapaApp && orig && et.idDe(orig) ? null : f.etapa || null),
         // só vai quando marca ou desmarca: o resto das demandas grava como antes
         ...(f.avulso || orig?.avulso_base ? { avulso_base: !f.pai && f.avulso } : {}) };
       const r = novo
-        ? await exec.demandaSalvar(esc, { projeto_id: f.projeto, pai_id: f.pai || null, ...campos })
-        : await exec.demandaSalvar(esc, { id: alvo.id, versao: orig!.versao, ...(excluir ? { excluir: true } : { ...campos, pai_id: f.pai || null }) });
-      // V4: a etapa escolhida é a do app; o texto de etapa do ClickUp acompanha pelo de/para (0083)
-      if (!excluir && (f.etapaApp || null) !== (orig ? et.idDe(orig) : null)) await etapasApi.definir(esc, 'demanda', String(r.id), f.etapaApp || null);
+        ? await exec.demandaSalvarV4(esc, { projeto_id: f.projeto, pai_id: f.pai || null, ...campos })
+        : await exec.demandaSalvarV4(esc, { id: alvo.id, versao: orig!.versao, ...(excluir ? { excluir: true } : { ...campos, pai_id: f.pai || null }) });
       avisar(excluir ? 'Demanda excluída' : 'Demanda gravada', 'ok');
       aoGravar(String(r.id));
     } catch (e) {
@@ -142,9 +146,10 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
           <Campo rotulo="Responsável (GP/Líder)" tipo="select" valor={f.resp} aoMudar={v => setF({ ...f, resp: v })}
             opcoes={[{ valor: '', rotulo: '—' }, ...equipe.filter(m => m.ativo || m.id === f.resp).map(m => ({ valor: m.id, rotulo: m.nome }))]}
             ajuda={gpCliente && f.resp === gpCliente ? 'Sugerido: GP do cliente.' : undefined} />
-          <Campo rotulo="Etapa" tipo="select" valor={f.etapaApp} aoMudar={v => setF({ ...f, etapaApp: v })}
-            opcoes={[{ valor: '', rotulo: '—' }, ...et.lista.filter(e => e.ativo || e.id === f.etapaApp).map(e => ({ valor: e.id, rotulo: e.nome }))]}
-            ajuda={f.etapa && !f.etapaApp ? `No ClickUp: ${f.etapa} (sem vínculo no cadastro de etapas)` : undefined} />
+          <Campo rotulo="Etapa" tipo="select" valor={f.etapaApp} aoMudar={v => setF({ ...f, etapaApp: v })} obrigatorio={!ehSub && !f.avulso}
+            opcoes={[{ valor: '', rotulo: ehSub ? '— a da demanda —' : '— escolha —' }, ...et.lista.filter(e => e.ativo || e.id === f.etapaApp).map(e => ({ valor: e.id, rotulo: e.nome }))]}
+            ajuda={f.etapa && !f.etapaApp ? `No ClickUp: ${f.etapa} (sem vínculo no cadastro de etapas)`
+              : ehSub ? (etapaMae && f.etapaApp === etapaMae ? 'Sugerida: a etapa da demanda.' : 'Vazia, vale a etapa da demanda.') : undefined} />
           <Campo rotulo="Módulo" tipo="select" valor={f.modulo} aoMudar={v => setF({ ...f, modulo: v })}
             opcoes={[{ valor: '', rotulo: '—' }, ...(opcoes?.modulos ?? []).map(m => ({ valor: m.id, rotulo: m.nome }))]} />
         </div>

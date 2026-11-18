@@ -2,7 +2,7 @@
 // Kanban (arrastar muda a localização; soltar em Atribuído abre o Alocar agenda) e Meus chamados.
 import { useMemo, useRef, useState } from 'react';
 import { idadeDias, slaDaLinha } from '../api/chamados';
-import { BACKLOGS, chamV4, exigenciaDoMovimento, LOCAIS, rotuloLocal, type ChamadoFluxo, type Local } from '../api/chamadosV4';
+import { BACKLOGS, chamV4, destinosDe, exigenciaDoMovimento, LOCAIS, rotuloLocal, type ChamadoFluxo, type Local } from '../api/chamadosV4';
 import { rotuloPrioridade } from '../api/execucao';
 import { AlocarAgenda } from '../componentes/AlocarAgenda';
 import { Botao } from '../componentes/Botao';
@@ -29,6 +29,7 @@ function useMover(aoMudar: () => void) {
   const mover = async (c: ChamadoFluxo, destino: Local) => {
     const pede = exigenciaDoMovimento(c, destino);
     if (pede === 'alocar') { setAlocar(c); return; }
+    if (pede === 'triado') { avisar(`O chamado #${c.numero} já foi triado e não volta para a Triagem.`, 'erro'); return; }
     if (pede === 'bloqueado') { avisar(`O chamado #${c.numero} tem ${c.tarefas_abertas} agenda(s) em aberto; conclua ou cancele antes de devolver.`, 'erro'); return; }
     let ticket: string | undefined;
     if (pede === 'ticket') {
@@ -53,7 +54,7 @@ function SeletorMover({ c, mover, rotulo = 'Mover para…' }: { c: ChamadoFluxo;
   return (
     <select className="kb-mover" aria-label={`Mover o chamado ${c.numero}`} value="" onChange={e => { if (e.target.value) mover(c, e.target.value as Local); }}>
       <option value="">{rotulo}</option>
-      {LOCAIS.filter(l => l.valor !== c.localizacao).map(l => <option key={l.valor} value={l.valor}>{l.rotulo}</option>)}
+      {destinosDe(c).map(l => <option key={l.valor} value={l.valor}>{l.rotulo}</option>)}
     </select>
   );
 }

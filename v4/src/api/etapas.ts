@@ -7,6 +7,8 @@ import type { Gravado } from './cadastros';
 export interface Etapa {
   id: string; versao: number; codigo: string; nome: string; cor: string; ordem: number; ativo: boolean; sistema: boolean;
   cu_principal: string | null; vinculos: string[];
+  /** Vale para chamado: aparece no formulário de abertura do chamado (0102). */
+  chamado?: boolean;
 }
 export interface EtapasResposta { pode_editar: boolean; etapas: Etapa[]; opcoes_cu: string[]; sem_vinculo: string[] }
 

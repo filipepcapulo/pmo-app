@@ -28,6 +28,7 @@ import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
+import { useEtapas } from '../estado/etapas';
 import { gps, useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
@@ -149,8 +150,9 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
 
 // ---------------------------------------------------------------- Indicadores
 function AbaIndicadores({ ficha }: { ficha: ProjetoFicha }) {
+  const et = useEtapas();
   const t = ficha.totais, p = ficha.projeto, hoje = hojeIso();
-  const rs = riscos(ficha.demandas, hoje), ms = proximosMarcos(ficha.demandas, hoje);
+  const rs = riscos(ficha.demandas, hoje), ms = proximosMarcos(ficha.demandas, hoje, 5, d => et.de(d)?.codigo);
   const goLive = t?.go_live ?? null, diasGo = goLive ? diaNum(goLive) - diaNum(hoje) : null;
   const raiz = ficha.demandas.filter(d => !d.pai_id);
   return (

@@ -14,6 +14,7 @@ import { BotaoFavorito } from '../componentes/BotaoFavorito';
 import { Checklist } from '../componentes/Checklist';
 import { Comentarios } from '../componentes/Comentarios';
 import { NomePessoa } from '../componentes/NomePessoa';
+import { EtapaFicha } from '../componentes/Pilulas';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
@@ -95,7 +96,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
           <div><dt>Horas</dt><dd>{t.horas_reais != null ? <>{horas(t.horas_reais)} <small className="ajuda">reais · {horas(t.horas_previstas)} previstas</small></> : <>{horas(t.horas_previstas)} <small className="ajuda">previstas</small></>}</dd></div>
           <div><dt>Agenda</dt><dd>{rotuloModalidade(t.modalidade) || '—'}</dd></div>
           <div><dt>Usuário do cliente</dt><dd>{uc ? <>{uc.nome}{(uc.email || uc.telefone) && <small className="ajuda"> · {[uc.email, uc.telefone].filter(Boolean).join(' · ')}</small>}</> : '—'}</dd></div>
-          <div><dt>Etapa</dt><dd>{t.etapa ?? '—'}</dd></div>
+          <div><dt>Etapa</dt><dd><EtapaFicha reg={t} /></dd></div>
           <div><dt>Agendamento</dt><dd>{t.agendamento ?? '—'}</dd></div>
           <div><dt>Experience</dt><dd>{t.experience ?? '—'}{sx?.lancamento_id && <small className="ajuda"> · lançamento {sx.lancamento_id}</small>}</dd></div>
           <div><dt>Apontamento</dt><dd>{t.apontamento ?? '—'}</dd></div>

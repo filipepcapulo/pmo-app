@@ -34,7 +34,7 @@ export function relatorioBacklog(arvore: NoCliente[], filtros: string[], hoje = 
 export const COLUNAS_DEMANDAS = ['Demanda', 'Subdemanda', 'Status', 'Prioridade', 'Início', 'Fim', 'Horas previstas', 'Etapa'];
 
 /** Demandas da tela Demandas (filtro de status/texto aplicado no banco), um bloco por cliente · projeto. */
-export function relatorioDemandas(itens: DemandaLinha[], filtros: string[]): Relatorio {
+export function relatorioDemandas(itens: (DemandaLinha & { etapa_nome?: string | null })[], filtros: string[]): Relatorio {
   const nomes = new Map(itens.map(d => [d.id, d.nome]));
   const grupos = new Map<string, SecaoRelatorio>();
   for (const d of itens) {
@@ -42,7 +42,7 @@ export function relatorioDemandas(itens: DemandaLinha[], filtros: string[]): Rel
     grupos.set(d.projeto_id, g);
     const sub = !!d.pai_id;
     g.linhas.push([sub ? (nomes.get(d.pai_id!) ?? '') : d.nome, sub ? d.nome : '', rotuloStatusDemanda(d.status), rotuloPrioridade(d.prioridade),
-      dataBr(d.inicio), dataBr(d.fim), horas(d.horas_previstas), d.etapa ?? '']);
+      dataBr(d.inicio), dataBr(d.fim), horas(d.horas_previstas), d.etapa_nome ?? d.etapa ?? '']);
   }
   return { titulo: 'Demandas', filtros, colunas: COLUNAS_DEMANDAS, secoes: [...grupos.values()] };
 }

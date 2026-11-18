@@ -120,9 +120,9 @@ export function riscos(demandas: DemandaProjeto[], hoje = hojeIso()) {
 }
 
 /** Próximos marcos: entregáveis abertos com fim de hoje em diante (Go Live primeiro em caso de empate). */
-export function proximosMarcos(demandas: DemandaProjeto[], hoje = hojeIso(), limite = 5) {
+export function proximosMarcos(demandas: DemandaProjeto[], hoje = hojeIso(), limite = 5, codigoEtapa?: (d: DemandaProjeto) => string | null | undefined) {
   return demandas.filter(d => !d.pai_id && (d.tipo ?? 'entregavel') === 'entregavel' && !['concluida', 'cancelada'].includes(d.status))
-    .map(d => ({ d, fim: d.totais?.fim ?? d.fim ?? null, golive: /go.?live/i.test(d.etapa ?? '') || /go.?live/i.test(d.nome) }))
+    .map(d => ({ d, fim: d.totais?.fim ?? d.fim ?? null, golive: codigoEtapa?.(d) === 'go_live' || /go.?live/i.test(d.etapa ?? '') || /go.?live/i.test(d.nome) }))
     .filter((x): x is { d: DemandaProjeto; fim: string; golive: boolean } => !!x.fim && x.fim >= hoje)
     .sort((a, b) => a.fim.localeCompare(b.fim) || Number(b.golive) - Number(a.golive)).slice(0, limite);
 }

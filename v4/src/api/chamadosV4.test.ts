@@ -45,3 +45,29 @@ describe('fluxo do chamado (V4)', () => {
     expect(exigenciaDoMovimento(c, 'backlog_consultores')).toBe('nada');
   });
 });
+
+// 4.13.0 (0102): chamado triado não volta para a Triagem; "Triado por"
+import { destinosDe, textoTriado } from './chamadosV4';
+import { etapaChamadoSugerida } from './chamados';
+describe('chamado triado (0102)', () => {
+  it('depois de triado, a Triagem sai dos destinos e o movimento é barrado', () => {
+    expect(destinosDe({ localizacao: 'backlog_consultores', status_triagem: 'triada' }).map(l => l.valor)).not.toContain('triagem');
+    expect(destinosDe({ localizacao: 'backlog_consultores', status_triagem: 'triada' }).map(l => l.valor)).not.toContain('backlog_consultores');
+    expect(destinosDe({ localizacao: 'aguardando_cliente', status_triagem: 'em_triagem' }).map(l => l.valor)).toContain('triagem');
+    expect(exigenciaDoMovimento({ tarefas_abertas: 0, ticket: null, localizacao: 'backlog_consultores', status_triagem: 'triada' }, 'triagem')).toBe('triado');
+    expect(exigenciaDoMovimento({ tarefas_abertas: 0, ticket: null, localizacao: 'aguardando_cliente', status_triagem: 'em_triagem' }, 'triagem')).toBe('nada');
+  });
+  it('texto: com nome e data; sem nome quando a triagem é antiga ou veio do ClickUp', () => {
+    const nome = (id: string) => (id === 'u1' ? 'Filipe Capulo' : null), dh = (iso: string) => iso.slice(0, 10);
+    expect(textoTriado({ triado_por: 'u1', triado_em: '2026-11-18T14:00:00Z' }, nome, dh)).toBe('Triado por Filipe Capulo em 2026-11-18');
+    expect(textoTriado({ triado_por: null, triado_em: '2026-11-18T14:00:00Z' }, nome, dh)).toBe('Triado em 2026-11-18');
+    expect(textoTriado({ triado_por: 'x', triado_em: null }, nome, dh)).toBe('Triado');
+  });
+  it('etapa sugerida do chamado: só entre as marcadas; personalização pelo tipo', () => {
+    const et = [{ id: 'c', codigo: 'backlog_consultores' }, { id: 'p', codigo: 'backlog_personalizacao' }];
+    expect(etapaChamadoSugerida('Erro / incidente', et)).toBe('c');
+    expect(etapaChamadoSugerida('Relatório / dashboard', et)).toBe('p');
+    expect(etapaChamadoSugerida('Relatório / dashboard', [{ id: 'b', codigo: 'briefing' }])).toBe('b');
+    expect(etapaChamadoSugerida('Erro / incidente', [])).toBe('');
+  });
+});

@@ -110,7 +110,7 @@ Toque em **+ Tarefa**.
 3. Se quiser: **Status**, **Etapa**, **Apontamento**, **Agendamento**, **Experience** e **Detalhamento**. A tarefa nova já vem com a sugestão **Apontamento = OS Experience**, **Agendamento = Agendar** e **Experience = Não lançado** (troque se for outro caso); a **Etapa** é a do cadastro de Etapas do app.
 4. Toque em **Gravar** (ou **Criar N tarefas**).
 
-Períodos: Manhã (08h-12h), Tarde (14h-18h), Dia (08h-18h), Noite (18h-22h) ou **Horário livre**. No horário livre, informe **Início** e **Fim** em hora cheia.
+Períodos: Manhã (08h-12h), Tarde (14h-18h), Dia (08h-18h), Noite (18h-22h) ou **Horário livre**. No horário livre, informe **Início** e **Fim** no formato hh:mm; os minutos são aceitos (ex.: 13:30 às 14:15), então a agenda pode ter menos de uma hora. Enquanto o ClickUp estiver em paralelo, lá a tarefa aparece na hora cheia que contém a janela (13:30 às 14:15 aparece como 13h-15h); no app valem o horário e as horas exatos.
 
 Tipos de agenda: Remoto, Interno, Presencial no cliente ou Presencial na Unidade Sankhya.
 
@@ -167,7 +167,7 @@ Quando houve desvio de agenda, a ficha mostra o quadro do desvio com o link para
 | "Cliente, demanda e título são obrigatórios." | Complete a tarefa |
 | "Escolha o consultor e a data da combinação." | Complete a combinação antes de adicionar |
 | "Essa combinação já está na lista." | A agenda já foi adicionada |
-| "No horário livre, informe início e fim em hora cheia…" | Use horas cheias, com o fim depois do início |
+| "No horário livre, informe início e fim no formato hh:mm…" | Use o formato hh:mm (ex.: 13:30), com o fim depois do início |
 | "Confira início, fim e intervalo." | O apontamento precisa de fim depois do início e intervalo menor que o total |
 | "Informe as horas estimadas." / "Informe o motivo." | Complete o pedido de mais agenda |
 | "Arquivo acima de 20 MB." | Reduza o arquivo |

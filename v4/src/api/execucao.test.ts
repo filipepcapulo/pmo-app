@@ -71,11 +71,17 @@ describe('escolha da demanda em cascata (cliente → demanda → subdemanda)', (
   });
 });
 
-describe('Horário livre só em hora cheia (0080)', () => {
-  it('recusa minutos, formato errado e fim antes do início; aceita hora cheia e os períodos fixos', () => {
+describe('Horário livre aceita minutos (0106)', () => {
+  it('aceita hora cheia, minutos e janela menor que 1 h; recusa formato errado, hora inexistente e fim que não vem depois do início', () => {
     expect(horarioInvalido({ periodo: 'livre', ini: '13:00', fim: '17:00' })).toBe(false);
-    expect(horarioInvalido({ periodo: 'livre', ini: '13:00', fim: '17:30' })).toBe(true);
-    expect(horarioInvalido({ periodo: 'livre', ini: '08:15', fim: '12:00' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '13:00', fim: '17:30' })).toBe(false);
+    expect(horarioInvalido({ periodo: 'livre', ini: '08:15', fim: '12:00' })).toBe(false);
+    expect(horarioInvalido({ periodo: 'livre', ini: '13:30', fim: '14:15' })).toBe(false);
+    expect(horarioInvalido({ periodo: 'livre', ini: '09:00', fim: '09:30' })).toBe(false);
+    expect(horarioInvalido({ periodo: 'livre', ini: '9:00', fim: '10:00' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '13:60', fim: '14:00' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '23:00', fim: '24:00' })).toBe(true);
+    expect(horarioInvalido({ periodo: 'livre', ini: '13:30', fim: '13:30' })).toBe(true);
     expect(horarioInvalido({ periodo: 'livre', ini: '17:00', fim: '13:00' })).toBe(true);
     expect(horarioInvalido({ periodo: 'livre', ini: '', fim: '' })).toBe(true);
     expect(horarioInvalido({ periodo: 'manha', ini: '', fim: '' })).toBe(false);

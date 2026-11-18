@@ -128,13 +128,15 @@ Botões:
 - **Extrato**: monta o texto para colar no WhatsApp do cliente (situação, prioridade, agenda e histórico visível). Toque em **Copiar**. Interações internas não entram.
 - **Imagem**: gera um PNG no formato de tela de celular para mandar no grupo interno, com o que a triagem precisa para decidir: prioridade, backlog e responsável em destaque, urgência e impacto, ambiente, prazo e motivo, SLA de solução, descrição, onde ocorre e resultado esperado. Use **Compartilhar** (celular), **Copiar** ou **Baixar PNG**. O telefone do contato não entra.
 - **+ Tarefa**: agenda o atendimento (chamado aberto).
+- **Editar chamado** (chamado já triado, para quem pode editar demandas): abre a subdemanda do chamado no mesmo popup de Demandas, sem sair da tela de Chamados. Dá para mudar nome, status, **prioridade**, etapa, responsável, horas, datas e descrição. Mudar a prioridade ali muda a prioridade do chamado e recalcula o SLA.
 - **Triagem**, **Recusar** e **Reabrir**: veja a seção 8.
+
+Abaixo dos dados fica o quadro **Detalhamento** e **Anexos**: o texto do chamado e os arquivos em miniatura (a imagem, a 1ª página do PDF ou o vídeo aparecem na própria miniatura; outros arquivos mostram a extensão). Toque na miniatura para ver em tamanho grande; **Anterior** e **Próximo** (ou as setas do teclado) passam pelos anexos e **Abrir em outra aba** baixa ou abre o arquivo. **+ Anexar** aceita até 20 MB por arquivo.
 
 Abas:
 
 - **Interações**: escolha o canal (WhatsApp, E-mail, Telefone ou Interno), escreva e toque em **Registrar**. **Visível ao cliente** marcado faz a interação entrar no extrato; o canal Interno nunca entra. **Resposta pronta…** preenche o texto com um modelo.
 - **Tarefas**: as agendas do chamado.
-- **Anexos**: **+ Anexar** (até 20 MB por arquivo); toque no nome para abrir.
 - **Relacionados**: os chamados ligados a este. Em **Abertos do mesmo cliente**, a triagem usa **Relacionar** ou **É duplicado deste** (o chamado atual é recusado como duplicado). O **×** desfaz a ligação.
 - **Portal Sankhya**: os chamados do portal ligados a este chamado.
 

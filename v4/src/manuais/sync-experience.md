@@ -96,7 +96,25 @@ Na ficha de uma tarefa com Apontamento "OS Experience" ou "Hora Dobrada" aparece
 | N lançamentos com a TAG desta tarefa | Há lançamento repetido; confira no Experience |
 | Data ou período da tarefa ausente/inválido | Complete a data e o período da tarefa |
 
-## 9. Se algo der errado
+## 9. Tarefas Pendentes no Experience
+
+No menu (☰): **Execução › Tarefas Pendentes no Experience**. Aparece para quem tem `sync_experience.gerenciar`.
+
+É o painel de acompanhamento: mostra as agendas do período que ainda pedem uma ação no Experience.
+
+| Pendência | Campo Experience da tarefa | O que falta |
+| --- | --- | --- |
+| Abertura | Vazio ou "Não lançado" | Criar o lançamento |
+| Ajuste | "Alterar" | Acertar a data e o horário do lançamento |
+| Exclusão | "Lixeira" | Excluir o lançamento |
+
+- A grade traz **Pendência**, **Consultor executante**, **Data da agenda**, **Período** (com o horário), **Apontamento**, Cliente, FAP, **Demanda** e Subdemanda, Tarefa, Experience, Lançamento, **Atenção** e Último sync.
+- Filtros: **De** e **Até** (padrão: 31 dias para trás e 31 para a frente; no máximo 125 dias), **Consultor**, **Apontamento** e os botões Todas, Abertura, Ajustes e Exclusão.
+- **Atenção** avisa o que precisa ser visto antes: projeto sem FAP no nome (o sync não trata), projeto inativo, tarefa que já tem OS no Sankhya, último sync com erro ou bloqueado e agenda que já passou sem lançamento.
+- **Sincronizar** roda o sync só daquela tarefa, no modo do escritório (em modo real pede confirmação). Feito no modo real, a tarefa sai da lista.
+- Entram as mesmas tarefas da seção 2 e ficam fora as da seção 3.
+
+## 10. Se algo der errado
 
 - **"Cadastre sua Conta Sankhya em Equipe › ficha › Conta Sankhya para rodar o sync."** Você ainda não tem a conta cadastrada.
 - **"A Sankhya recusou o login, por isso nada foi feito."** A senha mudou. Atualize em **Equipe › ficha › Conta Sankhya**.

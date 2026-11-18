@@ -4,7 +4,7 @@
 // demanda → subdemanda → tarefa, CSV), Equipe, Anexos (0069), Comentários e Histórico (auditoria); atalho para o Aceite de OS da FAP (V13d-3). Edição de demanda/tarefa sempre
 // pelo popup único (useEdicao); cadastro do projeto e pedidos de horas só aqui.
 import { useCallback, useEffect, useState } from 'react';
-import { api, data, FASES, horas, rotuloSituacao, SITUACOES, TIPOS_PEDIDO, type PedidoHoras, type ProjetoFicha } from '../api/cadastros';
+import { api, data, FASES, horas, projetoInativo, rotuloSituacao, SITUACOES, TIPOS_PEDIDO, type PedidoHoras, type ProjetoFicha } from '../api/cadastros';
 import { exec, rotuloPeriodo, rotuloStatusDemanda, rotuloStatusTarefa, semAlerta } from '../api/execucao';
 import {
   dependenciaViolada, diaNum, hojeIso, linhasGantt, porConsultor, proj, proximosMarcos, riscos, rotuloCampo, rotuloTabela,
@@ -93,7 +93,9 @@ export function ProjetoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
       <header className="pagina-topo">
         <div>
           <small className="ajuda"><Resumo tipo="cliente" id={c.dados.cliente.id}><a href={hashDe(caminhoEntidade('cliente', c.dados.cliente.id))}>{c.dados.cliente.nome}</a></Resumo> · Projeto</small>
-          <h1><Resumo tipo="projeto" id={p.id}>{p.nome}</Resumo> <span className="pilula">{p.fase}</span></h1>
+          <h1><Resumo tipo="projeto" id={p.id}>{p.nome}</Resumo> <span className="pilula">{p.fase}</span>
+            {projetoInativo(p.situacao) && <span className="pilula pilula-inativo" data-testid="projeto-inativo">Inativo</span>}</h1>
+          {projetoInativo(p.situacao) && <p className="ajuda">Projeto inativo ({rotuloSituacao(p.situacao).toLowerCase()}): não movimenta — demandas, subdemandas e tarefas não são criadas nem alteradas. Para voltar a movimentar, edite a Situação para Ativo.</p>}
           <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} />
         </div>
         <div className="linha">
@@ -203,7 +205,7 @@ function AbaIndicadores({ ficha }: { ficha: ProjetoFicha }) {
       <section className="cartao">
         <h2 className="secao">Dados</h2>
         <dl className="dados">
-          <div><dt>Situação</dt><dd>{rotuloSituacao(p.situacao)}</dd></div>
+          <div><dt>Situação</dt><dd>{rotuloSituacao(p.situacao)}{projetoInativo(p.situacao) && <small className="ajuda"> · inativo</small>}</dd></div>
           <div><dt>GP</dt><dd><NomePessoa id={p.gp_id} comAvatar /></dd></div>
           <div><dt>Início previsto</dt><dd>{data(p.inicio_previsto)}</dd></div>
           <div><dt>Fim previsto</dt><dd>{data(p.fim_previsto)}</dd></div>
@@ -553,7 +555,7 @@ function EditarProjeto({ aberto, projeto, aoFechar, aoGravar }: { aberto: boolea
           <Campo rotulo="Nome" valor={f.nome} aoMudar={v => setF({ ...f, nome: v })} obrigatorio maxLength={200} />
           <Campo rotulo="Fase" tipo="select" valor={f.fase} aoMudar={v => setF({ ...f, fase: v })} obrigatorio opcoes={fases.map(x => ({ valor: x, rotulo: x }))} />
           <Campo rotulo="Situação" tipo="select" valor={f.situacao} aoMudar={v => setF({ ...f, situacao: v })}
-            opcoes={SITUACOES.map(s => ({ valor: s.valor, rotulo: s.rotulo }))} ajuda="Encerrado/cancelado = &quot;Z&quot; na lista do ClickUp." />
+            opcoes={SITUACOES.map(s => ({ valor: s.valor, rotulo: s.rotulo }))} ajuda="Encerrado ou Cancelado = projeto inativo: não movimenta (no ClickUp, &quot;Z&quot; na frente da lista)." />
           <Campo rotulo="GP" tipo="select" valor={f.gp} aoMudar={v => setF({ ...f, gp: v })}
             opcoes={[{ valor: '', rotulo: '— sem GP —' }, ...gps(lista).map(m => ({ valor: m.id, rotulo: m.nome }))]} />
           <Campo rotulo="Início previsto" tipo="date" valor={f.inicio} aoMudar={v => setF({ ...f, inicio: v })} />

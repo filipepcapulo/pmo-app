@@ -17,11 +17,20 @@ export const LOCAIS: { valor: Local; rotulo: string; cor: string }[] = [
 ];
 export const rotuloLocal = (v: string | null | undefined) => LOCAIS.find(l => l.valor === v)?.rotulo ?? 'Encerrado';
 export const BACKLOGS: Local[] = ['backlog_consultores', 'backlog_personalizacao'];
+/** Para onde o chamado pode ser movido à mão: todos os lugares menos o atual; depois de triado, a Triagem sai (0102). */
+export const destinosDe = (c: { localizacao?: string | null; status_triagem: string }) =>
+  LOCAIS.filter(l => l.valor !== c.localizacao && !(l.valor === 'triagem' && c.status_triagem === 'triada'));
+/** "Triado por Fulano em 18/11/26 14:30" — sem o nome quando a triagem é anterior ao registro (ou veio do ClickUp). */
+export function textoTriado(c: { triado_por?: string | null; triado_em?: string | null }, nomeDe: (id: string) => string | null | undefined, dataHora: (iso: string) => string): string {
+  const nome = c.triado_por ? nomeDe(c.triado_por) : null;
+  return `Triado${nome ? ` por ${nome}` : ''}${c.triado_em ? ` em ${dataHora(c.triado_em)}` : ''}`;
+}
 
 export interface ChamadoFluxo extends ChamadoLinha {
   localizacao: Local | null; localizacao_em: string | null; origem: string | null; status: string; responsavel_id: string | null; etapa_id: string | null;
   projeto_id: string; projeto: string; horas_previstas: number | null; demanda_versao: number;
   tarefas_abertas: number; tarefas_total: number; consultores: string[]; proxima_data: string | null;
+  triado_por?: string | null; triado_em?: string | null;
 }
 export interface ChamadoDaSub { id: string; versao: number; numero: number; titulo: string; localizacao: Local | null; fila: string; tarefas_abertas: number }
 export interface AvisoBacklog { pers: string[]; cons: string[]; padrao_pers: string[]; padrao_cons: string[] }
@@ -41,8 +50,9 @@ export const chamV4 = {
 
 // ---------------------------------------------------------------- regras puras (testadas no Vitest)
 /** O que o movimento pede antes de gravar: agenda (popup de alocar), ticket, confirmação ou nada. */
-export function exigenciaDoMovimento(c: Pick<ChamadoFluxo, 'tarefas_abertas' | 'ticket' | 'localizacao'>, destino: Local): 'nada' | 'alocar' | 'ticket' | 'confirmar' | 'bloqueado' {
+export function exigenciaDoMovimento(c: Pick<ChamadoFluxo, 'tarefas_abertas' | 'ticket' | 'localizacao'> & { status_triagem?: string }, destino: Local): 'nada' | 'alocar' | 'ticket' | 'confirmar' | 'bloqueado' | 'triado' {
   if (destino === c.localizacao) return 'nada';
+  if (destino === 'triagem' && c.status_triagem === 'triada') return 'triado';
   if (destino === 'atribuido') return c.tarefas_abertas > 0 ? 'nada' : 'alocar';
   if (['triagem', 'aguardando_cliente', 'backlog_consultores', 'backlog_personalizacao'].includes(destino) && c.tarefas_abertas > 0) return 'bloqueado';
   if (destino === 'service_desk' && !c.ticket) return 'ticket';

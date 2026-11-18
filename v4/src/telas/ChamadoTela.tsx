@@ -1,11 +1,11 @@
 // Ficha do chamado (#/chamado/<id>): situação, SLA, dados do formulário, triagem, interações (com respostas prontas), extrato
 // para o WhatsApp, tarefas, anexos e relacionados. A tarefa nova usa o popup único e encerra a triagem no banco.
 import { useEffect, useState } from 'react';
-import { chamV4, exigenciaDoMovimento, LOCAIS, type Local } from '../api/chamadosV4';
+import { chamV4, destinosDe, exigenciaDoMovimento, textoTriado, type Local } from '../api/chamadosV4';
 import { AlocarAgenda } from '../componentes/AlocarAgenda';
 import { PilulaEtapa, PilulaLocal, PilulaResp, PilulaStatus } from '../componentes/Pilulas';
 import { ChamadosPortal } from '../componentes/ChamadosPortal';
-import { aplicarResposta, CANAIS, cham, estadoSla, extratoChamado, FILAS, IMPACTOS, prioridadeMatriz, rotuloCanal, rotuloFila, rotuloForma, rotuloSituacao, TIPOS, URGENCIAS, type FichaChamado, type OpcoesChamado } from '../api/chamados';
+import { aplicarResposta, CANAIS, cham, dataHoraBr, estadoSla, extratoChamado, FILAS, IMPACTOS, prioridadeMatriz, rotuloCanal, rotuloFila, rotuloForma, rotuloSituacao, TIPOS, URGENCIAS, type FichaChamado, type OpcoesChamado } from '../api/chamados';
 import { data, horas } from '../api/cadastros';
 import { PRIORIDADES, rotuloPrioridade } from '../api/execucao';
 import { Anexos } from '../componentes/Anexos';
@@ -201,6 +201,7 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   const ed = useEdicao();
   const avisar = useToast();
   const c = useCarga(() => cham.ficha(esc, id), [esc, id, ed.geracao]);
+  const equipe = useEquipe();
   const [opcoes, setOpcoes] = useState<OpcoesChamado | null>(null);
   const [aba, setAba] = useState<Aba>('interacoes');
   const [triagem, setTriagem] = useState(false);
@@ -224,7 +225,8 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   };
   const moverPara = async (destino: Local) => {
     const abertas = f.tarefas.filter(t => ['planejada', 'em_andamento'].includes(t.status)).length;
-    const pede = exigenciaDoMovimento({ tarefas_abertas: abertas, ticket: ch.ticket, localizacao: ((ch as { localizacao?: Local | null }).localizacao ?? null) }, destino);
+    const pede = exigenciaDoMovimento({ tarefas_abertas: abertas, ticket: ch.ticket, localizacao: ((ch.localizacao ?? null) as Local | null), status_triagem: ch.status_triagem }, destino);
+    if (pede === 'triado') { avisar('Chamado já triado não volta para a Triagem.', 'erro'); return; }
     if (pede === 'alocar') { setAlocar(true); return; }
     if (pede === 'bloqueado') { avisar(`O chamado tem ${abertas} agenda(s) em aberto; conclua ou cancele antes de devolver.`, 'erro'); return; }
     let ticket: string | undefined;
@@ -248,7 +250,7 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
           <small className="ajuda">
             <Resumo tipo="cliente" id={ch.cliente_id}><a href={hashDe(caminhoEntidade('cliente', ch.cliente_id))}>{ch.cliente}</a></Resumo> · <Resumo tipo="projeto" id={f.projeto.id}><a href={hashDe(caminhoEntidade('projeto', f.projeto.id))}>{f.projeto.nome}</a></Resumo> · Chamado #{ch.numero}
           </small>
-          <h1><Resumo tipo="demanda" id={f.demanda.id}>{f.demanda.nome}</Resumo> <PilulaLocal local={(ch as { localizacao?: string | null }).localizacao} /> <PilulaSituacao s={ch.situacao} /></h1>
+          <h1><Resumo tipo="demanda" id={f.demanda.id}>{f.demanda.nome}</Resumo> {ch.localizacao ? <PilulaLocal local={ch.localizacao} /> : <PilulaSituacao s={ch.situacao} />}</h1>
           <span className="dem-pilulas"><PilulaEtapa reg={f.demanda} /><PilulaStatus status={f.demanda.status} /><PilulaResp id={f.demanda.responsavel_id} /></span>
         </div>
         <div className="linha">
@@ -258,14 +260,15 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
           {!fechado && (
             <select className="kb-mover" aria-label="Mover o chamado" value="" onChange={e => { if (e.target.value) moverPara(e.target.value as Local); }}>
               <option value="">Mover para…</option>
-              {LOCAIS.filter(l => l.valor !== (ch as { localizacao?: string | null }).localizacao).map(l => <option key={l.valor} value={l.valor}>{l.rotulo}</option>)}
+              {destinosDe(ch).map(l => <option key={l.valor} value={l.valor}>{l.rotulo}</option>)}
             </select>
           )}
           {!fechado && pode('tarefa.criar') && <Botao onClick={() => setAlocar(true)}>Alocar agenda</Botao>}
           {!fechado && pode('tarefa.criar') && <Botao onClick={() => ed.tarefa({ demanda_id: f.demanda.id })}>+ Tarefa</Botao>}
           {pode('chamado.triar') && !fechado && <Botao onClick={() => setRecusa(true)}>Recusar</Botao>}
           {pode('chamado.triar') && ch.status_triagem === 'recusada' && <Botao onClick={reabrir}>Reabrir</Botao>}
-          {pode('chamado.triar') && ch.status_triagem !== 'recusada' && <Botao variante="primario" onClick={() => setTriagem(true)}>Triagem</Botao>}
+          {pode('chamado.triar') && ['nova', 'em_triagem'].includes(ch.status_triagem) && <Botao variante="primario" onClick={() => setTriagem(true)}>Triagem</Botao>}
+          {ch.status_triagem === 'triada' && <span className="pilula pilula-neutra" data-testid="triado-por">{textoTriado(ch, id => equipe.porId.get(id)?.nome, dataHoraBr)}</span>}
         </div>
       </header>
 

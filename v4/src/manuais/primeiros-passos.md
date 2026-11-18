@@ -86,6 +86,8 @@ O sino só funciona com o app aberto. Para receber avisos com o app fechado, vej
 
 ## 8. A tela Início
 
+No alto ficam os **indicadores**: chamados em triagem, chamados no backlog e, para quem vê a Ociosidade, os consultores com ociosidade hoje. Tocar no cartão abre a tela correspondente. Os números contam só o que você pode ver.
+
 O Início abre com a saudação, o seu escritório e o seu perfil (Admin, GP, Líder Tech, Consultor ou Triagem). Abaixo:
 
 - **Favoritos por cliente**: os projetos, demandas e tarefas que você favoritou, agrupados por cliente, com o status, a marca **Atrasada** quando for o caso e a barra de horas.

@@ -30,6 +30,7 @@ export function Etapas() {
             <div className="pagina-topo">
               <h2><span className="pil pil-etapa" style={{ background: e.cor, color: corTexto(e.cor) }}>{e.nome}</span>
                 {!e.ativo && <span className="pilula pilula-neutra">Inativa</span>}
+                {e.chamado && <span className="pilula pilula-neutra" title="Aparece no formulário de abertura do chamado">Chamado</span>}
                 {e.sistema && <span className="pilula pilula-neutra" title="Usada pelo fluxo de chamados: não pode ser excluída">Fluxo</span>}</h2>
               {editar && <Botao variante="fantasma" onClick={() => setAberta(e)}>Editar</Botao>}
             </div>
@@ -56,14 +57,14 @@ function EtapaPopup({ etapa, aoFechar, aoGravar }: { etapa: Partial<Etapa> | nul
   const esc = useSessao().eu!.escritorio_id!;
   const et = useEtapas();
   const avisar = useToast();
-  const [f, setF] = useState({ nome: '', cor: '#64748b', ordem: '0', ativo: true, principal: '' });
+  const [f, setF] = useState({ nome: '', cor: '#64748b', ordem: '0', ativo: true, chamado: false, principal: '' });
   const [vinc, setVinc] = useState<string[]>([]);
   const [busca, setBusca] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
   useEffect(() => {
     if (!etapa) return;
-    setF({ nome: etapa.nome ?? '', cor: etapa.cor ?? '#64748b', ordem: String(etapa.ordem ?? 0), ativo: etapa.ativo ?? true, principal: etapa.cu_principal ?? '' });
+    setF({ nome: etapa.nome ?? '', cor: etapa.cor ?? '#64748b', ordem: String(etapa.ordem ?? 0), ativo: etapa.ativo ?? true, chamado: etapa.chamado ?? false, principal: etapa.cu_principal ?? '' });
     setVinc(etapa.vinculos ?? []);
     setBusca('');
     setErro(null);
@@ -83,7 +84,7 @@ function EtapaPopup({ etapa, aoFechar, aoGravar }: { etapa: Partial<Etapa> | nul
     setGravando(true);
     try {
       await etapasApi.salvar(esc, excluir ? { id: etapa!.id, versao: etapa!.versao, excluir: true }
-        : { ...(etapa?.id ? { id: etapa.id, versao: etapa.versao } : {}), nome: f.nome.trim(), cor: f.cor, ordem: Number(f.ordem) || 0, ativo: f.ativo,
+        : { ...(etapa?.id ? { id: etapa.id, versao: etapa.versao } : {}), nome: f.nome.trim(), cor: f.cor, ordem: Number(f.ordem) || 0, ativo: f.ativo, chamado: f.chamado,
             cu_principal: f.principal || null, vinculos: vinc });
       avisar(excluir ? 'Etapa excluída' : 'Etapa gravada', 'ok');
       aoGravar();
@@ -105,6 +106,7 @@ function EtapaPopup({ etapa, aoFechar, aoGravar }: { etapa: Partial<Etapa> | nul
           <Campo rotulo="Ordem" tipo="number" valor={f.ordem} aoMudar={v => setF({ ...f, ordem: v })} inputMode="numeric" ajuda="Menor aparece antes." />
         </div>
         <label className="check"><input type="checkbox" checked={f.ativo} onChange={e => setF({ ...f, ativo: e.target.checked })} /> Ativa (aparece para escolher em demandas)</label>
+        <label className="check"><input type="checkbox" checked={f.chamado} onChange={e => setF({ ...f, chamado: e.target.checked })} /> Vale para chamado (aparece no formulário de abertura do chamado)</label>
         <fieldset className="grupo">
           <legend>Etapas do ClickUp que correspondem a esta ({vinc.length})</legend>
           {opcoes.length > 10 && <input type="search" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar etapa do ClickUp…" aria-label="Buscar etapa do ClickUp" />}

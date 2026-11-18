@@ -39,6 +39,20 @@ O status agora é só o andamento: **Não iniciado**, **Em andamento**, **Em val
 
 O chamado **triado** vira subdemanda da demanda **Atendimento Avulso da Base** do cliente, no **Backlog Consultores** ou no **Backlog Personalização**, e fica marcado como **Precisa de alocação**. Quando recebe agenda, fica **Atribuído**; um chamado pode ter várias tarefas. Concluir uma tarefa não conclui o chamado: o app pergunta.
 
+### Etapa sugerida pelo nível acima
+
+- A **demanda** precisa de etapa: o formulário não grava sem ela.
+- A **subdemanda** nova já vem com a etapa da demanda. Você pode trocar.
+- A **tarefa** nova já vem com a etapa da subdemanda; se a subdemanda não tiver, vale a da demanda.
+
+Essa regra é do banco: vale também para o que for criado fora do formulário. O que chega do ClickUp fica com a etapa que veio de lá.
+
+Nas fichas, listas e relatórios o app mostra sempre a **etapa do app**, nunca o texto do ClickUp.
+
+### Etapas que valem para chamado
+
+Ao editar uma etapa, marque **Vale para chamado** para ela aparecer no formulário de abertura do chamado. As etapas marcadas ganham a etiqueta **Chamado** no cartão.
+
 ## 5. Abas, menu e filtros
 
 - **Uma aba por tela**: ao abrir um cliente, depois um projeto e uma demanda, você continua na mesma aba. A faixa no alto da tela mostra o caminho e o **Voltar**.

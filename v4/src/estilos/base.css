@@ -1136,3 +1136,65 @@ ul.msg-erro { padding-left: 18px; }
 /* V4 4.3.0: escolha dos consultores para os PDFs de produtividade (Fechamento) */
 .fech-escolha { display: grid; gap: 2px; max-height: 46vh; overflow: auto; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--linha); border-radius: 8px; }
 .fech-escolha .check { padding: 4px 0; }
+
+/* ---------------------------------------------------------------- Início: cartões de indicadores (4.13.0) */
+.inicio-indicadores { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.inicio-ind { display: flex; flex-direction: column; gap: 2px; text-decoration: none; color: var(--texto); border-left: 4px solid var(--linha); }
+.inicio-ind strong { font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.inicio-ind span { font-size: 13px; color: var(--texto-2); }
+.inicio-ind:hover { box-shadow: var(--sombra-alta); }
+.inicio-ind-alerta { border-left-color: var(--laranja); }
+
+/* ---------------------------------------------------------------- Painéis dinâmicos (4.13.0) */
+:root { --pd-seq: #2a78d6; --gd-1: #2a78d6; --gd-2: #eb6834; --gd-3: #1baf7a; --gd-4: #eda100; --gd-5: #e87ba4; --gd-6: #008300; --gd-7: #6250d6; --gd-8: #e34948; }
+:root[data-tema="escuro"] { --pd-seq: #3987e5; --gd-1: #3987e5; --gd-2: #d95926; --gd-3: #199e70; --gd-4: #c98500; --gd-5: #d55181; --gd-6: #0ca30c; --gd-7: #9085e9; --gd-8: #e66767; }
+.pd-cartao { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; text-align: left; border: 0; font: inherit; color: var(--texto); cursor: pointer; }
+.pd-cartao:hover { box-shadow: var(--sombra-alta); }
+.pd-cartao strong { font-size: 16px; }
+.pd-config { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.pd-duas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.pd-ordenados ol { list-style: decimal inside; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.pd-ordenados li { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: var(--superficie-2); border-radius: 8px; }
+.pd-ordenados li span { flex: 1; min-width: 0; }
+.pd-filtro { display: inline-flex; align-items: center; gap: 2px; }
+.pd-grafico-config { display: flex; flex-direction: column; gap: 10px; }
+.pd-tabela .num, .pd-tempo .num, .gd-tabela .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pd-grupo th { background: var(--superficie-2); font-weight: 600; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--texto); position: static; }
+.pd-grupo th button { text-transform: none; font-size: 13px; color: var(--texto); letter-spacing: 0; gap: 6px; }
+.pd-grupo th small { color: var(--texto-2); font-weight: 400; }
+.pd-grupo td { background: var(--superficie-2); }
+.pd-n1 th, .pd-n1 td, .pd-n2 th, .pd-n2 td, .pd-n3 th, .pd-n3 td { background: color-mix(in srgb, var(--superficie-2) 55%, var(--superficie)); }
+.pd-tabela tfoot th, .pd-tempo tfoot th { position: static; }
+.pd-tempo th[scope="row"] { position: sticky; left: 0; z-index: 1; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--texto); white-space: nowrap; }
+.pd-tempo td { min-width: 56px; }
+.pd-graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 12px; }
+.pd-grafico h2 { margin: 0 0 6px; font-size: 15px; }
+.gd-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 4px; }
+.gd-legenda { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--texto-2); }
+.gd-legenda li { display: inline-flex; align-items: center; gap: 5px; }
+.gd-cor { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.gd-area { position: relative; }
+.gd-area svg { width: 100%; height: auto; display: block; overflow: visible; }
+.gd-grade { stroke: var(--linha); stroke-width: 1; }
+.gd-base { stroke: var(--texto-2); stroke-width: 1; }
+.gd-eixo { fill: var(--texto-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+.gd-linha { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.gd-ponto { stroke: var(--superficie); stroke-width: 2; }
+.gd-foco { fill: var(--texto); opacity: .06; }
+.gd-alvo { fill: transparent; outline: none; }
+.gd-alvo:focus-visible { stroke: var(--foco); stroke-width: 2; }
+path.gd-s1, circle.gd-s1, span.gd-s1 { fill: var(--gd-1); background: var(--gd-1); } polyline.gd-s1 { stroke: var(--gd-1); }
+path.gd-s2, circle.gd-s2, span.gd-s2 { fill: var(--gd-2); background: var(--gd-2); } polyline.gd-s2 { stroke: var(--gd-2); }
+path.gd-s3, circle.gd-s3, span.gd-s3 { fill: var(--gd-3); background: var(--gd-3); } polyline.gd-s3 { stroke: var(--gd-3); }
+path.gd-s4, circle.gd-s4, span.gd-s4 { fill: var(--gd-4); background: var(--gd-4); } polyline.gd-s4 { stroke: var(--gd-4); }
+path.gd-s5, circle.gd-s5, span.gd-s5 { fill: var(--gd-5); background: var(--gd-5); } polyline.gd-s5 { stroke: var(--gd-5); }
+path.gd-s6, circle.gd-s6, span.gd-s6 { fill: var(--gd-6); background: var(--gd-6); } polyline.gd-s6 { stroke: var(--gd-6); }
+path.gd-s7, circle.gd-s7, span.gd-s7 { fill: var(--gd-7); background: var(--gd-7); } polyline.gd-s7 { stroke: var(--gd-7); }
+path.gd-s8, circle.gd-s8, span.gd-s8 { fill: var(--gd-8); background: var(--gd-8); } polyline.gd-s8 { stroke: var(--gd-8); }
+.gd-dica { position: absolute; top: 6px; transform: translateX(10px); background: var(--superficie); color: var(--texto); border-radius: 10px; box-shadow: var(--sombra-alta); padding: 8px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 3px; pointer-events: none; z-index: 2; min-width: 120px; }
+.gd-dica[data-lado="esq"] { transform: translateX(calc(-100% - 10px)); }
+.gd-dica span { display: flex; align-items: center; gap: 6px; color: var(--texto-2); }
+.gd-dica b { margin-left: auto; color: var(--texto); font-variant-numeric: tabular-nums; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) { --pd-seq: #3987e5; --gd-1: #3987e5; --gd-2: #d95926; --gd-3: #199e70; --gd-4: #c98500; --gd-5: #d55181; --gd-6: #0ca30c; --gd-7: #9085e9; --gd-8: #e66767; }
+}

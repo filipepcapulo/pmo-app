@@ -20,9 +20,28 @@ O que cada um faz, pelo padrão dos perfis (o Admin pode mudar as permissões):
 | **Alocar** e **+ Tarefa** | Admin, GP e Líder Tech |
 | Aba **Portal Sankhya** | Admin, GP e Líder Tech |
 
-A tela tem as abas **Busca**, **Backlog e alocação**, **Indicadores** e **Portal Sankhya**.
+A tela abre na **Triagem**. As abas, na ordem: **Triagem**, **Backlog**, **Kanban**, **Meus chamados**, **Indicadores**, **Portal Sankhya** e, por último, **Busca**.
+
+### O chamado anda sozinho
+
+O lugar do chamado no fluxo muda conforme o que você faz:
+
+| O que acontece | Para onde o chamado vai |
+|---|---|
+| Triagem concluída | Backlog Consultores ou Backlog Personalização |
+| Uma agenda (tarefa) é criada no chamado | **Atribuído** |
+| Todas as agendas são canceladas ou excluídas e nenhuma foi concluída | Volta ao backlog da fila |
+| A subdemanda vai para Em validação ou Concluído | Em Validação ou Concluído |
+
+Concluir uma agenda não conclui o chamado: o app pergunta se o chamado terminou.
+
+### Depois de triado, não volta
+
+Um chamado que já passou da triagem (foi para um backlog ou ganhou agenda) **não volta para a Triagem**. No lugar do botão **Triagem**, a ficha mostra **Triado por** com o nome de quem triou, a data e a hora. Chamados triados antes desta versão mostram só a data.
 
 ## 2. Abrir um chamado
+
+A **Etapa** do formulário vem do cadastro de etapas: aparecem só as marcadas como **Vale para chamado** em Cadastros › Etapas.
 
 Toque em **+ Chamado**. O formulário tem quatro partes; preencha tudo o que a triagem precisa para alocar sem voltar ao cliente. O rascunho fica guardado neste navegador até você abrir o chamado.
 

@@ -2,7 +2,7 @@
 // do cliente (o banco cria o projeto Avulso e essa demanda se faltarem) e depois sobe os anexos
 // nela (assim vão para o ClickUp). Rascunho salvo neste navegador; o mesmo id de operação protege contra clique repetido.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ABRANGENCIAS, AMBIENTES, cham, etapaSugerida, ETAPAS, faltasChamado, FORMAS, IMPACTOS, prioridadeMatriz, TIPOS, URGENCIAS, type FormChamado as Dados, type OpcoesChamado } from '../api/chamados';
+import { ABRANGENCIAS, AMBIENTES, cham, etapaChamadoSugerida, faltasChamado, FORMAS, IMPACTOS, prioridadeMatriz, TIPOS, URGENCIAS, type FormChamado as Dados, type OpcoesChamado } from '../api/chamados';
 import { novaOperacao } from '../api/cliente';
 import { enviarAnexo, rotuloPrioridade } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
@@ -11,9 +11,10 @@ import { Botao } from './Botao';
 import { Campo, Formulario } from './Campo';
 import { EscolhaChips } from './Chips';
 import { Popup } from './Popup';
+import { useEtapas } from '../estado/etapas';
 import { useToast } from './Toasts';
 
-const VAZIO: Dados = { cliente_id: '', projeto_id: '', titulo: '', tipo: '', etapa: 'Atendimento avulso', descricao: '', passos: '', esperado: '', ambiente: '', abrangencia: '', impacto: '', urgencia: '',
+const VAZIO: Dados = { cliente_id: '', projeto_id: '', titulo: '', tipo: '', etapa: '', descricao: '', passos: '', esperado: '', ambiente: '', abrangencia: '', impacto: '', urgencia: '',
   solicitante: '', contato: '', origem: '', ticket: '', os_sankhya: '', forma_atendimento: 'remoto', prazo: '', motivo_prazo: '', horas: '', sem_anexo: '' };
 const RASCUNHO = 'pmo4:chamado:rascunho';
 const MAX_ARQ = 10, MAX_MB = 10;
@@ -25,6 +26,9 @@ function lerRascunho(): Dados {
 export function FormChamado({ opcoes, aoFechar, aoGravar }: { opcoes: OpcoesChamado; aoFechar: () => void; aoGravar: (id: string) => void }) {
   const esc = useSessao().eu!.escritorio_id!;
   const avisar = useToast();
+  const et = useEtapas();
+  // etapas do cadastro marcadas "vale para chamado" (Geral › Etapas); `f.etapa` guarda o id da escolhida
+  const etapas = useMemo(() => et.ativas.filter(e => e.chamado), [et.ativas]);
   const [f, setF] = useState<Dados>(lerRascunho);
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [tentou, setTentou] = useState(false);
@@ -41,6 +45,10 @@ export function FormChamado({ opcoes, aoFechar, aoGravar }: { opcoes: OpcoesCham
     return () => clearTimeout(t);
   }, [f]);
   const mudar = (c: Partial<Dados>) => setF(a => ({ ...a, ...c }));
+  // rascunho antigo (etapa em texto) ou etapa que deixou de valer para chamado: volta à sugerida
+  useEffect(() => {
+    if (etapas.length && !etapas.some(e => e.id === f.etapa)) mudar({ etapa: etapaChamadoSugerida(f.tipo, etapas) });
+  }, [etapas, f.etapa, f.tipo]);
   const escolher = (l: FileList | null) => {
     const novos = Array.from(l ?? []);
     const grande = novos.find(a => a.size > MAX_MB * 1024 * 1024);
@@ -53,8 +61,8 @@ export function FormChamado({ opcoes, aoFechar, aoGravar }: { opcoes: OpcoesCham
     if (faltas.length) { setErro(`Preencha: ${faltas.map(x => x[1]).join(', ')}.`); return; }
     setGravando(true); setErro(null);
     try {
-      const { horas, projeto_id, ...resto } = f;
-      const r = await cham.abrir(esc, { ...resto, projeto_id: projeto_id || (avulsos.length === 1 ? avulsos[0].id : null),
+      const { horas, projeto_id, etapa, ...resto } = f;
+      const r = await cham.abrirV4(esc, { ...resto, etapa_id: etapa, projeto_id: projeto_id || (avulsos.length === 1 ? avulsos[0].id : null),
         horas: horas ? Number(horas.replace(',', '.')) : null, qtd_anexos: arquivos.length }, op.current);
       for (const a of arquivos) {
         try { await enviarAnexo(esc, 'demanda', r.demanda_id, a); } catch (e) { avisar(`${a.name}: ${(e as Error).message}`, 'erro'); }
@@ -87,9 +95,10 @@ export function FormChamado({ opcoes, aoFechar, aoGravar }: { opcoes: OpcoesCham
 
         <h3 className="secao">2 · Demanda</h3>
         <Campo rotulo="Título (resumo em uma linha)" obrigatorio valor={f.titulo} erro={falta('titulo')} aoMudar={v => mudar({ titulo: v })} maxLength={160} />
-        <EscolhaChips rotulo="Tipo de solicitação" obrigatorio valor={f.tipo} opcoes={TIPOS} ajuda={falta('tipo') ?? undefined} aoMudar={v => mudar({ tipo: v, etapa: etapaSugerida(v) })} />
+        <EscolhaChips rotulo="Tipo de solicitação" obrigatorio valor={f.tipo} opcoes={TIPOS} ajuda={falta('tipo') ?? undefined} aoMudar={v => mudar({ tipo: v, etapa: etapaChamadoSugerida(v, etapas) })} />
         <EscolhaChips rotulo="Ambiente" obrigatorio valor={f.ambiente} opcoes={AMBIENTES} ajuda={falta('ambiente') ?? undefined} aoMudar={v => mudar({ ambiente: v })} />
-        <EscolhaChips rotulo="Etapa" obrigatorio valor={f.etapa} opcoes={ETAPAS} aoMudar={v => mudar({ etapa: v })} />
+        <EscolhaChips rotulo="Etapa" obrigatorio valor={f.etapa} opcoes={etapas.map(e => ({ valor: e.id, rotulo: e.nome }))} aoMudar={v => mudar({ etapa: v })}
+          ajuda={falta('etapa') ?? (etapas.length ? undefined : 'Nenhuma etapa marcada para chamado: marque em Geral › Etapas.')} />
         <Campo rotulo="Descrição detalhada" tipo="textarea" obrigatorio valor={f.descricao} erro={falta('descricao')} aoMudar={v => mudar({ descricao: v })} ajuda={`${f.descricao.trim().length}/50`} />
         <Campo rotulo="Onde ocorre / passos para reproduzir" tipo="textarea" obrigatorio={/erro/i.test(f.tipo)} valor={f.passos} erro={falta('passos')} aoMudar={v => mudar({ passos: v })} />
         <Campo rotulo="Resultado esperado" tipo="textarea" obrigatorio valor={f.esperado} erro={falta('esperado')} aoMudar={v => mudar({ esperado: v })} />

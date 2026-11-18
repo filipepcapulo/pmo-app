@@ -42,6 +42,7 @@ import { Ferias } from '../telas/Ferias';
 import { Reembolso } from '../telas/Reembolso';
 import { NotificacoesAparelho } from '../telas/NotificacoesAparelho';
 import { Ociosidade } from '../telas/Ociosidade';
+import { Paineis } from '../telas/Paineis';
 import { Portfolio } from '../telas/Portfolio';
 import { Equipe } from '../telas/Equipe';
 import { Inicio } from '../telas/Inicio';
@@ -212,6 +213,7 @@ export function Casca() {
     if (r.modulo.id === 'produtividade') return <Produtividade />;
     if (r.modulo.id === 'ociosidade') return <Ociosidade />;
     if (r.modulo.id === 'portfolio') return <Portfolio />;
+    if (r.modulo.id === 'paineis') return <Paineis />;
     if (r.modulo.id === 'ferias') return <Ferias />;
     if (r.modulo.id === 'reembolso') return <Reembolso parametro={r.parametro} />;
     return <EmConstrucao titulo={r.modulo.titulo} etapa={r.modulo.etapa} />;

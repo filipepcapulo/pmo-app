@@ -147,8 +147,8 @@ export function Chamados({ ir, parametro }: { ir: (caminho: string, titulo?: str
   const esc = useSessao().eu!.escritorio_id!;
   const pode = usePode();
   // #/chamados/portal abre direto na aba do portal (link do aviso no sino)
-  const inicial = (p?: string): Aba => (p === 'portal' ? (pode('chamados_portal.usar') ? 'portal' : 'busca')
-    : p && ['triagem', 'backlog', 'kanban', 'meus', 'indicadores'].includes(p) ? p as Aba : 'busca');
+  const inicial = (p?: string): Aba => (p === 'portal' ? (pode('chamados_portal.usar') ? 'portal' : 'triagem')
+    : p && ['triagem', 'backlog', 'kanban', 'meus', 'indicadores', 'busca'].includes(p) ? p as Aba : 'triagem');
   const [aba, setAba] = useState<Aba>(() => inicial(parametro));
   useEffect(() => { if (parametro) setAba(inicial(parametro)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [parametro]);
   const [novo, setNovo] = useState(false);
@@ -157,9 +157,10 @@ export function Chamados({ ir, parametro }: { ir: (caminho: string, titulo?: str
   const [geracao, setGeracao] = useState(0);
   const carregar = () => cham.opcoes(esc).then(setOpcoes).catch(() => setOpcoes(null));
   useEffect(() => { carregar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [esc]);
-  const abas: { id: Aba; rotulo: string }[] = [{ id: 'busca', rotulo: 'Busca' }, { id: 'triagem', rotulo: 'Triagem' }, { id: 'backlog', rotulo: 'Backlog' },
+  // 4.13.0: a tela abre na Triagem, depois os backlogs; a Busca fica por último
+  const abas: { id: Aba; rotulo: string }[] = [{ id: 'triagem', rotulo: 'Triagem' }, { id: 'backlog', rotulo: 'Backlog' },
     { id: 'kanban', rotulo: 'Kanban' }, { id: 'meus', rotulo: 'Meus chamados' }, { id: 'indicadores', rotulo: 'Indicadores' },
-    ...(pode('chamados_portal.usar') ? [{ id: 'portal' as Aba, rotulo: 'Portal Sankhya' }] : [])];
+    ...(pode('chamados_portal.usar') ? [{ id: 'portal' as Aba, rotulo: 'Portal Sankhya' }] : []), { id: 'busca', rotulo: 'Busca' }];
   return (
     <div className={`pagina${['backlog', 'kanban', 'triagem', 'meus'].includes(aba) ? ' pagina-larga' : ''}`}>
       <header className="pagina-topo">

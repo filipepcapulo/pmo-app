@@ -1,7 +1,7 @@
 // Ficha da demanda/subdemanda (#/demanda/<id>): barra de horas abaixo do nome, dados, subdemandas, tarefas,
 // checklist, anexos e comentários. Editar/criar sempre pelo popup único (useEdicao).
 import { useEffect, useState } from 'react';
-import { data, horas } from '../api/cadastros';
+import { data, horas, projetoInativo } from '../api/cadastros';
 import { exec, rotuloPrioridade, semAlerta } from '../api/execucao';
 import { Anexos } from '../componentes/Anexos';
 import { ArvoreDemandas, StatusPilula } from '../componentes/ArvoreDemandas';
@@ -38,6 +38,7 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   if (c.erro) return <div className="vazio-tela"><h2>Demanda</h2><p>{c.erro}</p></div>;
   if (!c.dados) return <div className="carregando-tela"><span className="giro" /> Carregando…</div>;
   const { demanda: d, totais: t, projeto, cliente, pai, subdemandas, tarefas } = c.dados;
+  const inativo = projetoInativo(projeto.situacao);   // 0105: projeto inativo não movimenta
   const nomes = new Map([[d.id, d.nome], ...subdemandas.map(s => [s.id, s.nome] as [string, string])]);
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'tarefas', rotulo: `Tarefas (${tarefas.length})` }, { id: 'checklist', rotulo: `Checklist (${c.dados.checklist.length})` },
@@ -53,15 +54,16 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
             <Resumo tipo="projeto" id={projeto.id}><a href={hashDe(caminhoEntidade('projeto', projeto.id))}>{projeto.nome}</a></Resumo>
             {pai && <> · <Resumo tipo="demanda" id={pai.id}><a href={hashDe(caminhoEntidade('demanda', pai.id))}>{pai.nome}</a></Resumo></>} · {pai ? 'Subdemanda' : 'Demanda'}
           </small>
-          <h1><Resumo tipo="demanda" id={d.id}>{d.nome}</Resumo> <StatusPilula status={d.status} />{t?.atrasada && !semAlerta(d) && <span className="pilula st-atrasada">Atrasada</span>}</h1>
+          <h1><Resumo tipo="demanda" id={d.id}>{d.nome}</Resumo> <StatusPilula status={d.status} />{t?.atrasada && !semAlerta(d) && <span className="pilula st-atrasada">Atrasada</span>}
+            {inativo && <span className="pilula pilula-inativo" title="Projeto encerrado ou cancelado: não movimenta">Projeto inativo</span>}</h1>
           <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} semAlerta={semAlerta(d)} />
         </div>
         <div className="linha">
           <BotaoFavorito entidade="demanda" id={d.id} />
-          {pode('tarefa.criar') && <Botao onClick={() => ed.tarefa({ demanda_id: d.id })}>+ Tarefa</Botao>}
-          {!pai && pode('demanda.criar') && <Botao onClick={() => ed.demanda({ projeto_id: projeto.id, pai_id: d.id })}>+ Subdemanda</Botao>}
+          {pode('tarefa.criar') && !inativo && <Botao onClick={() => ed.tarefa({ demanda_id: d.id })}>+ Tarefa</Botao>}
+          {!pai && pode('demanda.criar') && !inativo && <Botao onClick={() => ed.demanda({ projeto_id: projeto.id, pai_id: d.id })}>+ Subdemanda</Botao>}
           {pode('agenda.solicitar') && <Botao onClick={() => ed.pedirAgenda({ demanda_id: d.id, nome: d.nome })}>Preciso de mais agenda</Botao>}
-          {pode('demanda.editar') && <Botao variante="primario" onClick={() => ed.demanda({ id: d.id })}>Editar</Botao>}
+          {pode('demanda.editar') && !inativo && <Botao variante="primario" onClick={() => ed.demanda({ id: d.id })}>Editar</Botao>}
         </div>
       </header>
 

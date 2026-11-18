@@ -34,6 +34,8 @@ export const SITUACOES: { valor: Situacao; rotulo: string }[] = [
   { valor: 'encerrado', rotulo: 'Encerrado' }, { valor: 'cancelado', rotulo: 'Cancelado' },
 ];
 export const rotuloSituacao = (s: string) => SITUACOES.find(x => x.valor === s)?.rotulo ?? s;
+/** Projeto inativo = Encerrado ou Cancelado ("Z" na frente da lista do ClickUp): não movimenta (0105). */
+export const projetoInativo = (s: string | null | undefined) => s === 'encerrado' || s === 'cancelado';
 export const FASES = ['P1', 'P2', 'P3', 'P4', 'P5', 'Avulso', 'Sustentação', 'Horas Cruzadas'];
 export interface ProjetoLinha extends ProjetoResumo { versao: number; cliente_id: string; cliente: string; cliente_ativo: boolean }
 export type TipoPedido = 'empreito' | 'medicao' | 'banco_horas';

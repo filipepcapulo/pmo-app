@@ -5,7 +5,7 @@ import { data, horas } from '../api/cadastros';
 import { podeApontar } from '../api/consultor';
 import { podeDesviar, rotuloDesvioTarefa } from '../api/desvios';
 import { syncExperience, textoResultado as textoSync, textoSyncTarefa } from '../api/syncExperience';
-import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo, type Apontamento } from '../api/execucao';
+import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo, tarefaTravadaOs, type Apontamento } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { Anexos } from '../componentes/Anexos';
 import { StatusPilula } from '../componentes/ArvoreDemandas';
@@ -62,6 +62,8 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
     setSincronizando(false);
   }
   const souResp = t.responsavel_id === eu!.usuario.id;
+  // 0105: apontada no Sankhya (tem nº de OS) — só o Admin altera
+  const travada = tarefaTravadaOs(t, eu!.perfil);
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'apontamentos', rotulo: `Apontamentos (${apontamentos.length})` }, { id: 'checklist', rotulo: `Checklist (${c.dados.checklist.length})` },
     { id: 'anexos', rotulo: `Anexos (${c.dados.anexos.length})` }, { id: 'comentarios', rotulo: `Comentários (${nCom ?? c.dados.comentarios})` },
@@ -84,7 +86,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
           {pode('agenda.solicitar') && (souResp || pode('tarefa.editar')) && <Botao onClick={() => ed.pedirAgenda({ tarefa_id: t.id, nome: t.nome })}>Preciso de mais agenda</Botao>}
           {souResp && pode('apontamento.gravar') && podeApontar(t, hojeIso()) && <Botao onClick={() => ed.apontar({ tarefa_id: t.id, nome: t.nome, data: t.data, periodo: t.periodo, hora_ini: t.hora_ini, hora_fim: t.hora_fim })}>Apontar</Botao>}
           {souResp && pode('desvio.informar') && podeDesviar({ data: t.data, status: t.status, horas_reais: t.horas_reais }, hojeIso()) && <Botao onClick={() => ed.informarDesvio({ tarefa_id: t.id, nome: t.nome, data: t.data, periodo: t.periodo, hora_ini: t.hora_ini, hora_fim: t.hora_fim })}>Informar desvio</Botao>}
-          {pode('tarefa.editar') && <Botao variante="primario" onClick={() => ed.tarefa({ id: t.id })}>Editar</Botao>}
+          {pode('tarefa.editar') && !travada && <Botao variante="primario" onClick={() => ed.tarefa({ id: t.id })}>Editar</Botao>}
         </div>
       </header>
 
@@ -102,6 +104,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
           <div><dt>Apontamento</dt><dd>{t.apontamento ?? '—'}</dd></div>
           <div><dt>ClickUp</dt><dd>{t.clickup_id ? <a href={`https://app.clickup.com/t/${t.clickup_id}`} target="_blank" rel="noopener">{t.clickup_id}</a> : '—'}</dd></div>
         </dl>
+        {t.tem_os && <p className="ajuda" data-testid="tarefa-com-os">🔒 Apontada no Sankhya (tem número de OS): só o administrador altera ou exclui esta tarefa.</p>}
         {t.detalhamento && <p className="descricao">{t.detalhamento}</p>}
         {t.motivo_status && !(desvio && t.motivo_status === 'desvio') && <p className="ajuda">Motivo: {t.motivo_status}</p>}
         {desvio && (

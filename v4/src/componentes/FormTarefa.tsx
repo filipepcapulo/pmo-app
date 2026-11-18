@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { etapasApi } from '../api/etapas';
 import { useEtapas } from '../estado/etapas';
 import { horas } from '../api/cadastros';
-import { AVISO_HORARIO, exec, horarioInvalido, MODALIDADES, PADRAO_TAREFA, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
+import { AVISO_HORARIO, exec, horarioInvalido, MODALIDADES, PADRAO_TAREFA, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, tarefaTravadaOs, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
 import type { AlvoTarefa } from '../estado/edicao';
 import { usePode, useEquipe } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
@@ -32,7 +32,8 @@ const AGENDAS = MODALIDADES.filter(m => m.valor);
 
 export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { alvo: AlvoTarefa; opcoes: OpcoesExecucao | null; aoFechar: () => void; aoGravar: () => void;
   aoConcluir?: (demandaId: string) => void }) {
-  const esc = useSessao().eu!.escritorio_id!;
+  const eu = useSessao().eu;
+  const esc = eu!.escritorio_id!;
   const pode = usePode();
   const avisar = useToast();
   const { lista: equipe, porId } = useEquipe();
@@ -53,7 +54,9 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
   const [mais, setMais] = useState<{ data: string; periodo: string; ini: string; fim: string } | null>(null);
   const [conf, setConf] = useState<{ lista: Conflito[]; seguir: () => void } | null>(null);
   const novo = !alvo.id;
-  const podeGravar = pode(novo ? 'tarefa.criar' : 'tarefa.editar');
+  // 0105: tarefa apontada no Sankhya (tem nº de OS) só o Admin altera
+  const travadaOs = !novo && tarefaTravadaOs(orig, eu?.perfil);
+  const podeGravar = pode(novo ? 'tarefa.criar' : 'tarefa.editar') && !travadaOs;
 
   useEffect(() => {
     const local = (r: { cliente: { nome: string }; projeto: { nome: string }; pai: { nome: string } | null }) =>
@@ -201,7 +204,8 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
         <Botao onClick={aoFechar}>{podeGravar ? 'Cancelar' : 'Fechar'}</Botao>
         {podeGravar && <Botao variante="primario" carregando={gravando} onClick={() => enviar()}>
           {novo && nNovas > 1 ? `Criar ${nNovas} tarefas` : 'Gravar'}</Botao>}</>}>
-      {!podeGravar && <p className="ajuda">Você não tem permissão para {novo ? 'criar' : 'editar'} tarefas.</p>}
+      {travadaOs ? <p className="ajuda" data-testid="form-tarefa-os">🔒 Tarefa apontada no Sankhya (tem número de OS): só o administrador altera ou exclui.</p>
+        : !podeGravar && <p className="ajuda">Você não tem permissão para {novo ? 'criar' : 'editar'} tarefas.</p>}
       <Formulario aoEnviar={() => enviar()} className="form-2x">
         {caixa ? (
           <div className="campo"><span className="rotulo">Demanda</span>

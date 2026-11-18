@@ -73,6 +73,8 @@ export interface Tarefa {
   etapa: string | null; etapa_id?: string | null; agendamento: string | null; experience: string | null; apontamento: string | null; grupo_criacao: string | null;
   versao: number; clickup_id: string | null; horas_reais: number | null; apontamentos: number;
   usuario_cliente_id?: string | null;
+  /** 0105: já apontada no Sankhya (tem número de OS) — só o Admin altera. */
+  tem_os?: boolean;
 }
 /** Quem criou ou editou a tarefa por último (0051); `clickup` = nasceu no ClickUp e não foi gravada no app. */
 export interface Autoria { acao: 'criou' | 'editou' | 'clickup'; id: string | null; nome: string | null; em: string | null }
@@ -202,6 +204,25 @@ export async function abrirAnexo(caminho: string) {
   if (r.error || !r.data) throw new Error('Não foi possível abrir o anexo.');
   window.open(r.data.signedUrl, '_blank', 'noopener');
 }
+/** Link assinado para mostrar o anexo na própria tela (miniatura e pré-visualização); vale 1 hora. */
+export async function urlAnexo(caminho: string, segundos = 3600): Promise<string> {
+  const r = await sb.storage.from(BUCKET).createSignedUrl(caminho, segundos);
+  if (r.error || !r.data) throw new Error('Não foi possível abrir o anexo.');
+  return r.data.signedUrl;
+}
+/** Como o anexo aparece na galeria: o tipo informado no envio vale; sem ele, a extensão do nome. */
+export type VisualAnexo = 'imagem' | 'pdf' | 'video' | 'outro';
+export function visualAnexo(a: Pick<Anexo, 'nome' | 'tipo'>): VisualAnexo {
+  const t = (a.tipo ?? '').toLowerCase(), ext = (/\.([a-z0-9]+)$/i.exec(a.nome)?.[1] ?? '').toLowerCase();
+  if (t.startsWith('image/') || (!t && ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext))) return 'imagem';
+  if (t === 'application/pdf' || (!t && ext === 'pdf')) return 'pdf';
+  if (t.startsWith('video/') || (!t && ['mp4', 'webm', 'mov'].includes(ext))) return 'video';
+  return 'outro';
+}
+/** Extensão em maiúsculas para o ladrilho do arquivo sem pré-visualização ("XLSX", "ZIP"; sem extensão = "ARQ"). */
+export const extensaoAnexo = (nome: string) => (/\.([a-z0-9]{1,5})$/i.exec(nome)?.[1] ?? 'arq').toUpperCase();
+/** Tarefa apontada no Sankhya: só o Admin altera (o banco confere de novo — 0105). */
+export const tarefaTravadaOs = (t: { tem_os?: boolean } | null | undefined, perfil: string | null | undefined) => !!t?.tem_os && perfil !== 'admin';
 
 // ---------------------------------------------------------------- regras puras (testadas no Vitest)
 /** Fatias da barra de pílula (escopo §2.3): real (OS/app) e planejado (sem apontamento, outra cor) sobre o previsto. */

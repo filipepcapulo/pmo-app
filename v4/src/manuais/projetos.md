@@ -58,7 +58,7 @@ Botões do topo:
 
 - **☆ Favoritar**: põe o projeto nos favoritos do menu lateral. Toque em **★ Favorito** para tirar.
 - **Aceite de OS**: abre o Aceite de OS já com a FAP do projeto. Só aparece para quem tem a permissão e quando o nome do projeto traz o número da FAP.
-- **Editar**: muda **Nome**, **Fase**, **Situação**, **GP**, **Início previsto** e **Fim previsto**. Situação Encerrado ou Cancelado equivale ao "Z" na lista do ClickUp.
+- **Editar**: muda **Nome**, **Fase**, **Situação**, **GP**, **Início previsto** e **Fim previsto**. Situação **Encerrado** ou **Cancelado** deixa o projeto **inativo** (equivale ao "Z" na frente da lista do ClickUp): a ficha mostra a marca **Inativo** e o projeto não movimenta mais — o app não cria, altera nem exclui demanda, subdemanda ou tarefa dele, nem para o Admin. Para voltar a movimentar, edite a Situação para **Ativo**.
 
 As abas: **Indicadores**, **Horas**, **Cronograma**, **5W2H**, **Demandas**, **Equipe**, **Anexos**, **Comentários** e **Histórico**. O app lembra a última aba que você usou. A aba **Rentabilidade** só aparece para quem tem o papel no cofre financeiro e tem manual próprio.
 

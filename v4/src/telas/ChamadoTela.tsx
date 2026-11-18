@@ -1,5 +1,7 @@
-// Ficha do chamado (#/chamado/<id>): situação, SLA, dados do formulário, triagem, interações (com respostas prontas), extrato
-// para o WhatsApp, tarefas, anexos e relacionados. A tarefa nova usa o popup único e encerra a triagem no banco.
+// Ficha do chamado (#/chamado/<id>): situação, SLA, dados do formulário, detalhamento e anexos no painel principal (miniaturas
+// e pré-visualização grande — 4.14.0), triagem, interações (com respostas prontas), extrato para o WhatsApp, tarefas e
+// relacionados. A tarefa nova usa o popup único e encerra a triagem no banco. Depois de triado, "Editar chamado" abre a subdemanda
+// do chamado no popup único (a prioridade do chamado acompanha a dela — 0105).
 import { useEffect, useState } from 'react';
 import { chamV4, destinosDe, exigenciaDoMovimento, textoTriado, type Local } from '../api/chamadosV4';
 import { AlocarAgenda } from '../componentes/AlocarAgenda';
@@ -27,7 +29,7 @@ import { Resumo } from '../componentes/Resumo';
 import { gerarImagemChamado, modeloImagem } from '../util/chamadoImagem';
 import { baixarArquivo } from '../util/csv';
 
-type Aba = 'interacoes' | 'tarefas' | 'anexos' | 'relacionados' | 'portal';
+type Aba = 'interacoes' | 'tarefas' | 'relacionados' | 'portal';
 
 /** Imagem do chamado para o grupo interno (4.12.0): prévia do PNG e as saídas que o aparelho oferece (compartilhar, copiar, baixar). */
 function ImagemChamado({ f, aoFechar }: { f: FichaChamado; aoFechar: () => void }) {
@@ -239,7 +241,7 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   };
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'interacoes', rotulo: `Interações (${f.interacoes.length})` }, { id: 'tarefas', rotulo: `Tarefas (${f.tarefas.length})` },
-    { id: 'anexos', rotulo: `Anexos (${f.anexos.length})` }, { id: 'relacionados', rotulo: `Relacionados (${f.relacionados.length})` },
+    { id: 'relacionados', rotulo: `Relacionados (${f.relacionados.length})` },
     // V13e-2: chamados do portal Sankhya ligados a este chamado
     ...(pode('chamados_portal.usar') ? [{ id: 'portal' as Aba, rotulo: 'Portal Sankhya' }] : []),
   ];
@@ -268,6 +270,7 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
           {pode('chamado.triar') && !fechado && <Botao onClick={() => setRecusa(true)}>Recusar</Botao>}
           {pode('chamado.triar') && ch.status_triagem === 'recusada' && <Botao onClick={reabrir}>Reabrir</Botao>}
           {pode('chamado.triar') && ['nova', 'em_triagem'].includes(ch.status_triagem) && <Botao variante="primario" onClick={() => setTriagem(true)}>Triagem</Botao>}
+          {pode('demanda.editar') && ch.status_triagem === 'triada' && <Botao variante="primario" onClick={() => ed.demanda({ id: f.demanda.id })}>Editar chamado</Botao>}
           {ch.status_triagem === 'triada' && <span className="pilula pilula-neutra" data-testid="triado-por">{textoTriado(ch, id => equipe.porId.get(id)?.nome, dataHoraBr)}</span>}
         </div>
       </header>
@@ -291,7 +294,14 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
           <div><dt>Demanda</dt><dd><a href={hashDe(caminhoEntidade('demanda', f.demanda.id))}>Abrir</a> <StatusPilula status={f.demanda.status} /></dd></div>
         </dl>
         {ch.motivo_recusa && <p className="msg-erro">Recusado: {ch.motivo_recusa}</p>}
-        {f.demanda.descricao && <p className="descricao">{f.demanda.descricao}</p>}
+      </section>
+
+      <section className="cartao" aria-label="Detalhamento e anexos" data-testid="chamado-detalhe">
+        <h2 className="secao">Detalhamento</h2>
+        {f.demanda.descricao ? <p className="descricao">{f.demanda.descricao}</p> : <p className="ajuda">Sem detalhamento.</p>}
+        <h2 className="secao">Anexos ({f.anexos.length})</h2>
+        <Anexos galeria entidade="demanda" id={f.demanda.id} itens={f.anexos} aoMudar={c.recarregar} />
+        {ch.sem_anexo && <p className="ajuda">Aberto sem anexo: {ch.sem_anexo}</p>}
       </section>
 
       <section className="cartao">
@@ -300,10 +310,6 @@ export function ChamadoTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
         </div>
         {aba === 'interacoes' && <Interacoes f={f} opcoes={opcoes} aoMudar={c.recarregar} />}
         {aba === 'tarefas' && <ListaTarefas tarefas={f.tarefas} nomeDemanda={() => null} />}
-        {aba === 'anexos' && <>
-          <Anexos entidade="demanda" id={f.demanda.id} itens={f.anexos} aoMudar={c.recarregar} />
-          {ch.sem_anexo && <p className="ajuda">Aberto sem anexo: {ch.sem_anexo}</p>}
-        </>}
         {aba === 'relacionados' && <Relacionados f={f} aoMudar={c.recarregar} />}
         {aba === 'portal' && <ChamadosPortal chamado={ch.id} />}
       </section>

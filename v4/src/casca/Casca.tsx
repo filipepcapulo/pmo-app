@@ -25,6 +25,7 @@ import { Componentes } from '../telas/Componentes';
 import { Mcp } from '../telas/Mcp';
 import { SyncClickup } from '../telas/SyncClickup';
 import { SyncExperience } from '../telas/SyncExperience';
+import { ExperiencePendentes } from '../telas/ExperiencePendentes';
 import { Fechamento, MeuFechamento } from '../telas/Fechamento';
 import { Financeiro } from '../telas/Financeiro';
 import { Sugestoes } from '../telas/Sugestoes';
@@ -193,6 +194,7 @@ export function Casca() {
     if (r.modulo.id === 'meu-fechamento') return <MeuFechamento />;
     if (r.modulo.id === 'componentes') return <Componentes />;
     if (r.modulo.id === 'sync-experience') return <SyncExperience />;
+    if (r.modulo.id === 'experience-pendentes') return <ExperiencePendentes />;
     if (r.modulo.id === 'sync-clickup') return <SyncClickup />;
     if (r.modulo.id === 'mcp') return <Mcp />;
     if (r.modulo.id === 'aceite-os') return <AceiteOs parametro={r.parametro} />;

@@ -5,7 +5,7 @@ import { data, horas } from '../api/cadastros';
 import { podeApontar } from '../api/consultor';
 import { podeDesviar, rotuloDesvioTarefa } from '../api/desvios';
 import { syncExperience, textoResultado as textoSync, textoSyncTarefa } from '../api/syncExperience';
-import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo, tarefaTravadaOs, type Apontamento } from '../api/execucao';
+import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo, tarefaTravadaOs, AVISO_TAREFA_OS, PERMISSAO_EDITAR_COM_OS, type Apontamento } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { Anexos } from '../componentes/Anexos';
 import { StatusPilula } from '../componentes/ArvoreDemandas';
@@ -62,8 +62,8 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
     setSincronizando(false);
   }
   const souResp = t.responsavel_id === eu!.usuario.id;
-  // 0105: apontada no Sankhya (tem nº de OS) — só o Admin altera
-  const travada = tarefaTravadaOs(t, eu!.perfil);
+  // 0105/0113: apontada no Sankhya (tem nº de OS) — só altera o Admin ou quem tem tarefa.editar_com_os
+  const travada = tarefaTravadaOs(t, pode(PERMISSAO_EDITAR_COM_OS));
   const abas: { id: Aba; rotulo: string }[] = [
     { id: 'apontamentos', rotulo: `Apontamentos (${apontamentos.length})` }, { id: 'checklist', rotulo: `Checklist (${c.dados.checklist.length})` },
     { id: 'anexos', rotulo: `Anexos (${c.dados.anexos.length})` }, { id: 'comentarios', rotulo: `Comentários (${nCom ?? c.dados.comentarios})` },
@@ -104,7 +104,7 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
           <div><dt>Apontamento</dt><dd>{t.apontamento ?? '—'}</dd></div>
           <div><dt>ClickUp</dt><dd>{t.clickup_id ? <a href={`https://app.clickup.com/t/${t.clickup_id}`} target="_blank" rel="noopener">{t.clickup_id}</a> : '—'}</dd></div>
         </dl>
-        {t.tem_os && <p className="ajuda" data-testid="tarefa-com-os">🔒 Apontada no Sankhya (tem número de OS): só o administrador altera ou exclui esta tarefa.</p>}
+        {t.tem_os && <p className="ajuda" data-testid="tarefa-com-os">🔒 Apontada no Sankhya (tem número de OS): {AVISO_TAREFA_OS} esta tarefa.</p>}
         {t.detalhamento && <p className="descricao">{t.detalhamento}</p>}
         {t.motivo_status && !(desvio && t.motivo_status === 'desvio') && <p className="ajuda">Motivo: {t.motivo_status}</p>}
         {desvio && (

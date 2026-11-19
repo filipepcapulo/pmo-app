@@ -88,7 +88,7 @@ export interface Tarefa {
   etapa: string | null; etapa_id?: string | null; agendamento: string | null; experience: string | null; apontamento: string | null; grupo_criacao: string | null;
   versao: number; clickup_id: string | null; horas_reais: number | null; apontamentos: number;
   usuario_cliente_id?: string | null;
-  /** 0105: já apontada no Sankhya (tem número de OS) — só o Admin altera. */
+  /** 0105/0113: já apontada no Sankhya (tem número de OS) — só altera o Admin ou quem tem `tarefa.editar_com_os`. */
   tem_os?: boolean;
 }
 /** Quem criou ou editou a tarefa por último (0051); `clickup` = nasceu no ClickUp e não foi gravada no app. */
@@ -236,8 +236,12 @@ export function visualAnexo(a: Pick<Anexo, 'nome' | 'tipo'>): VisualAnexo {
 }
 /** Extensão em maiúsculas para o ladrilho do arquivo sem pré-visualização ("XLSX", "ZIP"; sem extensão = "ARQ"). */
 export const extensaoAnexo = (nome: string) => (/\.([a-z0-9]{1,5})$/i.exec(nome)?.[1] ?? 'arq').toUpperCase();
-/** Tarefa apontada no Sankhya: só o Admin altera (o banco confere de novo — 0105). */
-export const tarefaTravadaOs = (t: { tem_os?: boolean } | null | undefined, perfil: string | null | undefined) => !!t?.tem_os && perfil !== 'admin';
+/** Permissão que libera editar e excluir a tarefa com número de OS (0113). O Admin tem todas. */
+export const PERMISSAO_EDITAR_COM_OS = 'tarefa.editar_com_os';
+/** Tarefa apontada no Sankhya: só altera quem tem a permissão acima — `liberado` = pode(PERMISSAO_EDITAR_COM_OS). O banco confere de novo (0105, 0113). */
+export const tarefaTravadaOs = (t: { tem_os?: boolean } | null | undefined, liberado: boolean) => !!t?.tem_os && !liberado;
+/** Aviso da tarefa com OS para quem está travado. */
+export const AVISO_TAREFA_OS = 'só o administrador ou quem tem a permissão de editar tarefa com OS altera ou exclui';
 
 // ---------------------------------------------------------------- regras puras (testadas no Vitest)
 /** Fatias da barra de pílula (escopo §2.3): real (OS/app) e planejado (sem apontamento, outra cor) sobre o previsto. */

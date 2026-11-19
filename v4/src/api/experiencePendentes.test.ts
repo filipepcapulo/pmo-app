@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { avisosPendente, erroPeriodoPendentes, filtrarPendentes, janelaPendente, opcoesPendentes, periodoPendentes, ROTULO_PENDENCIA, totaisPendentes, type LinhaPendente } from './experiencePendentes';
-import { extensaoAnexo, tarefaTravadaOs, visualAnexo } from './execucao';
+import { AVISO_TAREFA_OS, extensaoAnexo, PERMISSAO_EDITAR_COM_OS, tarefaTravadaOs, visualAnexo } from './execucao';
 import { projetoInativo } from './cadastros';
 
 const linha = (m: Partial<LinhaPendente>): LinhaPendente => ({
@@ -48,13 +48,14 @@ describe('Tarefas Pendentes no Experience (0105)', () => {
 });
 
 describe('Tarefa com OS, projeto inativo e galeria de anexos (0105)', () => {
-  it('tarefa com número de OS: só o Admin altera', () => {
-    expect(tarefaTravadaOs({ tem_os: true }, 'gp')).toBe(true);
-    expect(tarefaTravadaOs({ tem_os: true }, 'consultor')).toBe(true);
-    expect(tarefaTravadaOs({ tem_os: true }, 'admin')).toBe(false);
-    expect(tarefaTravadaOs({ tem_os: false }, 'gp')).toBe(false);
-    expect(tarefaTravadaOs({}, 'gp')).toBe(false);
-    expect(tarefaTravadaOs(null, 'gp')).toBe(false);
+  it('tarefa com número de OS: só altera quem tem tarefa.editar_com_os (0113; o Admin tem todas)', () => {
+    expect(PERMISSAO_EDITAR_COM_OS).toBe('tarefa.editar_com_os');
+    expect(tarefaTravadaOs({ tem_os: true }, false)).toBe(true);
+    expect(tarefaTravadaOs({ tem_os: true }, true)).toBe(false);
+    expect(tarefaTravadaOs({ tem_os: false }, false)).toBe(false);
+    expect(tarefaTravadaOs({}, false)).toBe(false);
+    expect(tarefaTravadaOs(null, false)).toBe(false);
+    expect(AVISO_TAREFA_OS).toContain('permissão de editar tarefa com OS');
   });
   it('projeto inativo = encerrado ou cancelado (o "Z" da lista)', () => {
     expect(['ativo', 'pausado', 'encerrado', 'cancelado'].map(projetoInativo)).toEqual([false, false, true, true]);

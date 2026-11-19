@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { etapasApi } from '../api/etapas';
 import { useEtapas } from '../estado/etapas';
 import { horas } from '../api/cadastros';
-import { ajudaHorasPeriodo, AVISO_HORARIO, exec, horarioInvalido, horasDoPeriodoEscolhido, MODALIDADES, PADRAO_TAREFA, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, tarefaTravadaOs, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
+import { ajudaHorasPeriodo, AVISO_HORARIO, exec, horarioInvalido, horasDoPeriodoEscolhido, MODALIDADES, PADRAO_TAREFA, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, tarefaTravadaOs, AVISO_TAREFA_OS, PERMISSAO_EDITAR_COM_OS, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
 import type { AlvoTarefa } from '../estado/edicao';
 import { usePode, useEquipe } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
@@ -56,8 +56,8 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
   const [mais, setMais] = useState<{ data: string; periodo: string; ini: string; fim: string } | null>(null);
   const [conf, setConf] = useState<{ lista: Conflito[]; seguir: () => void } | null>(null);
   const novo = !alvo.id;
-  // 0105: tarefa apontada no Sankhya (tem nº de OS) só o Admin altera
-  const travadaOs = !novo && tarefaTravadaOs(orig, eu?.perfil);
+  // 0105/0113: tarefa apontada no Sankhya (tem nº de OS) só altera o Admin ou quem tem tarefa.editar_com_os
+  const travadaOs = !novo && tarefaTravadaOs(orig, pode(PERMISSAO_EDITAR_COM_OS));
   const podeGravar = pode(novo ? 'tarefa.criar' : 'tarefa.editar') && !travadaOs;
 
   useEffect(() => {
@@ -206,7 +206,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
         <Botao onClick={aoFechar}>{podeGravar ? 'Cancelar' : 'Fechar'}</Botao>
         {podeGravar && <Botao variante="primario" carregando={gravando} onClick={() => enviar()}>
           {novo && nNovas > 1 ? `Criar ${nNovas} tarefas` : 'Gravar'}</Botao>}</>}>
-      {travadaOs ? <p className="ajuda" data-testid="form-tarefa-os">🔒 Tarefa apontada no Sankhya (tem número de OS): só o administrador altera ou exclui.</p>
+      {travadaOs ? <p className="ajuda" data-testid="form-tarefa-os">🔒 Tarefa apontada no Sankhya (tem número de OS): {AVISO_TAREFA_OS}.</p>
         : !podeGravar && <p className="ajuda">Você não tem permissão para {novo ? 'criar' : 'editar'} tarefas.</p>}
       <Formulario aoEnviar={() => enviar()} className="form-2x">
         {caixa ? (

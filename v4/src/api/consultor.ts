@@ -9,14 +9,20 @@ export interface LinhaAgenda {
   modalidade: string | null; status: StatusTarefa; tarefa: string; demanda_id: string; demanda: string; projeto_id: string; projeto: string;
   cliente_id: string; cliente: string; horas_reais: number;
 }
-export type OrigemFiltro = '' | 'sankhya_om' | 'app';
+/** '' = apontamentos (OS + app); 'previsto' = agenda sem apontamento; 'tudo' = apontamentos + previstas (0110). */
+export type OrigemFiltro = '' | 'sankhya_om' | 'app' | 'previsto' | 'tudo';
 export interface LinhaApontamento extends Record<string, unknown> {
-  apontamento_id: string; versao: number; origem: 'sankhya_om' | 'app' | 'manual'; numero_os: string | null; numero_interno: number | null;
+  /** Linha 'previsto' (0110): agenda sem apontamento — apontamento_id e versao nulos, horas = horas previstas. */
+  apontamento_id: string | null; versao: number | null; origem: 'sankhya_om' | 'app' | 'manual' | 'previsto'; numero_os: string | null; numero_interno: number | null;
   data: string; hora_ini: string | null; intervalo_min: number; hora_fim: string | null; horas: number; texto: string | null;
   consultor_id: string; consultor: string; tarefa_id: string; tarefa: string; demanda: string; projeto: string; cliente: string;
-  conferido_em: string | null; conferido_por: string | null;
+  conferido_em: string | null; conferido_por: string | null; status_tarefa?: string | null; tipo_apontamento?: string | null;
 }
-export interface RelatorioApontamentos { horas: number; horas_os: number; horas_app: number; total: number; itens: LinhaApontamento[] }
+export interface RelatorioApontamentos {
+  horas: number; horas_os: number; horas_app: number; total: number; itens: LinhaApontamento[];
+  /** 0110: agendas sem apontamento do filtro (0 quando o filtro só traz apontamentos). */
+  horas_previstas?: number; total_previstas?: number;
+}
 export type SituacaoPedido = 'aberto' | 'atendido' | 'recusado';
 export interface PedidoAgenda {
   id: string; versao: number; horas: number; motivo: string; situacao: SituacaoPedido; criado_em: string; solicitante_id: string;

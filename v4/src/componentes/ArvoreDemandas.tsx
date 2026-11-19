@@ -15,7 +15,7 @@ import { Icone } from './Icone';
 import { NomePessoa } from './NomePessoa';
 import { Tabela, type Coluna } from './Tabela';
 import { Resumo } from './Resumo';
-import { PilulaEtapa, PilulaResp, PilulaStatus } from './Pilulas';
+import { PilulaEtapa, PilulaResp, PilulaStatus, SinalStatus } from './Pilulas';
 
 type ComTotais = { id: string; nome: string; pai_id: string | null; status: string; projeto_id: string; totais?: Partial<TotaisDemanda> | null; extra?: string; avulso_base?: boolean;
   etapa?: string | null; etapa_id?: string | null; etapa_app_id?: string | null; responsavel_id?: string | null;
@@ -53,6 +53,7 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
       <div className="linha-exec-topo">
         {nFilhas ? <button type="button" className="seta" aria-expanded={aberta} aria-label={aberta ? 'Recolher' : 'Expandir'} onClick={alternar}><Icone nome={aberta ? 'baixo' : 'seta'} tam={16} /></button>
           : <span className="seta" aria-hidden />}
+        <SinalStatus status={d.status} />
         <Resumo tipo="demanda" id={d.id}><a href={href} className="linha-exec-nome">{d.nome}</a></Resumo>
         {d.extra && <small className="ajuda">{d.extra}</small>}
         {d.chamado && <a className="pil pil-chamado" href={hashDe(caminhoEntidade('chamado', d.chamado.id))} title="Abrir o chamado">Chamado #{d.chamado.numero}</a>}

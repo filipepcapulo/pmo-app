@@ -37,6 +37,8 @@ As demandas aparecem agrupadas por cliente e projeto. Toque no nome do grupo par
 
 Cada linha mostra o nome, o status, a marca **Atrasada** (quando é o caso), as datas, o % concluído e a barra de horas. A seta à esquerda recolhe ou expande as subdemandas; **Recolher tudo** e **Expandir tudo** fazem isso de uma vez.
 
+À esquerda do nome fica o **sinal do status**: círculo vazio (Não iniciado), azul (Em andamento), roxo (Em validação), verde com ✓ (Concluído), cinza com ✕ (Cancelado) e laranja (Suspenso). Passe o mouse para ler o nome do status.
+
 Atalhos na linha: **+ Sub** (nova subdemanda), **+ Tarefa** e **Editar**.
 
 A demanda ou subdemanda que tem tarefas mostra a pílula **N tarefas** (as canceladas não contam; na demanda entram também as tarefas das subdemandas). Clique na pílula para listar as tarefas ali mesmo, com data, período, consultor, status e horas; clique numa tarefa para abri-la e na pílula de novo para recolher.

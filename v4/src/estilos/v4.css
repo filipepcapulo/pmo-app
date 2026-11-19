@@ -254,3 +254,12 @@ button.rg-nivel { cursor: pointer; }
 .pil-tarefas { border: 1px solid var(--azul); background: transparent; color: var(--azul); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
 .pil-tarefas:hover, .pil-tarefas[aria-expanded="true"] { background: var(--azul); color: var(--superficie); }
 .tarefas-drill-carga { display: flex; align-items: center; gap: 8px; margin: 8px 0 0 28px; }
+/* sinal do status à esquerda do nome da demanda/subdemanda: cor + símbolo (o nome fica na dica) */
+.sinal-status { flex: 0 0 18px; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; line-height: 1; color: #fff; cursor: default; }
+.sst-nao_iniciado { background: transparent; border: 2px solid #9ca3af; }
+.sst-em_andamento { background: #1d4ed8; }
+.sst-em_validacao { background: #6d28d9; }
+.sst-concluida { background: #15803d; }
+.sst-cancelada { background: #6b7280; }
+.sst-pausada { background: #c2410c; font-size: 9px; }

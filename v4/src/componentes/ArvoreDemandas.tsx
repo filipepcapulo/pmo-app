@@ -5,12 +5,15 @@
 // tarefas da demanda (e das subdemandas dela) e lista ali mesmo.
 import { useEffect, useState } from 'react';
 import { data, horas } from '../api/cadastros';
-import { arvoreDemandas, exec, semAlerta, rotuloModalidade, rotuloPeriodo, rotuloStatusTarefa, type Tarefa, type TotaisDemanda } from '../api/execucao';
+import { arvoreDemandas, AVISO_TAREFA_OS, exec, PERMISSAO_EDITAR_COM_OS, semAlerta, tarefaTravadaOs, rotuloModalidade, rotuloPeriodo, rotuloStatusTarefa, type Tarefa, type TotaisDemanda } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
+import type { ItemLote } from '../estado/edicaoMultipla';
+import { useEtapas } from '../estado/etapas';
 import { useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { BarraHoras } from './BarraHoras';
+import { AcoesEdicaoMultipla, CaixaLote, useSelecao } from './EdicaoMultipla';
 import { Icone } from './Icone';
 import { NomePessoa } from './NomePessoa';
 import { Tabela, type Coluna } from './Tabela';
@@ -21,6 +24,12 @@ type ComTotais = { id: string; nome: string; pai_id: string | null; status: stri
   etapa?: string | null; etapa_id?: string | null; etapa_app_id?: string | null; responsavel_id?: string | null;
   chamado?: { id: string; numero: number; localizacao: string | null; precisa_alocacao?: boolean } | null };
 
+/** Linha da árvore como item da edição múltipla (4.23.0). */
+export const itemLoteDemanda = (d: ComTotais, etapaId: string | null): ItemLote =>
+  ({ tipo: 'demanda', id: d.id, nome: d.nome, status: d.status, etapa_id: etapaId, responsavel_id: d.responsavel_id ?? null });
+const itemLoteTarefa = (t: Tarefa, etapaId: string | null): ItemLote =>
+  ({ tipo: 'tarefa', id: t.id, nome: t.nome, status: t.status, etapa_id: etapaId, responsavel_id: t.responsavel_id, demanda_id: t.demanda_id });
+
 export function StatusPilula({ status, tipo = 'demanda' }: { status: string; tipo?: 'demanda' | 'tarefa' }) {
   if (tipo === 'demanda') return <PilulaStatus status={status} />;
   return <span className={`pilula st-${status}`}>{rotuloStatusTarefa(status)}</span>;
@@ -30,6 +39,7 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
   const ed = useEdicao();
   const pode = usePode();
   const [verTarefas, setVerTarefas] = useState(false);
+  const et = useEtapas();
   const t = d.totais;
   // pílula de tarefas: a lista vem da ficha da demanda só quando a pessoa abre (e de novo depois de cada gravação)
   const esc = useSessao().eu?.escritorio_id;
@@ -53,6 +63,7 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
       <div className="linha-exec-topo">
         {nFilhas ? <button type="button" className="seta" aria-expanded={aberta} aria-label={aberta ? 'Recolher' : 'Expandir'} onClick={alternar}><Icone nome={aberta ? 'baixo' : 'seta'} tam={16} /></button>
           : <span className="seta" aria-hidden />}
+        {pode('demanda.editar') && <CaixaLote item={itemLoteDemanda(d, et.idDe(d))} />}
         <SinalStatus status={d.status} />
         <Resumo tipo="demanda" id={d.id}><a href={href} className="linha-exec-nome">{d.nome}</a></Resumo>
         {d.extra && <small className="ajuda">{d.extra}</small>}
@@ -87,11 +98,23 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
 
 function TarefasDrill({ tarefas, nomeDemanda }: { tarefas: Tarefa[]; nomeDemanda?: (id: string) => string | null }) {
   const ed = useEdicao();
+  const pode = usePode();
+  const et = useEtapas();
+  const sel = useSelecao();
+  const marcavel = !!sel?.ativa && pode('tarefa.editar');
+  const liberado = pode(PERMISSAO_EDITAR_COM_OS);
+  const livres = marcavel ? tarefas.filter(t => !tarefaTravadaOs(t, liberado)).map(t => itemLoteTarefa(t, et.idDe(t))) : [];
+  const todas = livres.length > 0 && livres.every(i => sel!.tem(i));
   return (
     <ul className="tarefas-drill" aria-label="Tarefas">
+      {marcavel && livres.length > 1 && (
+        <li className="td-todas"><label className="check"><input type="checkbox" className="lote-caixa" checked={todas}
+          onChange={e => sel!.marcar(livres, e.target.checked)} /> Todas as {livres.length} tarefas</label></li>
+      )}
       {tarefas.map(t => (
         <li key={t.id} role="button" tabIndex={0} onClick={() => ed.tarefa({ id: t.id })}
           onKeyDown={e => { if (e.key === 'Enter') ed.tarefa({ id: t.id }); }}>
+          {marcavel && <CaixaLote item={itemLoteTarefa(t, et.idDe(t))} travada={tarefaTravadaOs(t, liberado) ? `Tarefa com OS: ${AVISO_TAREFA_OS}` : null} />}
           <span className="ajuda">{data(t.data)} · {rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim)}</span>
           <span className="td-nome">{t.nome}{nomeDemanda?.(t.demanda_id) && <small className="ajuda"> · {nomeDemanda(t.demanda_id)}</small>}</span>
           <NomePessoa id={t.responsavel_id} />
@@ -112,17 +135,21 @@ export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.', tarefas, 
   const fechadas = daTela ? fechadasDaTela! : fechadasAqui;
   const setFechadas = (v: Set<string> | ((s: Set<string>) => Set<string>)) => (daTela ? aoFechar!(typeof v === 'function' ? v : () => v) : setFechadasAqui(v));
   const tarefasDe = (id: string) => (tarefas ? tarefas.filter(t => t.demanda_id === id) : undefined);
+  const et = useEtapas();
+  const temSelecao = !!useSelecao();
   const arv = arvoreDemandas(demandas);
   if (!arv.length) return <p className="ajuda">{vazio}</p>;
   const comFilhas = arv.filter(x => x.filhas.length).map(x => x.item.id);
   const tudoFechado = comFilhas.length > 0 && comFilhas.every(id => fechadas.has(id));
   return (
     <>
-    {!daTela && comFilhas.length > 0 && (
+    {!daTela && (comFilhas.length > 0 || temSelecao) && (
       <div className="arvore-acoes">
-        <button type="button" className="link" onClick={() => setFechadas(tudoFechado ? new Set() : new Set(comFilhas))}>
+        {comFilhas.length > 0 && <button type="button" className="link" onClick={() => setFechadas(tudoFechado ? new Set() : new Set(comFilhas))}>
           <Icone nome={tudoFechado ? 'seta' : 'baixo'} tam={14} /> {tudoFechado ? 'Expandir tudo' : 'Recolher tudo'}
-        </button>
+        </button>}
+        {/* marca as demandas e subdemandas da árvore (as recolhidas também); tarefa é marcada na própria lista de tarefas */}
+        <AcoesEdicaoMultipla todos={demandas.map(d => itemLoteDemanda(d, et.idDe(d)))} />
       </div>
     )}
     <ul className="arvore">

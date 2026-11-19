@@ -10,6 +10,7 @@ import {
 } from '../estado/filtrosLista';
 import { ArvoreDemandas, ListaTarefas } from './ArvoreDemandas';
 import { BarraFiltros } from './BarraFiltros';
+import { EdicaoMultipla } from './EdicaoMultipla';
 import { SelecaoMultipla } from './SelecaoMultipla';
 
 /** Aba Demandas do projeto: responsável por nível (demanda com as subdemandas, subdemanda, tarefa) ou em todos. */
@@ -44,7 +45,9 @@ export function DemandasDoProjeto({ demandas, tarefas, vazio }: { demandas: Dema
           </span>
         </span>
       </BarraFiltros>
-      <ArvoreDemandas demandas={itens} tarefas={tarefas} vazio="Nenhuma demanda com esses filtros." />
+      <EdicaoMultipla chave={JSON.stringify(f)}>
+        <ArvoreDemandas demandas={itens} tarefas={tarefas} vazio="Nenhuma demanda com esses filtros." />
+      </EdicaoMultipla>
     </>
   );
 }

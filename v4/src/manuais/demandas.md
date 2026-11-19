@@ -37,6 +37,17 @@ As demandas aparecem agrupadas por cliente e projeto. Toque no nome do grupo par
 
 Cada linha mostra o nome, o status, a marca **Atrasada** (quando é o caso), as datas, o % concluído e a barra de horas. A seta à esquerda recolhe ou expande as subdemandas; **Recolher tudo** e **Expandir tudo** fazem isso de uma vez.
 
+### Edição múltipla
+
+Para trocar o **Status**, a **Etapa** ou o **Responsável** de vários itens de uma vez:
+
+1. Toque em **Edição múltipla** (acima da lista). Cada demanda e subdemanda ganha uma caixa de seleção; nas tarefas abertas pela pílula **N tarefas** também.
+2. Marque o que quiser alterar. **Selecionar tudo** marca todas as demandas e subdemandas que estão na tela; na lista de tarefas, **Todas as N tarefas** marca as daquela demanda.
+3. Na barra que aparece no rodapé, escolha o novo Status, a nova Etapa e/ou o novo Responsável. O campo deixado em **manter** não muda.
+4. Toque em **Aplicar em N**.
+
+Só os campos escolhidos são alterados; quem já estava com o valor escolhido não é gravado de novo. Se algum item não puder ser alterado (por exemplo, tarefa com OS, sem a permissão), ele continua marcado e a barra mostra o motivo; os demais são gravados normalmente. Com demandas e tarefas marcadas juntas, o Status mostra só os que existem nos dois. Mudar os filtros limpa a seleção. Vale a mesma permissão de editar demanda e de editar tarefa. A mesma função existe na aba **Demandas** do projeto.
+
 À esquerda do nome fica o **sinal do status**: círculo vazio (Não iniciado), azul (Em andamento), roxo (Em validação), verde com ✓ (Concluído), cinza com ✕ (Cancelado) e laranja (Suspenso). Passe o mouse para ler o nome do status.
 
 Atalhos na linha: **+ Sub** (nova subdemanda), **+ Tarefa** e **Editar**.

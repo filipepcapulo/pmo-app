@@ -1,5 +1,7 @@
 // V4: filtros de Etapa (cadastro de etapas do app) e Status (Não iniciado, Em andamento, Em validação, Concluído, Cancelado,
 // Suspenso); o Nível (demandas, subdemandas ou os dois) fica destacado no fim da barra e vale para TODOS os filtros.
+// 4.16.0: duas abas com a mesma barra de filtros — Gráfico (barras com a quantidade por cliente, em ordem alfabética; clicar
+// na barra mostra embaixo as demandas do cliente) e Lista (a visão de sempre). A aba fica guardada no aparelho.
 // Módulo Demandas (#/demandas): todas as demandas/subdemandas visíveis, agrupadas por cliente · projeto, com a barra
 // de horas e as mesmas ações (popup único) de qualquer tela. Filtros por status (vários, guardados no aparelho — V13a-5,
 // módulo 09 da Central), fase do projeto, etapa, responsável, tipo, prioridade, cliente, projeto, atrasadas e texto
@@ -17,7 +19,7 @@ import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { useEquipe, usePode } from '../estado/equipe';
-import { filtrarDemandas, NIVEIS_FILTRO, SEM, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
+import { contarPorCliente, filtrarDemandas, NIVEIS_FILTRO, SEM, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
@@ -25,6 +27,9 @@ import { ABERTAS, lerStatus, relatorioDemandas, rotuloStatus, TODOS } from '../a
 import { baixarRelatorioHtml } from '../util/relatorioHtml';
 
 const CHAVE_STATUS = 'pmo4.demandas.status';
+const CHAVE_ABA = 'pmo4.demandas.aba';
+type Aba = 'grafico' | 'lista';
+const ABAS: [Aba, string][] = [['grafico', 'Gráfico'], ['lista', 'Lista']];
 const PROJETOS_POR_VEZ = 40;
 const mesmos = (a: string[], b: string[]) => a.length === b.length && a.every(x => b.includes(x));
 
@@ -43,6 +48,10 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
   });
   const { f, mudar, limpar, aplicar, ativos } = useFiltroLista(minhas ? 'minhas-demandas' : 'demandas', PADRAO_DEMANDAS);
   const [mostrar, setMostrar] = useState(PROJETOS_POR_VEZ);
+  // "Minhas demandas" (dentro de Minha agenda) continua só com a lista
+  const [aba, setAba] = useState<Aba>(() => { try { return !minhas && localStorage.getItem(CHAVE_ABA) !== 'lista' ? 'grafico' : 'lista'; } catch { return minhas ? 'lista' : 'grafico'; } });
+  const trocarAba = (a: Aba) => { setAba(a); setMostrar(PROJETOS_POR_VEZ); try { localStorage.setItem(CHAVE_ABA, a); } catch { /* sem armazenamento */ } };
+  const [clienteSel, setClienteSel] = useState<string | null>(null);
   const filtro = status.length === TODOS.length ? null : status;
   const c = useCarga(() => (minhas ? consultor.demandas(esc, filtro, null) : todasDemandas(esc, filtro)),
     [esc, minhas, status.join(), ed.geracao]);
@@ -50,14 +59,19 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
   const itens = useMemo(() => filtrarDemandas(todas, f), [todas, f]);
   useEffect(() => setMostrar(PROJETOS_POR_VEZ), [f, status]);
   const grupos = useMemo(() => {
-    const m = new Map<string, { cliente: string; projeto: string; projeto_id: string; itens: DemandaLinha[] }>();
+    const m = new Map<string, { cliente_id: string; cliente: string; projeto: string; projeto_id: string; itens: DemandaLinha[] }>();
     for (const d of itens) {
-      const g = m.get(d.projeto_id) ?? { cliente: d.cliente, projeto: d.projeto, projeto_id: d.projeto_id, itens: [] };
+      const g = m.get(d.projeto_id) ?? { cliente_id: d.cliente_id, cliente: d.cliente, projeto: d.projeto, projeto_id: d.projeto_id, itens: [] };
       g.itens.push(d);
       m.set(d.projeto_id, g);
     }
     return [...m.values()];
   }, [itens]);
+  const porCliente = useMemo(() => contarPorCliente(itens), [itens]);
+  const maior = Math.max(1, ...porCliente.map(x => x.n));
+  // o cliente escolhido no gráfico sai da seleção quando os filtros o tiram da tela
+  const escolhido = aba === 'grafico' ? porCliente.find(x => x.cliente_id === clienteSel) ?? null : null;
+  const visiveis = aba === 'grafico' ? grupos.filter(g => g.cliente_id === escolhido?.cliente_id) : grupos;
   const ops = useMemo(() => ({
     fases: opcoesTexto(todas.map(d => d.fase), FASES.filter(x => todas.some(d => d.fase === x))),
     etapas: [...et.lista.filter(e => e.ativo || todas.some(d => d.etapa_app_id === e.id)).map(e => ({ valor: e.id, rotulo: e.nome })),
@@ -86,6 +100,9 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
           {pode('demanda.criar') && <Botao variante="primario" onClick={() => ed.demanda({})}>+ Demanda</Botao>}
         </div>
       </header>}
+      {!minhas && <div className="segmentos" role="tablist" aria-label="Visões de demandas">
+        {ABAS.map(([v, r]) => <button key={v} type="button" role="tab" aria-selected={aba === v} onClick={() => trocarAba(v)}>{r}</button>)}
+      </div>}
       <BarraFiltros nome="demandas" n={c.dados ? itens.length : null} total={c.dados ? todas.length : null} ativos={ativos + (statusFora ? 1 : 0)} aoLimpar={limparTudo}>
         <input type="search" value={f.texto} onChange={e => mudar({ texto: e.target.value })} placeholder="Buscar demanda, cliente, projeto ou etapa" aria-label="Buscar demanda" />
         <details className="filtro-status">
@@ -121,14 +138,32 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
       {c.carregando && !c.dados && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}
       {c.dados && grupos.length === 0 && <p className="ajuda">Nenhuma demanda com esse filtro.</p>}
       {c.dados && c.dados.total > todas.length && <p className="ajuda">Carregadas {todas.length} de {c.dados.total}; refine o status.</p>}
-      {grupos.slice(0, mostrar).map(g => (
+      {aba === 'grafico' && porCliente.length > 0 && (
+        <section className="cartao gcli" aria-label="Quantidade de demandas por cliente">
+          <h2 className="secao">Quantidade por cliente <small className="ajuda">· {porCliente.length} cliente(s) · clique na barra para ver as demandas</small></h2>
+          <ul className="gcli-lista">
+            {porCliente.map(x => (
+              <li key={x.cliente_id}>
+                <button type="button" className="gcli-linha" aria-pressed={escolhido?.cliente_id === x.cliente_id}
+                  aria-label={`${x.cliente}: ${x.n} demanda(s)`} onClick={() => { setClienteSel(v => (v === x.cliente_id ? null : x.cliente_id)); setMostrar(PROJETOS_POR_VEZ); }}>
+                  <span className="gcli-nome" title={x.cliente}>{x.cliente}</span>
+                  <span className="gcli-trilho"><span className="gcli-barra" style={{ width: `${(x.n / maior) * 100}%` }} /></span>
+                  <b className="gcli-n">{x.n}</b>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {escolhido && <h2 className="secao gcli-titulo">{escolhido.cliente} <small className="ajuda">· {escolhido.n} demanda(s)/subdemanda(s)</small></h2>}
+      {visiveis.slice(0, mostrar).map(g => (
         <section key={g.projeto_id} className="cartao">
           <h2 className="secao"><Resumo tipo="projeto" id={g.projeto_id}><a href={hashDe(caminhoEntidade('projeto', g.projeto_id))}>{g.cliente} · {g.projeto}</a></Resumo></h2>
           <ArvoreDemandas demandas={g.itens} />
         </section>
       ))}
-      {grupos.length > mostrar && (
-        <p><Botao onClick={() => setMostrar(n => n + PROJETOS_POR_VEZ)}>Mostrar mais projetos ({grupos.length - mostrar} restantes)</Botao></p>
+      {visiveis.length > mostrar && (
+        <p><Botao onClick={() => setMostrar(n => n + PROJETOS_POR_VEZ)}>Mostrar mais projetos ({visiveis.length - mostrar} restantes)</Botao></p>
       )}
     </div>
   );

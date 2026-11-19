@@ -24,6 +24,13 @@ export function PilulaStatus({ status }: { status: string }) {
   return <span className={`pil pil-status pst-${statusV4(status)}`} title={`Status: ${rotuloStatusDemanda(status)}`}>{rotuloStatusDemanda(status)}</span>;
 }
 
+const GLIFO_STATUS: Record<string, string> = { nao_iniciado: '', em_andamento: '▸', em_validacao: '…', concluida: '✓', cancelada: '✕', pausada: 'Ⅱ' };
+/** 4.16.0: sinal do status à esquerda do nome da demanda/subdemanda (cor + símbolo; o nome do status fica na dica). */
+export function SinalStatus({ status }: { status: string }) {
+  const v = statusV4(status);
+  return <span className={`sinal-status sst-${v}`} role="img" aria-label={`Status: ${rotuloStatusDemanda(status)}`} title={`Status: ${rotuloStatusDemanda(status)}`}>{GLIFO_STATUS[v] ?? ''}</span>;
+}
+
 export function PilulaResp({ id, vazio }: { id?: string | null; vazio?: boolean }) {
   const { porId } = useEquipe();
   if (!id) return vazio ? <span className="pil pil-resp pil-sem" title="Sem responsável">—</span> : null;

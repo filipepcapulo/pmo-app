@@ -24,13 +24,24 @@ O que cada um faz, pelo padrão dos perfis (o Admin pode mudar as permissões):
 
 Os níveis: o projeto tem **demandas** (entregáveis); a demanda pode ter **subdemandas** (um nível só); demandas e subdemandas têm **tarefas**, que são as agendas dos consultores.
 
-## 2. A lista de demandas
+## 2. As abas Gráfico e Lista
+
+A tela tem duas abas, com a mesma barra de filtros: o que você filtra numa vale na outra. O app guarda no aparelho a aba em que você parou.
+
+- **Gráfico** (a primeira): uma barra por cliente, em ordem alfabética, com a quantidade de demandas e subdemandas que passam nos filtros. Clique na barra para ver, logo abaixo, as demandas daquele cliente, do mesmo jeito da Lista. Clique de novo na barra para recolher.
+- **Lista**: todas as demandas, como descrito a seguir.
+
+### A lista de demandas
 
 As demandas aparecem agrupadas por cliente e projeto. Toque no nome do grupo para abrir o projeto, ou na linha para abrir a demanda.
 
 Cada linha mostra o nome, o status, a marca **Atrasada** (quando é o caso), as datas, o % concluído e a barra de horas. A seta à esquerda recolhe ou expande as subdemandas; **Recolher tudo** e **Expandir tudo** fazem isso de uma vez.
 
+À esquerda do nome fica o **sinal do status**: círculo vazio (Não iniciado), azul (Em andamento), roxo (Em validação), verde com ✓ (Concluído), cinza com ✕ (Cancelado) e laranja (Suspenso). Passe o mouse para ler o nome do status.
+
 Atalhos na linha: **+ Sub** (nova subdemanda), **+ Tarefa** e **Editar**.
+
+A demanda ou subdemanda que tem tarefas mostra a pílula **N tarefas** (as canceladas não contam; na demanda entram também as tarefas das subdemandas). Clique na pílula para listar as tarefas ali mesmo, com data, período, consultor, status e horas; clique numa tarefa para abri-la e na pílula de novo para recolher.
 
 Filtros:
 

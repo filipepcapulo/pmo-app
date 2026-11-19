@@ -284,3 +284,14 @@ export function useFiltroLista<T extends object>(tela: string, padrao: T) {
   const aplicar = useCallback((bruto: unknown) => setF(normalizarFiltro(padrao, bruto)), [padrao]);
   return { f, mudar, limpar, aplicar, ativos: contarAtivos(f, padrao) };
 }
+
+/** Quantidade de demandas/subdemandas por cliente, em ordem alfabética (gráfico da tela Demandas). */
+export function contarPorCliente(itens: { cliente_id: string; cliente: string }[]): { cliente_id: string; cliente: string; n: number }[] {
+  const m = new Map<string, { cliente_id: string; cliente: string; n: number }>();
+  for (const d of itens) {
+    const c = m.get(d.cliente_id) ?? { cliente_id: d.cliente_id, cliente: d.cliente, n: 0 };
+    c.n++;
+    m.set(d.cliente_id, c);
+  }
+  return [...m.values()].sort((a, b) => a.cliente.localeCompare(b.cliente, 'pt-BR', { sensitivity: 'base' }));
+}

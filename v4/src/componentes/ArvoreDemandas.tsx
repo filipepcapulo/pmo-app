@@ -1,18 +1,21 @@
 // Peças comuns de execução: árvore demanda → subdemanda (com a barra de horas e as mesmas ações em toda tela) e a
 // lista de tarefas. Ações sempre pelo popup único (useEdicao). Com `tarefas`, cada linha abre as próprias tarefas
 // (drilldown demanda → subdemanda → tarefa da Tela de Projeto); clicar na tarefa abre o formulário.
-import { useState } from 'react';
+// 4.16.0: sem `tarefas` (tela Demandas e afins), a linha que tem tarefa mostra a pílula "N tarefas"; clicar busca as
+// tarefas da demanda (e das subdemandas dela) e lista ali mesmo.
+import { useEffect, useState } from 'react';
 import { data, horas } from '../api/cadastros';
-import { arvoreDemandas, semAlerta, rotuloModalidade, rotuloPeriodo, rotuloStatusTarefa, type Tarefa, type TotaisDemanda } from '../api/execucao';
+import { arvoreDemandas, exec, semAlerta, rotuloModalidade, rotuloPeriodo, rotuloStatusTarefa, type Tarefa, type TotaisDemanda } from '../api/execucao';
 import { useEdicao } from '../estado/edicao';
 import { useEquipe, usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
+import { useSessao } from '../estado/sessao';
 import { BarraHoras } from './BarraHoras';
 import { Icone } from './Icone';
 import { NomePessoa } from './NomePessoa';
 import { Tabela, type Coluna } from './Tabela';
 import { Resumo } from './Resumo';
-import { PilulaEtapa, PilulaResp, PilulaStatus } from './Pilulas';
+import { PilulaEtapa, PilulaResp, PilulaStatus, SinalStatus } from './Pilulas';
 
 type ComTotais = { id: string; nome: string; pai_id: string | null; status: string; projeto_id: string; totais?: Partial<TotaisDemanda> | null; extra?: string; avulso_base?: boolean;
   etapa?: string | null; etapa_id?: string | null; etapa_app_id?: string | null; responsavel_id?: string | null;
@@ -28,6 +31,20 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
   const pode = usePode();
   const [verTarefas, setVerTarefas] = useState(false);
   const t = d.totais;
+  // pílula de tarefas: a lista vem da ficha da demanda só quando a pessoa abre (e de novo depois de cada gravação)
+  const esc = useSessao().eu?.escritorio_id;
+  const nTarefas = tarefas ? 0 : Number(t?.tarefas ?? 0);
+  const [drill, setDrill] = useState<{ tarefas: Tarefa[]; nomes: Map<string, string> } | null>(null);
+  const [erroDrill, setErroDrill] = useState<string | null>(null);
+  const buscar = verTarefas && !tarefas && !!esc;
+  useEffect(() => {
+    if (!buscar) return;
+    let vivo = true;
+    exec.demanda(esc!, d.id).then(r => { if (vivo) { setErroDrill(null);
+      setDrill({ tarefas: r.tarefas.filter(x => x.status !== 'cancelada'), nomes: new Map(r.subdemandas.map(x => [x.id, x.nome])) }); } })
+      .catch(e => { if (vivo) setErroDrill((e as Error).message); });
+    return () => { vivo = false; };
+  }, [buscar, esc, d.id, ed.geracao]);
   const href = hashDe(caminhoEntidade('demanda', d.id));
   // a linha inteira abre a demanda (como as linhas clicáveis das tabelas); links e botões dentro dela seguem os seus
   const abrir = (e: React.MouseEvent) => { if (!(e.target as HTMLElement).closest('a, button, input, select, textarea, [role=button]')) location.hash = href; };
@@ -36,6 +53,7 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
       <div className="linha-exec-topo">
         {nFilhas ? <button type="button" className="seta" aria-expanded={aberta} aria-label={aberta ? 'Recolher' : 'Expandir'} onClick={alternar}><Icone nome={aberta ? 'baixo' : 'seta'} tam={16} /></button>
           : <span className="seta" aria-hidden />}
+        <SinalStatus status={d.status} />
         <Resumo tipo="demanda" id={d.id}><a href={href} className="linha-exec-nome">{d.nome}</a></Resumo>
         {d.extra && <small className="ajuda">{d.extra}</small>}
         {d.chamado && <a className="pil pil-chamado" href={hashDe(caminhoEntidade('chamado', d.chamado.id))} title="Abrir o chamado">Chamado #{d.chamado.numero}</a>}
@@ -45,6 +63,8 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
           <StatusPilula status={d.status} />
           <PilulaResp id={d.responsavel_id} />
           {t?.atrasada && !semAlerta(d) && <span className="pil pst-atrasada">Atrasada</span>}
+          {nTarefas > 0 && <button type="button" className="pil pil-tarefas" aria-expanded={verTarefas} onClick={() => setVerTarefas(v => !v)}
+            title={verTarefas ? 'Ocultar as tarefas' : 'Ver as tarefas aqui mesmo'}>{nTarefas} tarefa{nTarefas > 1 ? 's' : ''}</button>}
         </span>
         <small className="ajuda dem-datas">{t?.inicio || t?.fim ? `${data(t?.inicio)} → ${data(t?.fim)}` : ''}{t?.perc != null ? ` · ${t.perc}%` : ''}</small>
         <span className="linha-exec-bts">
@@ -57,11 +77,15 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
       </div>
       <BarraHoras previsto={t?.horas_previstas} real={t?.horas_reais ?? 0} planejado={t?.horas_planejadas ?? 0} compacta={!!sub} semAlerta={semAlerta(d)} />
       {verTarefas && tarefas && <TarefasDrill tarefas={tarefas} />}
+      {buscar && (erroDrill ? <p className="msg-erro">{erroDrill}</p>
+        : !drill ? <p className="ajuda tarefas-drill-carga"><span className="giro" /> Carregando as tarefas…</p>
+        : drill.tarefas.length ? <TarefasDrill tarefas={drill.tarefas} nomeDemanda={id => (id === d.id ? null : drill.nomes.get(id) ?? null)} />
+        : <p className="ajuda">Nenhuma tarefa.</p>)}
     </div>
   );
 }
 
-function TarefasDrill({ tarefas }: { tarefas: Tarefa[] }) {
+function TarefasDrill({ tarefas, nomeDemanda }: { tarefas: Tarefa[]; nomeDemanda?: (id: string) => string | null }) {
   const ed = useEdicao();
   return (
     <ul className="tarefas-drill" aria-label="Tarefas">
@@ -69,7 +93,7 @@ function TarefasDrill({ tarefas }: { tarefas: Tarefa[] }) {
         <li key={t.id} role="button" tabIndex={0} onClick={() => ed.tarefa({ id: t.id })}
           onKeyDown={e => { if (e.key === 'Enter') ed.tarefa({ id: t.id }); }}>
           <span className="ajuda">{data(t.data)} · {rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim)}</span>
-          <span className="td-nome">{t.nome}</span>
+          <span className="td-nome">{t.nome}{nomeDemanda?.(t.demanda_id) && <small className="ajuda"> · {nomeDemanda(t.demanda_id)}</small>}</span>
           <NomePessoa id={t.responsavel_id} />
           <StatusPilula status={t.status} tipo="tarefa" />
           <span>{t.horas_reais != null ? <strong>{horas(t.horas_reais)}</strong> : <span className="ajuda">{horas(t.horas_previstas)}</span>}</span>

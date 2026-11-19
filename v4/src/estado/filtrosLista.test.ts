@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { juntarPaginas } from '../api/execucao';
 import {
-  candidatosGrade, consultoresPorDemanda, contarAtivos, idsDoResponsavel, fasesPorCliente, filtrarClientes, filtrarDemandas, filtrarProjetos, filtrarTarefas, normalizarFiltro,
+  candidatosGrade, consultoresPorDemanda, contarAtivos, contarPorCliente, idsDoResponsavel, fasesPorCliente, filtrarClientes, filtrarDemandas, filtrarProjetos, filtrarTarefas, normalizarFiltro,
   opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_AGENDA_EQUIPE, PADRAO_CLIENTES, PADRAO_DEMANDAS, PADRAO_PROJETOS, PADRAO_TAREFAS, pessoasDaGrade, SEM, temTexto,
 } from './filtrosLista';
 
@@ -292,4 +292,13 @@ describe('filtrarPortfolio', () => {
   });
   it('demandas ainda não carregadas não escondem projeto', () =>
     expect(filtrarPortfolio(ps, null, { ...PADRAO_PORTFOLIO, etapas: ['e1'] }).length).toBe(3));
+});
+
+describe('contarPorCliente (gráfico da tela Demandas)', () => {
+  it('conta por cliente e ordena pelo nome, sem diferenciar maiúsculas nem acentos', () => {
+    const l = [{ cliente_id: 'z', cliente: 'Zeta' }, { cliente_id: 'a', cliente: 'álamo' }, { cliente_id: 'z', cliente: 'Zeta' },
+      { cliente_id: 'b', cliente: 'Beta' }, { cliente_id: 'z', cliente: 'Zeta' }];
+    expect(contarPorCliente(l)).toEqual([{ cliente_id: 'a', cliente: 'álamo', n: 1 }, { cliente_id: 'b', cliente: 'Beta', n: 1 }, { cliente_id: 'z', cliente: 'Zeta', n: 3 }]);
+    expect(contarPorCliente([])).toEqual([]);
+  });
 });

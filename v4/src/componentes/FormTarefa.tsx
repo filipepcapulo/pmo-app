@@ -39,7 +39,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
   const { lista: equipe, porId } = useEquipe();
   const et = useEtapas();
   const [orig, setOrig] = useState<Tarefa | null>(null);
-  // 4.15.2: o usuário mexeu no campo Período (mesmo escolhendo o que já estava marcado) -> a tarefa assume as horas do período
+  // 4.16.1: o usuário mexeu no campo Período (mesmo escolhendo o que já estava marcado) -> a tarefa assume as horas do período
   const [periodoTocado, setPeriodoTocado] = useState(false);
   const [caixa, setCaixa] = useState<{ local: string; nome: string } | null>(null);
   const [cliente, setCliente] = useState<string | null>(null);

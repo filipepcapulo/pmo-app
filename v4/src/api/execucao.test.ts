@@ -88,7 +88,7 @@ describe('Horário livre aceita minutos (0106)', () => {
   });
 });
 
-describe('horas do período na edição da tarefa (4.15.2)', () => {
+describe('horas do período na edição da tarefa (4.16.1)', () => {
   const periodos = { manha: 4, tarde: 4, dia: 8, noite: 4 };
   it('só manda as horas quando o período foi tocado e não é horário livre', async () => {
     const { horasDoPeriodoEscolhido } = await import('./execucao');

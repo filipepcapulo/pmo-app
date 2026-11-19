@@ -87,3 +87,25 @@ describe('Horário livre aceita minutos (0106)', () => {
     expect(horarioInvalido({ periodo: 'manha', ini: '', fim: '' })).toBe(false);
   });
 });
+
+describe('horas do período na edição da tarefa (4.15.2)', () => {
+  const periodos = { manha: 4, tarde: 4, dia: 8, noite: 4 };
+  it('só manda as horas quando o período foi tocado e não é horário livre', async () => {
+    const { horasDoPeriodoEscolhido } = await import('./execucao');
+    expect(horasDoPeriodoEscolhido('dia', false, periodos)).toEqual({});
+    expect(horasDoPeriodoEscolhido('dia', true, periodos)).toEqual({ horas_previstas: 8 });
+    expect(horasDoPeriodoEscolhido('manha', true, periodos)).toEqual({ horas_previstas: 4 });
+    expect(horasDoPeriodoEscolhido('livre', true, periodos)).toEqual({});
+    expect(horasDoPeriodoEscolhido('dia', true, undefined)).toEqual({});
+  });
+  it('a ajuda mostra as horas reais da tarefa enquanto o período não é tocado', async () => {
+    const { ajudaHorasPeriodo } = await import('./execucao');
+    const semPeriodo = { periodo: 'dia', horas_previstas: 0 };
+    expect(ajudaHorasPeriodo('dia', false, semPeriodo, periodos)).toBe('0 h previstas hoje; toque no período para assumir 8 h');
+    expect(ajudaHorasPeriodo('dia', true, semPeriodo, periodos)).toBe('8 h previstas');
+    expect(ajudaHorasPeriodo('manha', false, semPeriodo, periodos)).toBe('4 h previstas');
+    expect(ajudaHorasPeriodo('dia', false, { periodo: 'dia', horas_previstas: 8 }, periodos)).toBe('8 h previstas');
+    expect(ajudaHorasPeriodo('dia', false, null, periodos)).toBe('8 h previstas');
+    expect(ajudaHorasPeriodo('livre', false, semPeriodo, periodos)).toBeUndefined();
+  });
+});

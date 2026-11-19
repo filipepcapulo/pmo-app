@@ -5,8 +5,10 @@ import { useId, type ReactNode } from 'react';
 type Opcao = { valor: string; rotulo: string; detalhe?: string };
 
 /** Uma opção (rádio). "Manhã (08h-12h)" vira "Manhã" + detalhe pequeno "08h-12h". */
-export function EscolhaChips({ rotulo, valor, aoMudar, opcoes, obrigatorio, ajuda, desligado }: {
-  rotulo: string; valor: string; aoMudar: (v: string) => void; opcoes: Opcao[]; obrigatorio?: boolean; ajuda?: ReactNode; desligado?: boolean;
+/** aoReescolher: toque no chip que já está marcado (o rádio não dispara onChange nesse caso). */
+export function EscolhaChips({ rotulo, valor, aoMudar, aoReescolher, opcoes, obrigatorio, ajuda, desligado }: {
+  rotulo: string; valor: string; aoMudar: (v: string) => void; aoReescolher?: (v: string) => void; opcoes: Opcao[]; obrigatorio?: boolean; ajuda?: ReactNode;
+  desligado?: boolean;
 }) {
   const nome = useId();
   return (
@@ -17,7 +19,8 @@ export function EscolhaChips({ rotulo, valor, aoMudar, opcoes, obrigatorio, ajud
           const { titulo, detalhe } = separar(o);
           return (
             <label key={o.valor} className={`chip${valor === o.valor ? ' sel' : ''}`}>
-              <input type="radio" className="so-leitor" name={nome} value={o.valor} checked={valor === o.valor} onChange={() => aoMudar(o.valor)} />
+              <input type="radio" className="so-leitor" name={nome} value={o.valor} checked={valor === o.valor} onChange={() => aoMudar(o.valor)}
+                onClick={() => { if (valor === o.valor) aoReescolher?.(o.valor); }} />
               {titulo}{detalhe && <small>{detalhe}</small>}
             </label>
           );

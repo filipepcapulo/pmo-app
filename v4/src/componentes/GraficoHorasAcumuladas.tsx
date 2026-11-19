@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { hojeIso } from '../api/projeto';
-import { acumular, marcasEixo, produtividadeGrafico, type BarraGrafico } from '../api/produtividadeGrafico';
+import { acumular, marcasEixo, porOrigem, produtividadeGrafico, type BarraGrafico } from '../api/produtividadeGrafico';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 
@@ -18,15 +18,18 @@ function topo(x: number, y: number, l: number, a: number, r: number) {
   return `M${x},${y + a}V${y + k}Q${x},${y} ${x + k},${y}H${x + l - k}Q${x + l},${y} ${x + l},${y + k}V${y + a}Z`;
 }
 
-export function GraficoHorasAcumuladas({ escritorio, de, ate, consultores }: {
+export function GraficoHorasAcumuladas({ escritorio, de, ate, consultores, origens }: {
   escritorio: string; de: string; ate: string;
+  /** 4.21.0: origens do filtro (padrão: OS + app, sem a agenda prevista). Com a prevista, os dias futuros também entram. */
+  origens?: { os: boolean; app: boolean; previsto: boolean };
   /** Com produtividade.ver_todos: a lista para escolher um consultor. Sem ela (undefined), o banco devolve só o próprio. */
   consultores?: { id: string; nome: string }[];
 }) {
   const ed = useEdicao();
   const [consultor, setConsultor] = useState('');
   const c = useCarga(() => produtividadeGrafico.ler(escritorio, de, ate, consultor), [escritorio, de, ate, consultor, ed.geracao]);
-  const g = useMemo(() => (c.dados ? acumular(c.dados, hojeIso()) : null), [c.dados]);
+  const fo = origens ?? { os: true, app: true, previsto: false };
+  const g = useMemo(() => (c.dados ? acumular(porOrigem(c.dados, fo), fo.previsto ? undefined : hojeIso()) : null), [c.dados, fo.os, fo.app, fo.previsto]);
 
   const caixa = useRef<HTMLDivElement>(null);
   const [larg, setLarg] = useState(640);
@@ -57,8 +60,8 @@ export function GraficoHorasAcumuladas({ escritorio, de, ate, consultores }: {
     <section className="cartao gha" aria-label="Gráfico de horas executadas acumuladas" data-testid="grafico-horas">
       <header className="gha-topo">
         <div>
-          <h2>Horas executadas acumuladas</h2>
-          <p className="ajuda">Por dia, somando desde {diaMes(de)}; cores = tipo de OS (campo Apontamento da tarefa).</p>
+          <h2>{fo.previsto ? 'Horas acumuladas (executadas + previstas)' : 'Horas executadas acumuladas'}</h2>
+          <p className="ajuda">Por dia, somando desde {diaMes(de)}; cores = tipo de OS (campo Apontamento da tarefa){fo.previsto ? '; "Agenda prevista" = agenda ainda sem apontamento' : ''}.</p>
         </div>
         {consultores && consultores.length > 1 && (
           <label className="ajuda">Consultor{' '}
@@ -111,7 +114,7 @@ export function GraficoHorasAcumuladas({ escritorio, de, ate, consultores }: {
             ))}
           </div>
         )}
-        {g && g.total === 0 && !c.carregando && <p className="ajuda gha-vazio">Nenhuma hora executada neste período.</p>}
+        {g && g.total === 0 && !c.carregando && <p className="ajuda gha-vazio">{fo.previsto ? 'Nenhuma hora neste período para as origens escolhidas.' : 'Nenhuma hora executada neste período.'}</p>}
         {c.carregando && !g && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}
       </div>
       {g && g.series.length > 0 && (

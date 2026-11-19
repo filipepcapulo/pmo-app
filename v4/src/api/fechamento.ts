@@ -5,6 +5,8 @@ import { rpc } from './cliente';
 export interface LinhaFechamento extends Record<string, unknown> {
   consultor_id: string; consultor: string; dias_uteis: number; ausencia: number; capacidade: number; horas_os: number; horas_app: number;
   total: number; normais: number; extras: number; dias_com_apontamento: number; agendado: number; pendentes: number; ocupacao: number | null;
+  /** 0112: horas das agendas do período sem apontamento; total_geral = total + previsto. */
+  previsto?: number; total_geral?: number;
 }
 export interface Fechamento { de: string; ate: string; horas_dia: number; consultores: LinhaFechamento[] }
 
@@ -24,5 +26,10 @@ export function periodoFechamento(hoje: string): { de: string; ate: string } {
 export function totais(ls: LinhaFechamento[]) {
   const s = (k: keyof LinhaFechamento) => Math.round(ls.reduce((t, l) => t + (Number(l[k]) || 0), 0) * 100) / 100;
   return { capacidade: s('capacidade'), horas_os: s('horas_os'), horas_app: s('horas_app'), total: s('total'), normais: s('normais'),
-    extras: s('extras'), agendado: s('agendado'), pendentes: s('pendentes') };
+    extras: s('extras'), agendado: s('agendado'), pendentes: s('pendentes'), previsto: s('previsto') };
+}
+
+/** Total da linha conforme as origens do filtro (OS do Sankhya OM, Apontamento no APP e agenda prevista sem apontamento). */
+export function totalDoFiltro(l: Pick<LinhaFechamento, 'horas_os' | 'horas_app' | 'previsto'>, f: { os: boolean; app: boolean; previsto: boolean }) {
+  return Math.round(((f.os ? Number(l.horas_os) || 0 : 0) + (f.app ? Number(l.horas_app) || 0 : 0) + (f.previsto ? Number(l.previsto) || 0 : 0)) * 100) / 100;
 }

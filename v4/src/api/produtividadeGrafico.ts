@@ -6,6 +6,18 @@ export interface GraficoDia { dia: string; tipo: string; horas: number }
 export interface GraficoProdutividade {
   de: string; ate: string; so_proprio: boolean; consultor_id: string | null; total: number;
   tipos: { tipo: string; horas: number }[]; dias: GraficoDia[];
+  /** 0112: dia × tipo × origem do apontamento, mais a agenda prevista sem apontamento (origem 'previsto', tipo 'Agenda prevista'). */
+  dias_origem?: (GraficoDia & { origem: string })[];
+}
+
+/**
+ * Recorta o gráfico pelas origens do filtro (0112). Sem `dias_origem` (banco anterior à 0112) devolve o que veio.
+ * A OS manual acompanha a do Sankhya OM.
+ */
+export function porOrigem(g: GraficoProdutividade, f: { os: boolean; app: boolean; previsto: boolean }): Pick<GraficoProdutividade, 'de' | 'ate' | 'tipos' | 'dias'> {
+  if (!g.dias_origem) return g;
+  const dias = g.dias_origem.filter(d => (d.origem === 'previsto' ? f.previsto : d.origem === 'app' ? f.app : f.os)).map(d => ({ dia: d.dia, tipo: d.tipo, horas: Number(d.horas) || 0 }));
+  return { de: g.de, ate: g.ate, tipos: [], dias };
 }
 
 export const produtividadeGrafico = {

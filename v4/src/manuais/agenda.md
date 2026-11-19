@@ -40,6 +40,7 @@ Sem intervalo filtrado, a grade abre em hoje e busca mais uma semana sozinha qua
 - **Linha aberta**: cada dia é uma escala de horas (07h às 19h, maior só se alguma agenda cair fora). O cartão da tarefa fica no horário dela, com o cliente, o nome da tarefa, o período e o tipo de agenda (Remoto, Interno, Presencial, Unidade Sankhya). A faixa cinza clara é o almoço (12h às 14h). Tarefa sem horário aparece com borda tracejada e o texto "sem horário".
 - **Linha recolhida**: a célula mostra só o total de horas do dia e uma mini-faixa com os turnos ocupados. Tocar nela abre a linha.
 - **Cabeçalho do dia**: mostra a soma de horas alocadas na equipe visível naquele dia.
+- **Feriado e Férias** (opções do Período no ClickUp) contam **8 h** por agenda. Agenda **sem Período** no ClickUp aparece como Dia com **0 h** e não entra na soma: abra a tarefa e toque no **Período** (pode ser o que já está marcado) para ela assumir as horas do período; o campo mostra as horas que a tarefa tem hoje.
 - Tarefa concluída fica esmaecida; tarefa não executada fica riscada.
 
 ### Cores

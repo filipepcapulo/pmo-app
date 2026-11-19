@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { etapasApi } from '../api/etapas';
 import { useEtapas } from '../estado/etapas';
 import { horas } from '../api/cadastros';
-import { AVISO_HORARIO, exec, horarioInvalido, MODALIDADES, PADRAO_TAREFA, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, tarefaTravadaOs, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
+import { ajudaHorasPeriodo, AVISO_HORARIO, exec, horarioInvalido, horasDoPeriodoEscolhido, MODALIDADES, PADRAO_TAREFA, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, tarefaTravadaOs, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
 import type { AlvoTarefa } from '../estado/edicao';
 import { usePode, useEquipe } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
@@ -39,6 +39,8 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
   const { lista: equipe, porId } = useEquipe();
   const et = useEtapas();
   const [orig, setOrig] = useState<Tarefa | null>(null);
+  // 4.16.1: o usuário mexeu no campo Período (mesmo escolhendo o que já estava marcado) -> a tarefa assume as horas do período
+  const [periodoTocado, setPeriodoTocado] = useState(false);
   const [caixa, setCaixa] = useState<{ local: string; nome: string } | null>(null);
   const [cliente, setCliente] = useState<string | null>(null);
   const dataInicial = alvo.data ?? hojeLocal();
@@ -157,7 +159,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
     }
     try {
       await exec.tarefasSalvar(esc, { id: alvo.id, versao: orig!.versao,
-        ...(excluir ? { excluir: true } : { ...comuns, ...horario(f), responsavel_id: f.resp, data: f.data, ...forcar }) });
+        ...(excluir ? { excluir: true } : { ...comuns, ...horario(f), ...horasDoPeriodoEscolhido(f.periodo, periodoTocado, opcoes?.periodos), responsavel_id: f.resp, data: f.data, ...forcar }) });
       if (!excluir && (f.etapaApp || null) !== et.idDe(orig)) await definirEtapa([alvo.id!], f.etapaApp || null);
       avisar(excluir ? 'Tarefa excluída' : 'Tarefa gravada', 'ok');
       // V4: concluir a tarefa de um chamado não conclui o chamado — o app pergunta
@@ -256,8 +258,9 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
             <Campo rotulo="Responsável" tipo="select" valor={f.resp} aoMudar={v => setF({ ...f, resp: v })} opcoes={opPessoas.slice(1)} />
             <Campo rotulo="Data" tipo="date" valor={f.data} aoMudar={v => setF({ ...f, data: v })} />
           </div>
-          <EscolhaChips rotulo="Período" obrigatorio valor={f.periodo} aoMudar={v => setF({ ...f, periodo: v })} opcoes={PERIODOS}
-            ajuda={horasDe(f.periodo) != null ? `${horas(horasDe(f.periodo))} previstas` : undefined} />
+          <EscolhaChips rotulo="Período" obrigatorio valor={f.periodo} opcoes={PERIODOS}
+            aoMudar={v => { setF({ ...f, periodo: v }); setPeriodoTocado(true); }} aoReescolher={() => setPeriodoTocado(true)}
+            ajuda={ajudaHorasPeriodo(f.periodo, periodoTocado, orig, opcoes?.periodos)} />
           {f.periodo === 'livre' && (
             <div className="grade-campos dupla">
               <Campo rotulo="Início" tipo="text" valor={f.ini} aoMudar={v => setF({ ...f, ini: v })} placeholder="08:00" maxLength={5} />

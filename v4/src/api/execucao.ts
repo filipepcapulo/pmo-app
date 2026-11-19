@@ -1,7 +1,7 @@
 // Execução (V6): demandas, subdemandas, tarefas, comentários (@menção), checklist, anexos, favoritos por cliente e
 // notificações. Leitura e gravação só pelas funções `api.v1_*` (0024/0029); gravação sempre com id_operacao novo.
 import { novaOperacao, rpc, sb } from './cliente';
-import type { Gravado, Pessoa } from './cadastros';
+import { horas, type Gravado, type Pessoa } from './cadastros';
 
 // ---------------------------------------------------------------- rótulos
 type Op<T extends string = string> = { valor: T; rotulo: string };
@@ -41,6 +41,21 @@ export const PERIODOS: Op[] = [
   { valor: 'manha', rotulo: 'Manhã (08h-12h)' }, { valor: 'tarde', rotulo: 'Tarde (14h-18h)' }, { valor: 'dia', rotulo: 'Dia (08h-18h)' },
   { valor: 'noite', rotulo: 'Noite (18h-22h)' }, { valor: 'livre', rotulo: 'Horário livre' },
 ];
+/** Edição da tarefa: quando o usuário mexeu no campo Período (mesmo reescolhendo o que já estava marcado) e ele não é
+ *  horário livre, a tarefa assume as horas do período (agenda sem Período do ClickUp chega como "Dia" com 0 h — 0109). */
+export function horasDoPeriodoEscolhido(periodo: string, tocado: boolean, periodos: Record<string, number> | undefined): { horas_previstas?: number } {
+  const h = periodo !== 'livre' ? periodos?.[periodo] : undefined;
+  return tocado && h != null ? { horas_previstas: Number(h) } : {};
+}
+/** Ajuda do campo Período na edição: enquanto ninguém mexe no período, mostra as horas que a tarefa tem de verdade. */
+export function ajudaHorasPeriodo(periodo: string, tocado: boolean, orig: { periodo: string; horas_previstas: number | null } | null,
+  periodos: Record<string, number> | undefined): string | undefined {
+  const h = periodo !== 'livre' ? periodos?.[periodo] : undefined;
+  if (h == null) return undefined;
+  if (!tocado && orig && orig.periodo === periodo && Number(orig.horas_previstas ?? 0) !== Number(h))
+    return `${horas(Number(orig.horas_previstas ?? 0))} previstas hoje; toque no período para assumir ${horas(Number(h))}`;
+  return `${horas(Number(h))} previstas`;
+}
 export const MODALIDADES: Op[] = [
   { valor: '', rotulo: '—' }, { valor: 'remoto', rotulo: 'Remoto' }, { valor: 'interno', rotulo: 'Interno' }, { valor: 'presencial', rotulo: 'Presencial no cliente' },
   { valor: 'unidade', rotulo: 'Presencial na Unidade Sankhya' },

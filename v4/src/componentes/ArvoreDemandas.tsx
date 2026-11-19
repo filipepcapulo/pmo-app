@@ -103,9 +103,14 @@ function TarefasDrill({ tarefas, nomeDemanda }: { tarefas: Tarefa[]; nomeDemanda
   );
 }
 
-/** Demandas com subdemandas recolhíveis logo abaixo. */
-export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.', tarefas }: { demandas: ComTotais[]; vazio?: string; tarefas?: Tarefa[] }) {
-  const [fechadas, setFechadas] = useState<Set<string>>(new Set());
+/** Demandas com subdemandas recolhíveis logo abaixo. 4.18.0: com `fechadas`/`aoFechar` quem recolhe é a tela (um botão só
+ *  para todas as árvores, como em Demandas) e o "Recolher tudo" de cada árvore não aparece. */
+export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.', tarefas, fechadas: fechadasDaTela, aoFechar }: { demandas: ComTotais[]; vazio?: string; tarefas?: Tarefa[];
+  fechadas?: Set<string>; aoFechar?: (f: (s: Set<string>) => Set<string>) => void }) {
+  const [fechadasAqui, setFechadasAqui] = useState<Set<string>>(new Set());
+  const daTela = !!(fechadasDaTela && aoFechar);
+  const fechadas = daTela ? fechadasDaTela! : fechadasAqui;
+  const setFechadas = (v: Set<string> | ((s: Set<string>) => Set<string>)) => (daTela ? aoFechar!(typeof v === 'function' ? v : () => v) : setFechadasAqui(v));
   const tarefasDe = (id: string) => (tarefas ? tarefas.filter(t => t.demanda_id === id) : undefined);
   const arv = arvoreDemandas(demandas);
   if (!arv.length) return <p className="ajuda">{vazio}</p>;
@@ -113,7 +118,7 @@ export function ArvoreDemandas({ demandas, vazio = 'Nenhuma demanda.', tarefas }
   const tudoFechado = comFilhas.length > 0 && comFilhas.every(id => fechadas.has(id));
   return (
     <>
-    {comFilhas.length > 0 && (
+    {!daTela && comFilhas.length > 0 && (
       <div className="arvore-acoes">
         <button type="button" className="link" onClick={() => setFechadas(tudoFechado ? new Set() : new Set(comFilhas))}>
           <Icone nome={tudoFechado ? 'seta' : 'baixo'} tam={14} /> {tudoFechado ? 'Expandir tudo' : 'Recolher tudo'}

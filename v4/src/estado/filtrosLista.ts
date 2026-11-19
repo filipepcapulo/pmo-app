@@ -285,13 +285,19 @@ export function useFiltroLista<T extends object>(tela: string, padrao: T) {
   return { f, mudar, limpar, aplicar, ativos: contarAtivos(f, padrao) };
 }
 
-/** Quantidade de demandas/subdemandas por cliente, em ordem alfabética (gráfico da tela Demandas). */
-export function contarPorCliente(itens: { cliente_id: string; cliente: string }[]): { cliente_id: string; cliente: string; n: number }[] {
-  const m = new Map<string, { cliente_id: string; cliente: string; n: number }>();
+/** Quantidade de demandas/subdemandas por cliente, em ordem alfabética (gráfico da tela Demandas). 4.17.0: cada cliente traz
+ *  a quantidade por etapa do app (`etapas`, na ordem de `ordemEtapas`; "sem etapa" = id null, sempre por último). */
+export interface ContagemCliente { cliente_id: string; cliente: string; n: number; etapas: { id: string | null; n: number }[] }
+export function contarPorCliente(itens: { cliente_id: string; cliente: string; etapa_app_id?: string | null }[], ordemEtapas: string[] = []): ContagemCliente[] {
+  const m = new Map<string, { cliente_id: string; cliente: string; n: number; e: Map<string | null, number> }>();
   for (const d of itens) {
-    const c = m.get(d.cliente_id) ?? { cliente_id: d.cliente_id, cliente: d.cliente, n: 0 };
+    const c = m.get(d.cliente_id) ?? { cliente_id: d.cliente_id, cliente: d.cliente, n: 0, e: new Map<string | null, number>() };
+    const id = d.etapa_app_id ?? null;
     c.n++;
+    c.e.set(id, (c.e.get(id) ?? 0) + 1);
     m.set(d.cliente_id, c);
   }
-  return [...m.values()].sort((a, b) => a.cliente.localeCompare(b.cliente, 'pt-BR', { sensitivity: 'base' }));
+  const pos = (id: string | null) => { if (id === null) return Infinity; const i = ordemEtapas.indexOf(id); return i < 0 ? ordemEtapas.length : i; };
+  return [...m.values()].map(({ e, ...c }) => ({ ...c, etapas: [...e].map(([id, n]) => ({ id, n })).sort((a, b) => pos(a.id) - pos(b.id)) }))
+    .sort((a, b) => a.cliente.localeCompare(b.cliente, 'pt-BR', { sensitivity: 'base' }));
 }

@@ -298,7 +298,16 @@ describe('contarPorCliente (gráfico da tela Demandas)', () => {
   it('conta por cliente e ordena pelo nome, sem diferenciar maiúsculas nem acentos', () => {
     const l = [{ cliente_id: 'z', cliente: 'Zeta' }, { cliente_id: 'a', cliente: 'álamo' }, { cliente_id: 'z', cliente: 'Zeta' },
       { cliente_id: 'b', cliente: 'Beta' }, { cliente_id: 'z', cliente: 'Zeta' }];
-    expect(contarPorCliente(l)).toEqual([{ cliente_id: 'a', cliente: 'álamo', n: 1 }, { cliente_id: 'b', cliente: 'Beta', n: 1 }, { cliente_id: 'z', cliente: 'Zeta', n: 3 }]);
+    expect(contarPorCliente(l).map(({ etapas: _e, ...c }) => c)).toEqual([{ cliente_id: 'a', cliente: 'álamo', n: 1 }, { cliente_id: 'b', cliente: 'Beta', n: 1 }, { cliente_id: 'z', cliente: 'Zeta', n: 3 }]);
     expect(contarPorCliente([])).toEqual([]);
+  });
+  it('4.17.0: quantidade por etapa, na ordem do cadastro; sem etapa por último; os pedaços somam o total', () => {
+    const z = { cliente_id: 'z', cliente: 'Zeta' };
+    const l = [{ ...z, etapa_app_id: 'dev' }, { ...z, etapa_app_id: null }, { ...z, etapa_app_id: 'bk' }, { ...z, etapa_app_id: 'dev' }, { ...z },
+      { ...z, etapa_app_id: 'fora' }, { cliente_id: 'a', cliente: 'Alfa', etapa_app_id: 'dev' }];
+    const r = contarPorCliente(l, ['bk', 'dev']);
+    expect(r[0]).toEqual({ cliente_id: 'a', cliente: 'Alfa', n: 1, etapas: [{ id: 'dev', n: 1 }] });
+    expect(r[1].etapas).toEqual([{ id: 'bk', n: 1 }, { id: 'dev', n: 2 }, { id: 'fora', n: 1 }, { id: null, n: 2 }]);
+    expect(r[1].etapas.reduce((t, e) => t + e.n, 0)).toBe(r[1].n);
   });
 });

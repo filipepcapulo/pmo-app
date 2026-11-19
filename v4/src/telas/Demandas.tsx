@@ -2,6 +2,7 @@
 // Suspenso); o Nível (demandas, subdemandas ou os dois) fica destacado no fim da barra e vale para TODOS os filtros.
 // 4.16.0: duas abas com a mesma barra de filtros — Gráfico (barras com a quantidade por cliente, em ordem alfabética; clicar
 // na barra mostra embaixo as demandas do cliente) e Lista (a visão de sempre). A aba fica guardada no aparelho.
+// 4.17.0: a barra do cliente é empilhada por etapa, com a cor da etapa do cadastro (legenda acima das barras).
 // Módulo Demandas (#/demandas): todas as demandas/subdemandas visíveis, agrupadas por cliente · projeto, com a barra
 // de horas e as mesmas ações (popup único) de qualquer tela. Filtros por status (vários, guardados no aparelho — V13a-5,
 // módulo 09 da Central), fase do projeto, etapa, responsável, tipo, prioridade, cliente, projeto, atrasadas e texto
@@ -67,7 +68,13 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
     }
     return [...m.values()];
   }, [itens]);
-  const porCliente = useMemo(() => contarPorCliente(itens), [itens]);
+  const porCliente = useMemo(() => contarPorCliente(itens, et.lista.map(e => e.id)), [itens, et.lista]);
+  // etapas que aparecem no gráfico (na ordem do cadastro; "sem etapa" por último), para a legenda e as cores dos pedaços
+  const etapaDoGrafico = (id: string | null) => { const e = id ? et.porId.get(id) : null; return { nome: e?.nome ?? 'Sem etapa', cor: e?.cor ?? null }; };
+  const legenda = useMemo(() => {
+    const ids = new Set(porCliente.flatMap(x => x.etapas.map(e => e.id)));
+    return [...et.lista.filter(e => ids.has(e.id)).map(e => e.id as string | null), ...(ids.has(null) ? [null] : [])];
+  }, [porCliente, et.lista]);
   const maior = Math.max(1, ...porCliente.map(x => x.n));
   // o cliente escolhido no gráfico sai da seleção quando os filtros o tiram da tela
   const escolhido = aba === 'grafico' ? porCliente.find(x => x.cliente_id === clienteSel) ?? null : null;
@@ -141,13 +148,18 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
       {aba === 'grafico' && porCliente.length > 0 && (
         <section className="cartao gcli" aria-label="Quantidade de demandas por cliente">
           <h2 className="secao">Quantidade por cliente <small className="ajuda">· {porCliente.length} cliente(s) · clique na barra para ver as demandas</small></h2>
+          <ul className="gcli-legenda" aria-label="Cores das etapas">
+            {legenda.map(id => { const e = etapaDoGrafico(id); return <li key={id ?? 'sem'}><i className={e.cor ? undefined : 'gcli-sem'} style={e.cor ? { background: e.cor } : undefined} />{e.nome}</li>; })}
+          </ul>
           <ul className="gcli-lista">
             {porCliente.map(x => (
               <li key={x.cliente_id}>
                 <button type="button" className="gcli-linha" aria-pressed={escolhido?.cliente_id === x.cliente_id}
-                  aria-label={`${x.cliente}: ${x.n} demanda(s)`} onClick={() => { setClienteSel(v => (v === x.cliente_id ? null : x.cliente_id)); setMostrar(PROJETOS_POR_VEZ); }}>
+                  aria-label={`${x.cliente}: ${x.n} demanda(s) — ${x.etapas.map(e => `${etapaDoGrafico(e.id).nome}: ${e.n}`).join(', ')}`} onClick={() => { setClienteSel(v => (v === x.cliente_id ? null : x.cliente_id)); setMostrar(PROJETOS_POR_VEZ); }}>
                   <span className="gcli-nome" title={x.cliente}>{x.cliente}</span>
-                  <span className="gcli-trilho"><span className="gcli-barra" style={{ width: `${(x.n / maior) * 100}%` }} /></span>
+                  <span className="gcli-trilho"><span className="gcli-barra" style={{ width: `${(x.n / maior) * 100}%` }}>
+                    {x.etapas.map(e => { const g = etapaDoGrafico(e.id); return <span key={e.id ?? 'sem'} className={`gcli-seg${g.cor ? '' : ' gcli-sem'}`} data-n={e.n} title={`${g.nome}: ${e.n}`} style={{ flexGrow: e.n, ...(g.cor ? { background: g.cor } : {}) }} />; })}
+                  </span></span>
                   <b className="gcli-n">{x.n}</b>
                 </button>
               </li>

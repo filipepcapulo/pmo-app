@@ -159,3 +159,5 @@ Em **Execução › Ausências** qualquer pessoa solicita a própria ausência. 
 | "Nada no backlog com esse filtro." | Confira Etapa, Tipo, GP, Status e a caixa de esconder o que já tem agenda. |
 
 Não consigo arrastar a tarefa: mover exige a permissão `tarefa.editar`; no Kanban, só agrupado por **Consultor**.
+
+A tarefa mostra 🔒 e não deixa editar: ela já foi apontada no Sankhya (tem número de OS). Só altera ou exclui o Admin ou quem tem a permissão **Editar e excluir tarefa já apontada no Sankhya (com número de OS)** (`tarefa.editar_com_os`), que o Admin liga por perfil ou por pessoa em **Cadastros › Equipe › Acessos**. Ela nasce desligada para todos e não substitui a `tarefa.editar`. Concluir a tarefa, checklist, comentários e anexos continuam livres.

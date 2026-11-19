@@ -81,6 +81,7 @@ Bom saber:
 - **Horas previstas** acima do contratado no projeto são aceitas; o estouro aparece na barra de horas e no saldo do projeto.
 - **Atendimento Avulso da Base**: marque só na demanda que recebe os chamados do cliente como subdemandas.
 - **Excluir** pede confirmação: as tarefas da demanda deixam de aparecer.
+- **Subdemanda de chamado não tem Excluir**: o chamado precisa ter um fim. Conclua ou cancele o chamado. Se a tarefa for apagada no ClickUp, o chamado volta para a Triagem.
 
 ## 6. A ficha da demanda
 

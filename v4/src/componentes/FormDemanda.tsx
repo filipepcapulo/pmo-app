@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api, horas, type ProjetoLinha } from '../api/cadastros';
 import { FalhaApi } from '../api/cliente';
+import { chamV4, type ChamadoDaSub } from '../api/chamadosV4';
 import { exec, opcoesStatusDemanda, PRIORIDADES, type Demanda, type OpcoesExecucao } from '../api/execucao';
 import { useEtapas } from '../estado/etapas';
 import type { AlvoDemanda } from '../estado/edicao';
@@ -33,6 +34,14 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
   const novo = !alvo.id;
   const podeGravar = pode(novo ? 'demanda.criar' : 'demanda.editar');
 
+  // 4.15.1 (0108): subdemanda de chamado não se exclui (o chamado é concluído ou cancelado). undefined = ainda carregando.
+  const [chamado, setChamado] = useState<ChamadoDaSub | null | undefined>(alvo.id ? undefined : null);
+  useEffect(() => {
+    if (!alvo.id) { setChamado(null); return; }
+    let vivo = true;
+    chamV4.daDemanda(esc, alvo.id).then(c => { if (vivo) setChamado(c ?? null); }).catch(() => { if (vivo) setChamado(null); });
+    return () => { vivo = false; };
+  }, [alvo.id, esc]);
   useEffect(() => {
     if (alvo.id) exec.demanda(esc, alvo.id).then(r => {
       const d = r.demanda;
@@ -113,11 +122,12 @@ export function FormDemanda({ alvo, opcoes, aoFechar, aoGravar }: { alvo: AlvoDe
   return (
     <Popup aberto titulo={titulo} aoFechar={aoFechar} largura={640}
       rodape={<>
-        {!novo && podeGravar && <Botao variante="perigo" className="a-esquerda" carregando={gravando}
+        {!novo && podeGravar && chamado === null && <Botao variante="perigo" className="a-esquerda" carregando={gravando}
           onClick={() => { if (confirm('Excluir esta demanda? As tarefas dela deixam de aparecer.')) enviar(true); }}>Excluir</Botao>}
         <Botao onClick={aoFechar}>{podeGravar ? 'Cancelar' : 'Fechar'}</Botao>
         {podeGravar && <Botao variante="primario" carregando={gravando} onClick={() => enviar()}>Gravar</Botao>}</>}>
       {!podeGravar && <p className="ajuda">Você não tem permissão para {novo ? 'criar' : 'editar'} demandas.</p>}
+      {chamado && <p className="ajuda" data-testid="demanda-de-chamado">Subdemanda do chamado #{chamado.numero}: não pode ser excluída. Para encerrar, conclua ou cancele o chamado.</p>}
       <Formulario aoEnviar={() => enviar()} className="form-2x">
         {caixa ? <div className="campo"><span className="rotulo">Projeto</span><CaixaEscolhida {...caixa} rotuloTrocar="" /></div>
           : novo && !alvo.projeto_id && (

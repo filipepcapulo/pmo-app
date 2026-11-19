@@ -41,12 +41,12 @@ Cada linha mostra o nome, o status, a marca **Atrasada** (quando é o caso), as 
 
 Para trocar o **Status**, a **Etapa** ou o **Responsável** de vários itens de uma vez:
 
-1. Toque em **Edição múltipla** (acima da lista). Cada demanda e subdemanda ganha uma caixa de seleção; nas tarefas abertas pela pílula **N tarefas** também.
-2. Marque o que quiser alterar. **Selecionar tudo** marca todas as demandas e subdemandas que estão na tela; na lista de tarefas, **Todas as N tarefas** marca as daquela demanda.
+1. Passe o mouse sobre a linha da demanda, subdemanda ou tarefa: a caixa de seleção aparece no lugar do sinal do status (na tarefa, à esquerda da linha). No celular ou tablet, toque em **Selecionar** (acima da lista) para mostrar as caixas.
+2. Marque a primeira: as caixas das outras linhas passam a ficar à mostra. **Selecionar tudo** marca todas as demandas e subdemandas que estão na tela; na lista de tarefas, **Todas as N tarefas** marca as daquela demanda.
 3. Na barra que aparece no rodapé, escolha o novo Status, a nova Etapa e/ou o novo Responsável. O campo deixado em **manter** não muda.
 4. Toque em **Aplicar em N**.
 
-Só os campos escolhidos são alterados; quem já estava com o valor escolhido não é gravado de novo. Se algum item não puder ser alterado (por exemplo, tarefa com OS, sem a permissão), ele continua marcado e a barra mostra o motivo; os demais são gravados normalmente. Com demandas e tarefas marcadas juntas, o Status mostra só os que existem nos dois. Mudar os filtros limpa a seleção. Vale a mesma permissão de editar demanda e de editar tarefa. A mesma função existe na aba **Demandas** do projeto.
+Só os campos escolhidos são alterados; quem já estava com o valor escolhido não é gravado de novo. Se algum item não puder ser alterado (por exemplo, tarefa com OS, sem a permissão), ele continua marcado e a barra mostra o motivo; os demais são gravados normalmente. Com demandas e tarefas marcadas juntas, o Status mostra só os que existem nos dois. Mudar os filtros limpa a seleção; **Limpar seleção** esconde as caixas de novo. Vale a mesma permissão de editar demanda e de editar tarefa. A mesma função existe na aba **Demandas** do projeto.
 
 À esquerda do nome fica o **sinal do status**: círculo vazio (Não iniciado), azul (Em andamento), roxo (Em validação), verde com ✓ (Concluído), cinza com ✕ (Cancelado) e laranja (Suspenso). Passe o mouse para ler o nome do status.
 

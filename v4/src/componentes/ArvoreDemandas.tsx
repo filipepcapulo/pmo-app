@@ -40,6 +40,7 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
   const pode = usePode();
   const [verTarefas, setVerTarefas] = useState(false);
   const et = useEtapas();
+  const temSelecao = !!useSelecao();
   const t = d.totais;
   // pílula de tarefas: a lista vem da ficha da demanda só quando a pessoa abre (e de novo depois de cada gravação)
   const esc = useSessao().eu?.escritorio_id;
@@ -63,8 +64,9 @@ function LinhaDemanda({ d, sub, aberta, alternar, nFilhas, tarefas }: { d: ComTo
       <div className="linha-exec-topo">
         {nFilhas ? <button type="button" className="seta" aria-expanded={aberta} aria-label={aberta ? 'Recolher' : 'Expandir'} onClick={alternar}><Icone nome={aberta ? 'baixo' : 'seta'} tam={16} /></button>
           : <span className="seta" aria-hidden />}
-        {pode('demanda.editar') && <CaixaLote item={itemLoteDemanda(d, et.idDe(d))} />}
+        {/* edição múltipla: a caixa ocupa o lugar do sinal quando o mouse passa na linha (ou quando já há algo marcado) */}
         <SinalStatus status={d.status} />
+        {temSelecao && pode('demanda.editar') && <CaixaLote item={itemLoteDemanda(d, et.idDe(d))} />}
         <Resumo tipo="demanda" id={d.id}><a href={href} className="linha-exec-nome">{d.nome}</a></Resumo>
         {d.extra && <small className="ajuda">{d.extra}</small>}
         {d.chamado && <a className="pil pil-chamado" href={hashDe(caminhoEntidade('chamado', d.chamado.id))} title="Abrir o chamado">Chamado #{d.chamado.numero}</a>}
@@ -101,13 +103,14 @@ function TarefasDrill({ tarefas, nomeDemanda }: { tarefas: Tarefa[]; nomeDemanda
   const pode = usePode();
   const et = useEtapas();
   const sel = useSelecao();
-  const marcavel = !!sel?.ativa && pode('tarefa.editar');
+  const marcavel = !!sel && pode('tarefa.editar');
+  const aMostra = marcavel && (sel!.ativa || sel!.total > 0);
   const liberado = pode(PERMISSAO_EDITAR_COM_OS);
   const livres = marcavel ? tarefas.filter(t => !tarefaTravadaOs(t, liberado)).map(t => itemLoteTarefa(t, et.idDe(t))) : [];
   const todas = livres.length > 0 && livres.every(i => sel!.tem(i));
   return (
-    <ul className="tarefas-drill" aria-label="Tarefas">
-      {marcavel && livres.length > 1 && (
+    <ul className={`tarefas-drill${marcavel ? ' com-lote' : ''}`} aria-label="Tarefas">
+      {aMostra && livres.length > 1 && (
         <li className="td-todas"><label className="check"><input type="checkbox" className="lote-caixa" checked={todas}
           onChange={e => sel!.marcar(livres, e.target.checked)} /> Todas as {livres.length} tarefas</label></li>
       )}

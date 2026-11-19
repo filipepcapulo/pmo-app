@@ -1,5 +1,5 @@
-// Edição múltipla (4.23.0): em Demandas e na aba Demandas do projeto, o botão "Edição múltipla" liga as caixas de
-// seleção nas linhas (demanda, subdemanda e tarefa); com algo marcado, a barra fixa no rodapé troca Status, Etapa e/ou
+// Edição múltipla (4.23.0): em Demandas e na aba Demandas do projeto, passar o mouse na linha (demanda, subdemanda ou
+// tarefa) mostra a caixa de seleção no lugar do sinal do status; marcada a primeira, todas aparecem. Com algo marcado, a barra fixa no rodapé troca Status, Etapa e/ou
 // Responsável de todos de uma vez. Cada item é gravado pela mesma função do formulário (as permissões e travas do banco
 // valem igual); o que falhar fica marcado, com o motivo. A regra está em estado/edicaoMultipla.ts.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -101,7 +101,7 @@ export function EdicaoMultipla({ chave, children }: { chave: string; children: R
   return (
     <Ctx.Provider value={valor}>
       {children}
-      {ativa && sel.size > 0 && (
+      {sel.size > 0 && (
         <>
           <div className="lote-espaco" aria-hidden />
           <div className="lote-barra" role="region" aria-label="Edição múltipla" data-testid="lote-barra">
@@ -137,20 +137,22 @@ export function EdicaoMultipla({ chave, children }: { chave: string; children: R
   );
 }
 
-/** Botão que liga/desliga o modo e, ligado, marca tudo o que a tela mostra (`todos`). Some para quem não pode editar. */
+/** Ações acima da lista. No computador a caixa aparece ao passar o mouse na linha, então aqui só entra o "Selecionar tudo"
+ *  depois da primeira marcada; em tela de toque (sem mouse) o botão "Selecionar" mostra as caixas. Some para quem não pode editar. */
 export function AcoesEdicaoMultipla({ todos }: { todos: ItemLote[] }) {
   const s = useSelecao();
   const pode = usePode();
   if (!s || !(pode('demanda.editar') || pode('tarefa.editar'))) return null;
   const marcaveis = pode('demanda.editar') ? todos : todos.filter(i => i.tipo !== 'demanda');
   const tudo = marcaveis.length > 0 && marcaveis.every(i => s.tem(i));
+  const visivel = s.ativa || s.total > 0;
   return (
     <>
-      <button type="button" className="link" aria-pressed={s.ativa} data-testid="lote-modo" onClick={s.alternarModo}
+      <button type="button" className="link lote-so-toque" aria-pressed={s.ativa} data-testid="lote-modo" onClick={s.alternarModo}
         title="Marque várias demandas, subdemandas ou tarefas e troque Status, Etapa ou Responsável de todas de uma vez">
-        <Icone nome={s.ativa ? 'x' : 'lista'} tam={14} /> {s.ativa ? 'Sair da edição múltipla' : 'Edição múltipla'}
+        <Icone nome={s.ativa ? 'x' : 'lista'} tam={14} /> {s.ativa ? 'Cancelar seleção' : 'Selecionar'}
       </button>
-      {s.ativa && marcaveis.length > 0 && (
+      {visivel && marcaveis.length > 0 && (
         <button type="button" className="link" data-testid="lote-todos" onClick={() => s.marcar(marcaveis, !tudo)}>
           {tudo ? 'Desmarcar tudo' : `Selecionar tudo (${marcaveis.length})`}
         </button>
@@ -159,13 +161,16 @@ export function AcoesEdicaoMultipla({ todos }: { todos: ItemLote[] }) {
   );
 }
 
-/** Caixa de seleção da linha; só aparece com o modo ligado. */
+/** Caixa de seleção da linha: escondida até passar o mouse (ou focar); com a primeira marcada, todas ficam à mostra. */
 export function CaixaLote({ item, travada }: { item: ItemLote; travada?: string | null }) {
   const s = useSelecao();
-  if (!s?.ativa) return null;
+  if (!s) return null;
   return (
-    <input type="checkbox" className="lote-caixa" checked={s.tem(item)} disabled={!!travada} title={travada ?? undefined}
-      aria-label={`Selecionar ${item.tipo === 'tarefa' ? 'a tarefa' : 'a demanda'} ${item.nome}`}
-      onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()} onChange={e => s.marcar([item], e.target.checked)} />
+    <label className={`lote-rotulo${s.ativa || s.total > 0 ? ' lote-vis' : ''}`} title={travada ?? 'Selecionar para editar vários de uma vez'}
+      onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+      <input type="checkbox" className="lote-caixa" checked={s.tem(item)} disabled={!!travada}
+        aria-label={`Selecionar ${item.tipo === 'tarefa' ? 'a tarefa' : 'a demanda'} ${item.nome}`}
+        onChange={e => s.marcar([item], e.target.checked)} />
+    </label>
   );
 }

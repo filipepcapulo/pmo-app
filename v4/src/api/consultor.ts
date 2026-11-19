@@ -9,8 +9,21 @@ export interface LinhaAgenda {
   modalidade: string | null; status: StatusTarefa; tarefa: string; demanda_id: string; demanda: string; projeto_id: string; projeto: string;
   cliente_id: string; cliente: string; horas_reais: number;
 }
-/** '' = apontamentos (OS + app); 'previsto' = agenda sem apontamento; 'tudo' = apontamentos + previstas (0110). */
-export type OrigemFiltro = '' | 'sankhya_om' | 'app' | 'previsto' | 'tudo';
+/** Origens do filtro de Ordens de Serviço (seleção múltipla; nenhuma marcada = todas). 'previsto' = agenda sem apontamento (0110). */
+export type OrigemSel = 'sankhya_om' | 'app' | 'previsto';
+export const ORIGENS: { valor: OrigemSel; rotulo: string }[] = [
+  { valor: 'sankhya_om', rotulo: 'Sankhya OM' }, { valor: 'app', rotulo: 'Apontamento no APP' }, { valor: 'previsto', rotulo: 'Agenda prevista (sem apontamento)' },
+];
+/** A origem está no filtro? (nenhuma marcada = todas) */
+export const temOrigem = (sel: readonly string[], o: OrigemSel) => !ORIGENS.some(x => sel.includes(x.valor)) || sel.includes(o);
+/** p_origem de v1_apontamentos (0112): 'tudo' ou a lista separada por vírgula; a OS manual acompanha a do Sankhya OM. */
+export function origemParam(sel: readonly string[]): string {
+  const m = ORIGENS.map(o => o.valor).filter(o => temOrigem(sel, o));
+  return m.length === ORIGENS.length ? 'tudo' : m.flatMap(o => (o === 'sankhya_om' ? ['sankhya_om', 'manual'] : [o])).join(',');
+}
+/** Rótulo curto do total conforme o filtro: "OS + app + previsto". */
+export const rotuloOrigens = (sel: readonly string[]) =>
+  ([['sankhya_om', 'OS'], ['app', 'app'], ['previsto', 'previsto']] as const).filter(([o]) => temOrigem(sel, o)).map(([, r]) => r).join(' + ');
 export interface LinhaApontamento extends Record<string, unknown> {
   /** Linha 'previsto' (0110): agenda sem apontamento — apontamento_id e versao nulos, horas = horas previstas. */
   apontamento_id: string | null; versao: number | null; origem: 'sankhya_om' | 'app' | 'manual' | 'previsto'; numero_os: string | null; numero_interno: number | null;
@@ -20,8 +33,8 @@ export interface LinhaApontamento extends Record<string, unknown> {
 }
 export interface RelatorioApontamentos {
   horas: number; horas_os: number; horas_app: number; total: number; itens: LinhaApontamento[];
-  /** 0110: agendas sem apontamento do filtro (0 quando o filtro só traz apontamentos). */
-  horas_previstas?: number; total_previstas?: number;
+  /** 0110: agendas sem apontamento do filtro (0 quando o filtro só traz apontamentos). 0112: horas_total = apontado + previsto. */
+  horas_previstas?: number; total_previstas?: number; horas_total?: number;
 }
 export type SituacaoPedido = 'aberto' | 'atendido' | 'recusado';
 export interface PedidoAgenda {
@@ -36,7 +49,7 @@ export const consultor = {
     rpc<LinhaAgenda[]>('v1_agenda', { p_escritorio: esc, p_de: de, p_ate: ate, p_consultores: [eu] }),
   demandas: (esc: string, status: string[] | null, texto: string | null) =>
     rpc<{ total: number; itens: DemandaLinha[] }>('v1_minhas_demandas', { p_escritorio: esc, p_status: status, p_texto: texto, p_limite: 500 }),
-  apontamentos: (esc: string, f: { de: string; ate: string; origem?: OrigemFiltro; equipe?: boolean; consultor?: string | null }) =>
+  apontamentos: (esc: string, f: { de: string; ate: string; origem?: string | null; equipe?: boolean; consultor?: string | null }) =>
     rpc<RelatorioApontamentos>('v1_apontamentos', { p_escritorio: esc, p_de: f.de, p_ate: f.ate, p_origem: f.origem || null,
       p_equipe: !!f.equipe, p_consultor: f.consultor || null }),
   pedidos: (esc: string, f: { projeto?: string; meus?: boolean }) =>

@@ -8,8 +8,8 @@
 // Planilhas (V13e-1): planilhas de horas dos consultores (Drive) × agendas de planilha; Fechar (OBS/VISTO + validação) e aba do novo ciclo.
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
-import { consultor } from '../api/consultor';
-import { fechamento, periodoFechamento, totais, type LinhaFechamento } from '../api/fechamento';
+import { consultor, ORIGENS, rotuloOrigens, temOrigem } from '../api/consultor';
+import { fechamento, periodoFechamento, totais, totalDoFiltro, type LinhaFechamento } from '../api/fechamento';
 import { traduzirErro } from '../api/mensagens';
 import { hojeIso } from '../api/projeto';
 import { ApontamentosTravados } from '../componentes/ApontamentosTravados';
@@ -17,6 +17,7 @@ import { ConferenciaOS } from '../componentes/ConferenciaOS';
 import { GraficoHorasAcumuladas } from '../componentes/GraficoHorasAcumuladas';
 import { ConferenciaPlanilhas } from '../componentes/ConferenciaPlanilhas';
 import { RelatorioApontamentos } from '../componentes/RelatorioApontamentos';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
@@ -53,7 +54,8 @@ ${itens.map(a => `<tr><td>${data(a.data)}</td><td>${a.origem === 'app' ? 'APP' :
   w.document.close();
 }
 
-function Fechamento({ todos }: { todos: boolean }) {
+function Fechamento({ todos, origens, aoMudarOrigens }: { todos: boolean; origens: string[]; aoMudarOrigens: (s: string[]) => void }) {
+  const os = temOrigem(origens, 'sankhya_om'), app = temOrigem(origens, 'app'), previsto = temOrigem(origens, 'previsto');
   const escritorio = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
   const p0 = useMemo(() => periodoFechamento(hojeIso()), []);
@@ -66,30 +68,34 @@ function Fechamento({ todos }: { todos: boolean }) {
     return [
       { chave: 'consultor', titulo: 'Consultor' },
       { chave: 'dias_uteis', titulo: 'Dias úteis', alinhar: 'dir' },
-      h('capacidade', 'Capacidade'), h('agendado', 'Agendado'), h('horas_os', 'Sankhya OM'), h('horas_app', 'APP'), h('total', 'Total'),
+      h('capacidade', 'Capacidade'), h('agendado', 'Agendado'), ...(os ? [h('horas_os', 'Sankhya OM')] : []), ...(app ? [h('horas_app', 'APP')] : []),
+      ...(previsto ? [{ chave: 'previsto', titulo: 'Previsto', alinhar: 'dir', texto: l => horas(l.previsto ?? 0), valor: l => l.previsto ?? 0 } as Coluna<LinhaFechamento>] : []),
+      { chave: 'total_filtro', titulo: 'Total', alinhar: 'dir', texto: l => horas(totalDoFiltro(l, { os, app, previsto })), valor: l => totalDoFiltro(l, { os, app, previsto }) },
       h('normais', 'Normais'), h('extras', 'Extras'),
       { chave: 'ocupacao', titulo: 'Ocupação', alinhar: 'dir', texto: l => (l.ocupacao == null ? '—' : `${l.ocupacao}%`) },
       { chave: 'pendentes', titulo: 'Sem conferência', alinhar: 'dir', render: l => (l.pendentes ? <span className="pilula pilula-neutra">{l.pendentes}</span> : '0'), texto: l => String(l.pendentes) },
       { chave: 'acao', titulo: '', fixa: true, render: l => <button type="button" className="link" onClick={() => relatorio(escritorio, l, de, ate).catch(e => setErro(traduzirErro(e).mensagem))}>Relatório</button> },
     ];
-  }, [escritorio, de, ate]);
+  }, [escritorio, de, ate, os, app, previsto]);
   const t = c.dados ? totais(c.dados.consultores) : null;
   return (
     <>
       <div className="barra-filtros">
+        <SelecaoMultipla rotulo="Origem" opcoes={ORIGENS} sel={origens} aoMudar={aoMudarOrigens} />
         <label className="ajuda">De <input type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} aria-label="De" /></label>
         <label className="ajuda">Até <input type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} aria-label="Até" /></label>
         {(de !== p0.de || ate !== p0.ate) && <button type="button" className="link" onClick={() => { setDe(p0.de); setAte(p0.ate); }}>Período do fechamento (21 a 20)</button>}
       </div>
-      <p className="ajuda">Normais = até {horas(c.dados?.horas_dia ?? 8)} por dia útil; extras = o que passa disso e todo sábado/domingo. Capacidade = dias úteis × horas do dia − ausências (sem feriados).</p>
+      <p className="ajuda">Normais = até {horas(c.dados?.horas_dia ?? 8)} por dia útil; extras = o que passa disso e todo sábado/domingo. Capacidade = dias úteis × horas do dia − ausências (sem feriados). Normais, extras e ocupação contam só o apontado (OS + app); Previsto = agenda do período ainda sem apontamento.</p>
       {(c.erro || erro) && <p className="msg-erro">{c.erro || erro}</p>}
       {t && <section className="indicadores" aria-label={todos ? 'Totais da equipe' : 'Seus totais'}>
-        <div className="indicador"><small>Total (OS + app)</small><strong data-testid="fech-total">{horas(t.total)}</strong></div>
+        <div className="indicador"><small>Total ({rotuloOrigens(origens)})</small><strong data-testid="fech-total">{horas(totalDoFiltro(t, { os, app, previsto }))}</strong></div>
+        {previsto && <div className="indicador"><small>Previsto sem apontamento</small><strong data-testid="fech-previsto">{horas(t.previsto)}</strong></div>}
         <div className="indicador"><small>Capacidade</small><strong>{horas(t.capacidade)}</strong></div>
         <div className="indicador"><small>Extras</small><strong>{horas(t.extras)}</strong></div>
         <div className="indicador"><small>Sem conferência</small><strong>{t.pendentes}</strong></div>
       </section>}
-      <GraficoHorasAcumuladas escritorio={escritorio} de={de} ate={ate}
+      <GraficoHorasAcumuladas escritorio={escritorio} de={de} ate={ate} origens={{ os, app, previsto }}
         consultores={todos ? c.dados?.consultores.map(l => ({ id: l.consultor_id, nome: l.consultor })) ?? [] : undefined} />
       {c.dados && <section className="cartao">
         <Tabela id="fechamento" nome={`Fechamento ${data(de)} a ${data(ate)}`} colunas={colunas} linhas={c.dados.consultores} chave={l => l.consultor_id} tamanhoInicial={30} vazio="Nenhum consultor." />
@@ -102,6 +108,8 @@ function Fechamento({ todos }: { todos: boolean }) {
 export function Produtividade() {
   const todos = usePode()('produtividade.ver_todos');
   const [aba, setAba] = useState<'fechamento' | 'apontamentos' | 'travados' | 'conferencia' | 'planilhas'>('fechamento');
+  // 4.21.0: o filtro de origem (seleção múltipla; nenhuma marcada = todas) vale para as abas Fechamento e Apontamentos
+  const [origens, setOrigens] = useState<string[]>([]);
   return (
     <div className="pagina">
       <header className="pagina-topo"><div>
@@ -116,8 +124,8 @@ export function Produtividade() {
         <button type="button" role="tab" aria-selected={aba === 'conferencia'} onClick={() => setAba('conferencia')}>{todos ? 'Conferência de OS' : 'Minha conferência de OS'}</button>
         <button type="button" role="tab" aria-selected={aba === 'planilhas'} onClick={() => setAba('planilhas')}>{todos ? 'Planilhas' : 'Minha planilha'}</button>
       </div>
-      {aba === 'fechamento' ? <Fechamento todos={todos} /> 
-        : aba === 'apontamentos' ? <RelatorioApontamentos equipe={todos} /> : aba === 'travados' ? <ApontamentosTravados /> : aba === 'conferencia' ? <ConferenciaOS /> : <ConferenciaPlanilhas />}
+      {aba === 'fechamento' ? <Fechamento todos={todos} origens={origens} aoMudarOrigens={setOrigens} /> 
+        : aba === 'apontamentos' ? <RelatorioApontamentos equipe={todos} origens={origens} aoMudarOrigens={setOrigens} /> : aba === 'travados' ? <ApontamentosTravados /> : aba === 'conferencia' ? <ConferenciaOS /> : <ConferenciaPlanilhas />}
     </div>
   );
 }

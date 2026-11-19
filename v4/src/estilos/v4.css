@@ -250,3 +250,7 @@ button.rg-nivel { cursor: pointer; }
 .gcli-n { min-width: 2.5ch; text-align: right; font-variant-numeric: tabular-nums; }
 .gcli-titulo { margin-top: 18px; }
 @media (max-width: 560px) { .gcli-linha { grid-template-columns: minmax(70px, 38%) 1fr auto; gap: 6px; } }
+/* pílula "N tarefas" na linha da demanda: é um botão que abre a lista de tarefas ali mesmo */
+.pil-tarefas { border: 1px solid var(--azul); background: transparent; color: var(--azul); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.pil-tarefas:hover, .pil-tarefas[aria-expanded="true"] { background: var(--azul); color: var(--superficie); }
+.tarefas-drill-carga { display: flex; align-items: center; gap: 8px; margin: 8px 0 0 28px; }

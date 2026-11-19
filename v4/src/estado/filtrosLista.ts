@@ -285,6 +285,15 @@ export function useFiltroLista<T extends object>(tela: string, padrao: T) {
   return { f, mudar, limpar, aplicar, ativos: contarAtivos(f, padrao) };
 }
 
+/** Itens que o gráfico de Demandas conta conforme o nível escolhido em "Aplicar filtros em" (4.18.0): só demandas, só subdemandas
+ *  ou os dois. A lista filtrada traz também o contexto (as subdemandas da demanda que passou, ou a mãe da subdemanda que passou),
+ *  que aparece na árvore mas não entra na contagem. Subdemanda = tem mãe carregada (`todas`), como em filtrarDemandas. */
+export function itensDoNivel<T extends { id: string; pai_id: string | null }>(filtradas: T[], nivel: string, todas: { id: string }[] = filtradas): T[] {
+  if (nivel !== 'demanda' && nivel !== 'subdemanda') return filtradas;
+  const ids = new Set(todas.map(d => d.id));
+  return filtradas.filter(d => (!!d.pai_id && ids.has(d.pai_id)) === (nivel === 'subdemanda'));
+}
+
 /** Quantidade de demandas/subdemandas por cliente, em ordem alfabética (gráfico da tela Demandas). 4.17.0: cada cliente traz
  *  a quantidade por etapa do app (`etapas`, na ordem de `ordemEtapas`; "sem etapa" = id null, sempre por último). */
 export interface ContagemCliente { cliente_id: string; cliente: string; n: number; etapas: { id: string | null; n: number }[] }

@@ -2,6 +2,8 @@
 // Suspenso); o Nível (demandas, subdemandas ou os dois) fica destacado no fim da barra e vale para TODOS os filtros.
 // 4.16.0: duas abas com a mesma barra de filtros — Gráfico (barras com a quantidade por cliente, em ordem alfabética; clicar
 // na barra mostra embaixo as demandas do cliente) e Lista (a visão de sempre). A aba fica guardada no aparelho.
+// 4.18.0: o gráfico conta no nível escolhido em "Aplicar filtros em".
+// 4.18.0: um botão só ("Recolher tudo"/"Expandir tudo", acima dos projetos) recolhe as subdemandas de todas as demandas em tela.
 // 4.17.0: a barra do cliente é empilhada por etapa, com a cor da etapa do cadastro (legenda acima das barras).
 // Módulo Demandas (#/demandas): todas as demandas/subdemandas visíveis, agrupadas por cliente · projeto, com a barra
 // de horas e as mesmas ações (popup único) de qualquer tela. Filtros por status (vários, guardados no aparelho — V13a-5,
@@ -10,17 +12,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FASES } from '../api/cadastros';
 import { consultor } from '../api/consultor';
-import { PRIORIDADES, STATUS_V4, todasDemandas, type DemandaLinha } from '../api/execucao';
+import { arvoreDemandas, PRIORIDADES, STATUS_V4, todasDemandas, type DemandaLinha } from '../api/execucao';
 import { useEtapas } from '../estado/etapas';
 import { ArvoreDemandas } from '../componentes/ArvoreDemandas';
 import { BarraFiltros } from '../componentes/BarraFiltros';
 import { Botao } from '../componentes/Botao';
+import { Icone } from '../componentes/Icone';
 import { FiltrosSalvos } from '../componentes/FiltrosSalvos';
 import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { useEquipe, usePode } from '../estado/equipe';
-import { contarPorCliente, filtrarDemandas, NIVEIS_FILTRO, SEM, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
+import { contarPorCliente, filtrarDemandas, itensDoNivel, NIVEIS_FILTRO, SEM, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
@@ -68,7 +71,10 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
     }
     return [...m.values()];
   }, [itens]);
-  const porCliente = useMemo(() => contarPorCliente(itens, et.lista.map(e => e.id)), [itens, et.lista]);
+  // 4.18.0: o gráfico conta no nível escolhido em "Aplicar filtros em" (só demandas, só subdemandas ou os dois)
+  const contados = useMemo(() => itensDoNivel(itens, f.nivel, todas), [itens, f.nivel, todas]);
+  const oQue = f.nivel === 'demanda' ? 'demanda(s)' : f.nivel === 'subdemanda' ? 'subdemanda(s)' : 'demanda(s)/subdemanda(s)';
+  const porCliente = useMemo(() => contarPorCliente(contados, et.lista.map(e => e.id)), [contados, et.lista]);
   // etapas que aparecem no gráfico (na ordem do cadastro; "sem etapa" por último), para a legenda e as cores dos pedaços
   const etapaDoGrafico = (id: string | null) => { const e = id ? et.porId.get(id) : null; return { nome: e?.nome ?? 'Sem etapa', cor: e?.cor ?? null }; };
   const legenda = useMemo(() => {
@@ -79,6 +85,10 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
   // o cliente escolhido no gráfico sai da seleção quando os filtros o tiram da tela
   const escolhido = aba === 'grafico' ? porCliente.find(x => x.cliente_id === clienteSel) ?? null : null;
   const visiveis = aba === 'grafico' ? grupos.filter(g => g.cliente_id === escolhido?.cliente_id) : grupos;
+  // recolher/expandir tudo: vale para todas as demandas com subdemanda em tela (inclusive as que "Mostrar mais" ainda vai trazer)
+  const [fechadas, setFechadas] = useState<Set<string>>(new Set());
+  const comFilhas = useMemo(() => visiveis.flatMap(g => arvoreDemandas(g.itens).filter(x => x.filhas.length).map(x => x.item.id)), [visiveis]);
+  const tudoFechado = comFilhas.length > 0 && comFilhas.every(id => fechadas.has(id));
   const ops = useMemo(() => ({
     fases: opcoesTexto(todas.map(d => d.fase), FASES.filter(x => todas.some(d => d.fase === x))),
     etapas: [...et.lista.filter(e => e.ativo || todas.some(d => d.etapa_app_id === e.id)).map(e => ({ valor: e.id, rotulo: e.nome })),
@@ -147,7 +157,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
       {c.dados && c.dados.total > todas.length && <p className="ajuda">Carregadas {todas.length} de {c.dados.total}; refine o status.</p>}
       {aba === 'grafico' && porCliente.length > 0 && (
         <section className="cartao gcli" aria-label="Quantidade de demandas por cliente">
-          <h2 className="secao">Quantidade por cliente <small className="ajuda">· {porCliente.length} cliente(s) · clique na barra para ver as demandas</small></h2>
+          <h2 className="secao">Quantidade por cliente <small className="ajuda">· {contados.length} {oQue} · {porCliente.length} cliente(s) · clique na barra para ver as demandas</small></h2>
           <ul className="gcli-legenda" aria-label="Cores das etapas">
             {legenda.map(id => { const e = etapaDoGrafico(id); return <li key={id ?? 'sem'}><i className={e.cor ? undefined : 'gcli-sem'} style={e.cor ? { background: e.cor } : undefined} />{e.nome}</li>; })}
           </ul>
@@ -155,7 +165,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
             {porCliente.map(x => (
               <li key={x.cliente_id}>
                 <button type="button" className="gcli-linha" aria-pressed={escolhido?.cliente_id === x.cliente_id}
-                  aria-label={`${x.cliente}: ${x.n} demanda(s) — ${x.etapas.map(e => `${etapaDoGrafico(e.id).nome}: ${e.n}`).join(', ')}`} onClick={() => { setClienteSel(v => (v === x.cliente_id ? null : x.cliente_id)); setMostrar(PROJETOS_POR_VEZ); }}>
+                  aria-label={`${x.cliente}: ${x.n} ${oQue} — ${x.etapas.map(e => `${etapaDoGrafico(e.id).nome}: ${e.n}`).join(', ')}`} onClick={() => { setClienteSel(v => (v === x.cliente_id ? null : x.cliente_id)); setMostrar(PROJETOS_POR_VEZ); }}>
                   <span className="gcli-nome" title={x.cliente}>{x.cliente}</span>
                   <span className="gcli-trilho"><span className="gcli-barra" style={{ width: `${(x.n / maior) * 100}%` }}>
                     {x.etapas.map(e => { const g = etapaDoGrafico(e.id); return <span key={e.id ?? 'sem'} className={`gcli-seg${g.cor ? '' : ' gcli-sem'}`} data-n={e.n} title={`${g.nome}: ${e.n}`} style={{ flexGrow: e.n, ...(g.cor ? { background: g.cor } : {}) }} />; })}
@@ -167,11 +177,19 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
           </ul>
         </section>
       )}
-      {escolhido && <h2 className="secao gcli-titulo">{escolhido.cliente} <small className="ajuda">· {escolhido.n} demanda(s)/subdemanda(s)</small></h2>}
+      {escolhido && <h2 className="secao gcli-titulo">{escolhido.cliente} <small className="ajuda">· {escolhido.n} {oQue}</small></h2>}
+      {comFilhas.length > 0 && (
+        <div className="arvore-acoes arvore-acoes-tela">
+          <button type="button" className="link" data-testid="recolher-todas" title="Vale para todas as demandas em tela"
+            onClick={() => setFechadas(tudoFechado ? new Set() : new Set(comFilhas))}>
+            <Icone nome={tudoFechado ? 'seta' : 'baixo'} tam={14} /> {tudoFechado ? 'Expandir tudo' : 'Recolher tudo'}
+          </button>
+        </div>
+      )}
       {visiveis.slice(0, mostrar).map(g => (
         <section key={g.projeto_id} className="cartao">
           <h2 className="secao"><Resumo tipo="projeto" id={g.projeto_id}><a href={hashDe(caminhoEntidade('projeto', g.projeto_id))}>{g.cliente} · {g.projeto}</a></Resumo></h2>
-          <ArvoreDemandas demandas={g.itens} />
+          <ArvoreDemandas demandas={g.itens} fechadas={fechadas} aoFechar={setFechadas} />
         </section>
       ))}
       {visiveis.length > mostrar && (

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { juntarPaginas } from '../api/execucao';
 import {
-  candidatosGrade, consultoresPorDemanda, contarAtivos, contarPorCliente, idsDoResponsavel, fasesPorCliente, filtrarClientes, filtrarDemandas, filtrarProjetos, filtrarTarefas, normalizarFiltro,
+  candidatosGrade, consultoresPorDemanda, contarAtivos, contarPorCliente, itensDoNivel, idsDoResponsavel, fasesPorCliente, filtrarClientes, filtrarDemandas, filtrarProjetos, filtrarTarefas, normalizarFiltro,
   opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_AGENDA_EQUIPE, PADRAO_CLIENTES, PADRAO_DEMANDAS, PADRAO_PROJETOS, PADRAO_TAREFAS, pessoasDaGrade, SEM, temTexto,
 } from './filtrosLista';
 
@@ -292,6 +292,17 @@ describe('filtrarPortfolio', () => {
   });
   it('demandas ainda não carregadas não escondem projeto', () =>
     expect(filtrarPortfolio(ps, null, { ...PADRAO_PORTFOLIO, etapas: ['e1'] }).length).toBe(3));
+});
+
+describe('itensDoNivel (4.18.0: o gráfico de Demandas conta no nível escolhido)', () => {
+  const todas = [{ id: 'm1', pai_id: null }, { id: 's1', pai_id: 'm1' }, { id: 's2', pai_id: 'm1' }, { id: 'm2', pai_id: null }, { id: 'orfa', pai_id: 'fora' }];
+  const ids = (n: string, l = todas) => itensDoNivel(l, n, todas).map(d => d.id);
+  it('demandas e subdemandas: conta tudo', () => expect(ids('')).toEqual(['m1', 's1', 's2', 'm2', 'orfa']));
+  it('demandas: sem as subdemandas (a subdemanda cuja mãe não foi carregada conta como demanda, como no filtro)', () => expect(ids('demanda')).toEqual(['m1', 'm2', 'orfa']));
+  it('subdemandas: sem as mães que vieram só de contexto', () => {
+    expect(ids('subdemanda')).toEqual(['s1', 's2']);
+    expect(ids('subdemanda', [todas[0], todas[1]])).toEqual(['s1']);
+  });
 });
 
 describe('contarPorCliente (gráfico da tela Demandas)', () => {

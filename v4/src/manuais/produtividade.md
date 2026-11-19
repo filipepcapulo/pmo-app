@@ -25,10 +25,12 @@ No **Meu fechamento** não existe essa permissão: ninguém vê o fechamento de 
 | Aba (para quem vê todos) | Aba (para quem vê só o próprio) | Para que serve |
 | --- | --- | --- |
 | **Fechamento** | **Fechamento** | Totais de horas por consultor no período e o gráfico |
-| **Apontamentos** | **Meus apontamentos** | Relatório dos apontamentos, por origem e período |
+| **Apontamentos** | **Meus apontamentos** | Relatório dos apontamentos, por origem e período, e das agendas previstas que ainda não têm apontamento |
 | **Travados** | **Meus travados** | OS do Experience travadas fora do prazo retroativo, por ciclo 21–20 |
 | **Conferência de OS** | **Minha conferência de OS** | OS do Experience comparadas com as agendas |
 | **Planilhas** | **Minha planilha** | Planilhas de horas comparadas com as agendas de planilha |
+
+Na aba **Apontamentos**, o filtro de origem escolhe o que aparece: **Todas as origens** (OS do Sankhya OM + Apontamento no APP), só **Sankhya OM**, só **Apontamento no APP**, **Agenda prevista (sem apontamento)** — as agendas lançadas no período que ainda não tiveram OS nem apontamento no app identificados (agenda cancelada ou não executada não entra) — ou **Tudo (apontado + previsto)**. As horas da agenda prevista aparecem no cartão **Previsto sem apontamento** e não somam no total apontado. Na linha da sua própria agenda prevista, **Apontar** abre o apontamento no app.
 
 Este manual detalha a aba **Fechamento** (seções 3 a 6) e o **Meu fechamento** (seções 7 e 8).
 

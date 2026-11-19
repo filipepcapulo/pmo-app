@@ -24,7 +24,14 @@ O que cada um faz, pelo padrão dos perfis (o Admin pode mudar as permissões):
 
 Os níveis: o projeto tem **demandas** (entregáveis); a demanda pode ter **subdemandas** (um nível só); demandas e subdemandas têm **tarefas**, que são as agendas dos consultores.
 
-## 2. A lista de demandas
+## 2. As abas Gráfico e Lista
+
+A tela tem duas abas, com a mesma barra de filtros: o que você filtra numa vale na outra. O app guarda no aparelho a aba em que você parou.
+
+- **Gráfico** (a primeira): uma barra por cliente, em ordem alfabética, com a quantidade de demandas e subdemandas que passam nos filtros. Clique na barra para ver, logo abaixo, as demandas daquele cliente, do mesmo jeito da Lista. Clique de novo na barra para recolher.
+- **Lista**: todas as demandas, como descrito a seguir.
+
+### A lista de demandas
 
 As demandas aparecem agrupadas por cliente e projeto. Toque no nome do grupo para abrir o projeto, ou na linha para abrir a demanda.
 

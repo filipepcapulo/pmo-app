@@ -237,3 +237,16 @@ button.rg-nivel { cursor: pointer; }
 .pilula-inativo { background: var(--texto-2); color: var(--superficie); }
 .secao + .descricao { margin-top: 0; }
 .descricao + .secao, .ajuda + .secao { margin-top: 18px; }
+/* Demandas › Gráfico: barras horizontais com a quantidade por cliente (ordem alfabética); a barra é um botão */
+.gcli-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.gcli-linha { display: grid; grid-template-columns: minmax(90px, 220px) 1fr auto; align-items: center; gap: 10px; width: 100%; padding: 5px 8px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--texto); font: inherit; text-align: left; cursor: pointer; }
+.gcli-linha:hover { background: var(--superficie-2); }
+.gcli-linha[aria-pressed="true"] { background: var(--verde-claro); color: var(--verde-texto); font-weight: 600; }
+.gcli-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gcli-trilho { display: block; height: 14px; border-radius: 4px; background: var(--superficie-2); overflow: hidden; }
+.gcli-linha[aria-pressed="true"] .gcli-trilho { background: var(--superficie); }
+.gcli-barra { display: block; height: 100%; min-width: 3px; border-radius: 4px; background: var(--verde); }
+.gcli-n { min-width: 2.5ch; text-align: right; font-variant-numeric: tabular-nums; }
+.gcli-titulo { margin-top: 18px; }
+@media (max-width: 560px) { .gcli-linha { grid-template-columns: minmax(70px, 38%) 1fr auto; gap: 6px; } }

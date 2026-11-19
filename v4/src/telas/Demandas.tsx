@@ -5,6 +5,7 @@
 // 4.18.0: o gráfico conta no nível escolhido em "Aplicar filtros em".
 // 4.18.0: um botão só ("Recolher tudo"/"Expandir tudo", acima dos projetos) recolhe as subdemandas de todas as demandas em tela.
 // 4.17.0: a barra do cliente é empilhada por etapa, com a cor da etapa do cadastro (legenda acima das barras).
+// 4.23.0: edição múltipla — marcar demandas, subdemandas e tarefas e trocar Status, Etapa ou Responsável de todas de uma vez.
 // Módulo Demandas (#/demandas): todas as demandas/subdemandas visíveis, agrupadas por cliente · projeto, com a barra
 // de horas e as mesmas ações (popup único) de qualquer tela. Filtros por status (vários, guardados no aparelho — V13a-5,
 // módulo 09 da Central), fase do projeto, etapa, responsável, tipo, prioridade, cliente, projeto, atrasadas e texto
@@ -14,7 +15,8 @@ import { FASES } from '../api/cadastros';
 import { consultor } from '../api/consultor';
 import { arvoreDemandas, PRIORIDADES, STATUS_V4, todasDemandas, type DemandaLinha } from '../api/execucao';
 import { useEtapas } from '../estado/etapas';
-import { ArvoreDemandas } from '../componentes/ArvoreDemandas';
+import { ArvoreDemandas, itemLoteDemanda } from '../componentes/ArvoreDemandas';
+import { AcoesEdicaoMultipla, EdicaoMultipla } from '../componentes/EdicaoMultipla';
 import { BarraFiltros } from '../componentes/BarraFiltros';
 import { Botao } from '../componentes/Botao';
 import { Icone } from '../componentes/Icone';
@@ -89,6 +91,8 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
   const [fechadas, setFechadas] = useState<Set<string>>(new Set());
   const comFilhas = useMemo(() => visiveis.flatMap(g => arvoreDemandas(g.itens).filter(x => x.filhas.length).map(x => x.item.id)), [visiveis]);
   const tudoFechado = comFilhas.length > 0 && comFilhas.every(id => fechadas.has(id));
+  // edição múltipla: "Selecionar tudo" vale para as demandas e subdemandas dos projetos que estão na tela agora
+  const emTela = useMemo(() => visiveis.slice(0, mostrar).flatMap(g => g.itens.map(d => itemLoteDemanda(d, d.etapa_app_id ?? null))), [visiveis, mostrar]);
   const ops = useMemo(() => ({
     fases: opcoesTexto(todas.map(d => d.fase), FASES.filter(x => todas.some(d => d.fase === x))),
     etapas: [...et.lista.filter(e => e.ativo || todas.some(d => d.etapa_app_id === e.id)).map(e => ({ valor: e.id, rotulo: e.nome })),
@@ -178,12 +182,14 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
         </section>
       )}
       {escolhido && <h2 className="secao gcli-titulo">{escolhido.cliente} <small className="ajuda">· {escolhido.n} {oQue}</small></h2>}
-      {comFilhas.length > 0 && (
+      <EdicaoMultipla chave={JSON.stringify([f, status, aba, escolhido?.cliente_id ?? null])}>
+      {emTela.length > 0 && (
         <div className="arvore-acoes arvore-acoes-tela">
-          <button type="button" className="link" data-testid="recolher-todas" title="Vale para todas as demandas em tela"
+          {comFilhas.length > 0 && <button type="button" className="link" data-testid="recolher-todas" title="Vale para todas as demandas em tela"
             onClick={() => setFechadas(tudoFechado ? new Set() : new Set(comFilhas))}>
             <Icone nome={tudoFechado ? 'seta' : 'baixo'} tam={14} /> {tudoFechado ? 'Expandir tudo' : 'Recolher tudo'}
-          </button>
+          </button>}
+          <AcoesEdicaoMultipla todos={emTela} />
         </div>
       )}
       {visiveis.slice(0, mostrar).map(g => (
@@ -192,6 +198,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
           <ArvoreDemandas demandas={g.itens} fechadas={fechadas} aoFechar={setFechadas} />
         </section>
       ))}
+      </EdicaoMultipla>
       {visiveis.length > mostrar && (
         <p><Botao onClick={() => setMostrar(n => n + PROJETOS_POR_VEZ)}>Mostrar mais projetos ({visiveis.length - mostrar} restantes)</Botao></p>
       )}

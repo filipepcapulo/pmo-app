@@ -268,3 +268,36 @@ button.rg-nivel { cursor: pointer; }
 .sst-concluida { background: #15803d; }
 .sst-cancelada { background: #6b7280; }
 .sst-pausada { background: #c2410c; font-size: 9px; }
+
+/* 4.23.0: edição múltipla (Demandas e aba Demandas do projeto). A caixa fica escondida: aparece ao passar o mouse na linha
+   (no lugar do sinal do status; na tarefa, na margem à esquerda) e, com a primeira marcada, em todas (.lote-vis). */
+.arvore-acoes { gap: 16px; flex-wrap: wrap; }
+.arvore-acoes .link[aria-pressed="true"] { font-weight: 700; }
+.lote-so-toque { display: none !important; }
+@media (hover: none) { .lote-so-toque { display: inline-flex !important; } }
+.lote-caixa { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; min-height: 0; flex: 0 0 16px; margin: 0; padding: 0; border: 1.5px solid var(--texto-2); border-radius: 5px;
+  background: var(--superficie) center / 12px no-repeat; cursor: pointer; transition: border-color .12s, background-color .12s; }
+@media (hover: hover) { .lote-caixa:hover:not(:disabled) { border-color: var(--verde); } }
+.lote-caixa:checked { border-color: var(--verde); background-color: var(--verde);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2l2.4 2.4 4.6-5'/%3E%3C/svg%3E"); }
+.lote-caixa:disabled { opacity: .45; cursor: not-allowed; }
+.lote-rotulo { display: inline-flex; align-items: center; justify-content: center; opacity: 0; cursor: pointer; transition: opacity .12s; }
+.lote-rotulo.lote-vis, .lote-rotulo:focus-within, .lote-rotulo:has(.lote-caixa:checked) { opacity: 1; }
+@media (hover: hover) { .linha-exec-topo:hover .lote-rotulo, .tarefas-drill li:hover > .lote-rotulo { opacity: 1; } }
+/* na demanda a caixa vem logo depois do sinal e recua por cima dele (18px do sinal + 10px do espaço da linha) */
+.linha-exec-topo > .lote-rotulo { flex: 0 0 18px; width: 18px; height: 18px; margin-left: -28px; }
+.sinal-status:has(+ .lote-rotulo.lote-vis), .sinal-status:has(+ .lote-rotulo:focus-within), .sinal-status:has(+ .lote-rotulo .lote-caixa:checked) { visibility: hidden; }
+@media (hover: hover) { .linha-exec-topo:hover > .sinal-status:has(+ .lote-rotulo) { visibility: hidden; } }
+.tarefas-drill.com-lote li { position: relative; }
+.tarefas-drill.com-lote li > .lote-rotulo { position: absolute; left: -30px; top: 0; bottom: 0; width: 28px; }
+.tarefas-drill li.td-todas { cursor: default; color: var(--texto-2); }
+.tarefas-drill li.td-todas .check { margin: 0; cursor: pointer; }
+@media (hover: hover) { .tarefas-drill li.td-todas:hover { background: none; } }
+.lote-espaco { height: 110px; }
+.lote-barra { position: fixed; left: 50%; bottom: calc(16px + var(--baixo-seg)); transform: translateX(-50%); z-index: 40; width: max-content; max-width: calc(100vw - 24px);
+  background: var(--superficie); color: var(--texto); border: 1px solid var(--linha); border-radius: 14px; box-shadow: var(--sombra-alta); padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 6px; }
+.lote-linha { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.lote-linha select { width: auto; min-height: 36px; padding: 4px 8px; max-width: 220px; }
+.lote-n { white-space: nowrap; padding-right: 4px; }
+.lote-falhas { list-style: none; margin: 0; padding: 8px 10px; max-height: 130px; overflow: auto; font-size: 13px; border-radius: 8px; background: var(--superficie-2); color: var(--vermelho, #b42318); }

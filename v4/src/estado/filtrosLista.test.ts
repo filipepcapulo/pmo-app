@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { juntarPaginas } from '../api/execucao';
 import {
   candidatosGrade, consultoresPorDemanda, contarAtivos, contarPorCliente, itensDoNivel, idsDoResponsavel, fasesPorCliente, filtrarClientes, filtrarDemandas, filtrarProjetos, filtrarTarefas, normalizarFiltro,
-  opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_AGENDA_EQUIPE, PADRAO_CLIENTES, PADRAO_DEMANDAS, PADRAO_PROJETOS, PADRAO_TAREFAS, pessoasDaGrade, SEM, temTexto,
+  opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_AGENDA_EQUIPE, PADRAO_CLIENTES, PADRAO_DEMANDAS, PADRAO_DEMANDAS_TELA, PADRAO_PROJETOS, PADRAO_TAREFAS, pessoasDaGrade, SEM, temTexto,
 } from './filtrosLista';
 
 const FASES = ['P1', 'P2', 'P3', 'Sustentação'];
@@ -91,6 +91,15 @@ describe('demandas', () => {
   ];
   const ids = (f: Partial<typeof PADRAO_DEMANDAS>, cons?: Map<string, Set<string>>) => filtrarDemandas(dem, { ...PADRAO_DEMANDAS, ...f }, cons).map(d => d.id);
   it('sem filtro devolve tudo, na ordem', () => expect(ids({})).toEqual(['d1', 'd2', 'd3', 'd4']));
+  it('4.26.0 situação do projeto: ativos, inativos ou todos; sem a marca o projeto conta como ativo', () => {
+    const lista = dem.map(d => (d.projeto_id === 'p2' ? { ...d, projeto_inativo: true } : d.projeto_id === 'p1' ? { ...d, projeto_inativo: false } : d));
+    const com = (sitProjeto: string) => filtrarDemandas(lista, { ...PADRAO_DEMANDAS, sitProjeto }).map(d => d.id);
+    expect(com('ativos')).toEqual(['d1', 'd2', 'd4']);
+    expect(com('inativos')).toEqual(['d3']);
+    expect(com('')).toEqual(['d1', 'd2', 'd3', 'd4']);
+    expect(PADRAO_DEMANDAS.sitProjeto).toBe('');              // as outras listas não olham a situação
+    expect(PADRAO_DEMANDAS_TELA.sitProjeto).toBe('ativos');   // a tela de Demandas abre só com os ativos
+  });
   it('fase do projeto, etapa, tipo, prioridade, status, cliente e projeto', () => {
     expect(ids({ fases: ['P3', 'Sustentação'] })).toEqual(['d3', 'd4']);
     expect(ids({ etapas: ['Homologação'] })).toEqual(['d1', 'd2']);   // d2 não tem etapa: vale a da mãe (como no backlog da Agenda)

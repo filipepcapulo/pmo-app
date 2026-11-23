@@ -89,7 +89,12 @@ export interface FiltroDemandas {
    * responsável, onde as tarefas estão à mão).
    */
   nivel: string;
+  /** 4.26.0: situação do projeto da demanda — 'ativos' (Ativo e Suspenso), 'inativos' (Encerrado e Cancelado) ou '' (todos). */
+  sitProjeto: string;
 }
+export const SIT_PROJETO: Opcao[] = [
+  { valor: 'ativos', rotulo: 'Projetos ativos' }, { valor: 'inativos', rotulo: 'Projetos inativos' }, { valor: '', rotulo: 'Projetos ativos e inativos' },
+];
 export const NIVEIS_FILTRO: Opcao[] = [
   { valor: '', rotulo: 'Demandas e subdemandas' }, { valor: 'demanda', rotulo: 'Demandas' }, { valor: 'subdemanda', rotulo: 'Subdemandas' },
 ];
@@ -98,13 +103,17 @@ export const NIVEIS_RESPONSAVEL: Opcao[] = [
 ];
 export const NIVEL_TAREFA: Opcao = { valor: 'tarefa', rotulo: 'Só tarefas' };
 export const PADRAO_DEMANDAS: FiltroDemandas = {
-  texto: '', fases: [], etapas: [], responsaveis: [], status: [], tipos: [], prioridades: [], clientes: [], projetos: [], atrasadas: false, nivel: '',
+  texto: '', fases: [], etapas: [], responsaveis: [], status: [], tipos: [], prioridades: [], clientes: [], projetos: [], atrasadas: false, nivel: '', sitProjeto: '',
 };
+/** Tela de Demandas: abre só com os projetos ativos (como Clientes e Projetos); as outras listas não olham a situação. */
+export const PADRAO_DEMANDAS_TELA: FiltroDemandas = { ...PADRAO_DEMANDAS, sitProjeto: 'ativos' };
 export interface DemandaFiltravel {
   id: string; pai_id: string | null; nome: string; status: string; projeto_id?: string; tipo?: string; prioridade?: string;
   responsavel_id?: string | null; etapa?: string | null; fase?: string; cliente_id?: string; cliente?: string; projeto?: string;
   /** V4: etapa do app (id); quando vem preenchida o filtro de etapa compara por ela, senão pelo texto. */
   etapa_app_id?: string | null;
+  /** Projeto Encerrado ou Cancelado (a tela preenche); sem ele, o projeto conta como ativo. */
+  projeto_inativo?: boolean;
   /** Nome da etapa do app (a tela preenche); entra na busca por texto. Sem ele, vale o texto de `etapa`. */
   etapa_nome?: string | null;
   totais?: { atrasada?: boolean; avulso_base?: boolean } | null; avulso_base?: boolean;
@@ -161,6 +170,7 @@ function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string
     && (f.prioridades.length === 0 || f.prioridades.includes(d.prioridade ?? 'normal'))
     && (f.clientes.length === 0 || (!!d.cliente_id && f.clientes.includes(d.cliente_id)))
     && (f.projetos.length === 0 || (!!d.projeto_id && f.projetos.includes(d.projeto_id)))
+    && (!f.sitProjeto || (f.sitProjeto === 'inativos') === !!d.projeto_inativo)
     && (!f.atrasadas || (!!d.totais?.atrasada && !semAlerta(d)))
     && temTexto(f.texto, d.nome, mae?.nome, d.cliente, d.projeto, ...etapasTexto(d, mae));
 }

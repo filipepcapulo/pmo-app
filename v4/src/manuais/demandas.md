@@ -59,6 +59,7 @@ Filtros:
 - Busca por demanda, cliente ou projeto.
 - **Status**: começa em **Abertas** (Backlog, Planejada, Em andamento e Pausada). Marque os que quiser ou toque em **Todas**. O app guarda a escolha no aparelho.
 - **Fase**, **Responsável**, **Etapa**, **Cliente**, **Projeto**, **Tipo** (Entregável, Plano de ação, Chamado) e **Prioridade**: aceitam vários de uma vez.
+- **Projetos ativos** / **Projetos inativos** / **Projetos ativos e inativos**: a tela abre só com as demandas de projetos ativos (situação Ativo ou Suspenso). Inativo é o projeto Encerrado ou Cancelado.
 - Com um responsável escolhido, aparece o nível: **Todos os níveis**, **Só demandas (com as subdemandas)** ou **Só subdemandas**.
 - **Só atrasadas**.
 - **Filtros salvos…** e **Salvar filtro**: guardam o filtro com um nome.

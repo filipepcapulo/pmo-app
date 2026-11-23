@@ -21,7 +21,7 @@ A tela Equipe tem visões no alto: **Pessoas**, **Acessos por funcionalidade**, 
 A lista mostra **Nome**, **E-mail (login)**, **E-mail do ClickUp**, **Papéis**, **Perfil** e **Skills** (por exemplo, *2 cert. / 5*: 2 certificadas de 5).
 
 - **Buscar nome ou e-mail** filtra a lista.
-- **Todos os papéis** filtra por papel: Consultor, Desenvolvedor, GP, GS ou Outros.
+- **Papel** filtra por papel: Consultor, Desenvolvedor, GP, GS ou Outros. Aceita vários de uma vez, com **Exibir** (só os marcados) e **Ocultar** (todos menos os marcados); nada marcado mostra todos.
 - **Mostrar inativos** inclui quem foi inativado (etiqueta **Inativo**).
 - Toque na linha para abrir a ficha da pessoa.
 

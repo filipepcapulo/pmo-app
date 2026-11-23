@@ -3,6 +3,7 @@
 import { novaOperacao, rpc } from './cliente';
 import type { DemandaLinha, StatusTarefa } from './execucao';
 import { diaNum, somarDias } from './projeto';
+import { marcadosDe, montarSelecao, ocultando, passa, semSelecao } from '../util/selecao';
 
 export interface LinhaAgenda {
   tarefa_id: string; data: string; periodo: string; hora_ini: string | null; hora_fim: string | null; horas_previstas: number | null;
@@ -15,11 +16,11 @@ export const ORIGENS: { valor: OrigemSel; rotulo: string }[] = [
   { valor: 'sankhya_om', rotulo: 'Sankhya OM' }, { valor: 'app', rotulo: 'Apontamento no APP' }, { valor: 'previsto', rotulo: 'Agenda prevista (sem apontamento)' },
 ];
 /** A origem está no filtro? (nenhuma marcada = todas) */
-export const temOrigem = (sel: readonly string[], o: OrigemSel) => !ORIGENS.some(x => sel.includes(x.valor)) || sel.includes(o);
+export const temOrigem = (sel: readonly string[], o: OrigemSel) => passa(montarSelecao(marcadosDe(sel).filter(v => ORIGENS.some(x => x.valor === v)), ocultando(sel)), o);
 /** p_origem de v1_apontamentos (0112): 'tudo' ou a lista separada por vírgula; a OS manual acompanha a do Sankhya OM. */
 export function origemParam(sel: readonly string[]): string {
   const m = ORIGENS.map(o => o.valor).filter(o => temOrigem(sel, o));
-  return m.length === ORIGENS.length ? 'tudo' : m.flatMap(o => (o === 'sankhya_om' ? ['sankhya_om', 'manual'] : [o])).join(',');
+  return m.length === ORIGENS.length || m.length === 0 ? 'tudo' : m.flatMap(o => (o === 'sankhya_om' ? ['sankhya_om', 'manual'] : [o])).join(',');
 }
 /** Rótulo curto do total conforme o filtro: "OS + app + previsto". */
 export const rotuloOrigens = (sel: readonly string[]) =>
@@ -35,6 +36,18 @@ export interface RelatorioApontamentos {
   horas: number; horas_os: number; horas_app: number; total: number; itens: LinhaApontamento[];
   /** 0110: agendas sem apontamento do filtro (0 quando o filtro só traz apontamentos). 0112: horas_total = apontado + previsto. */
   horas_previstas?: number; total_previstas?: number; horas_total?: number;
+}
+/**
+ * Relatório só dos consultores que a seleção deixa passar (seleção múltipla com Exibir/Ocultar). O banco filtra um
+ * consultor ou nenhum; com vários, a tela pede todos e recorta aqui, refazendo os totais pelas linhas recebidas.
+ */
+export function recortarApontamentos(r: RelatorioApontamentos, sel: readonly string[]): RelatorioApontamentos {
+  if (semSelecao(sel)) return r;
+  const itens = r.itens.filter(a => passa(sel, a.consultor_id));
+  const soma = (f: (a: LinhaApontamento) => boolean) => itens.reduce((s, a) => s + (f(a) ? a.horas : 0), 0);
+  const previstas = itens.filter(a => a.origem === 'previsto').length;
+  return { ...r, itens, total: itens.length, total_previstas: previstas, horas: soma(a => a.origem !== 'previsto'), horas_os: soma(a => a.origem !== 'app' && a.origem !== 'previsto'),
+    horas_app: soma(a => a.origem === 'app'), horas_previstas: soma(a => a.origem === 'previsto'), horas_total: soma(() => true) };
 }
 export type SituacaoPedido = 'aberto' | 'atendido' | 'recusado';
 export interface PedidoAgenda {

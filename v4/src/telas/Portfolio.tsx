@@ -5,10 +5,10 @@
 // 3.25.0 (V13c-1): saldo dos pedidos do Experience × horas agendadas (seção própria e coluna "Pedido" na tabela).
 // V4 4.2.0: barra de filtros no topo (acima dos cartões) com os mesmos filtros da tela de Demandas + GP; os filtros de
 // demanda (status, etapa, responsável, tipo, prioridade, só atrasadas) mostram os projetos que têm demanda assim.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
-import { PRIORIDADES, STATUS_V4, todasDemandas } from '../api/execucao';
-import { ABERTAS, lerStatus, rotuloStatus, TODOS } from '../api/relatorios';
+import { PRIORIDADES, todasDemandas } from '../api/execucao';
+import { ABERTAS, TODOS } from '../api/relatorios';
 import { BarraFiltros } from '../componentes/BarraFiltros';
 import { FiltrosSalvos } from '../componentes/FiltrosSalvos';
 import { useEquipe } from '../estado/equipe';
@@ -28,6 +28,7 @@ import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { marcadosDe, montarSelecao, ocultando, passa, semSelecao } from '../util/selecao';
+import { OPCOES_STATUS, selDeStatus, STATUS_PADRAO, useStatusFiltro } from '../estado/statusFiltro';
 
 /** Cartões de fase e barras de GP: destacado = está passando num filtro com algo marcado; o clique marca/desmarca no modo atual (Exibir ou Ocultar). */
 const naSel = (sel: string[], v: string) => !semSelecao(sel) && passa(sel, v);
@@ -87,12 +88,8 @@ export function Portfolio() {
   const { porId } = useEquipe();
   const et = useEtapas();
   const { f, mudar, limpar, aplicar, ativos } = useFiltroLista('portfolio', PADRAO_PORTFOLIO);
-  const [status, setStatus] = useState<string[]>(() => { try { return lerStatus(localStorage.getItem(CHAVE_STATUS)); } catch { return ABERTAS; } });
-  useEffect(() => { try { localStorage.setItem(CHAVE_STATUS, JSON.stringify(status)); } catch { /* sem armazenamento */ } }, [status]);
-  const trocar = (banco: string[]) => setStatus(l => {
-    const n = banco.every(v => l.includes(v)) ? l.filter(x => !banco.includes(x)) : [...new Set([...l, ...banco])];
-    return n.length ? TODOS.filter(x => n.includes(x)) : l;
-  });
+  // Status no padrão dos filtros: escolha nos status da V4 (com Exibir/Ocultar); `status` é a lista do banco
+  const { sel: statusSel, setSel: setStatusSel, status } = useStatusFiltro(CHAVE_STATUS);
   const [plano, setPlano] = useState<Partial<DemandaProjeto> | null>(null);
   // demandas dos status escolhidos: dão as opções de etapa/responsável e dizem que projeto tem demanda que passa no filtro
   const dem = useCarga(() => todasDemandas(esc, status.length === TODOS.length ? null : status), [esc, status.join(), ed.geracao]);
@@ -116,7 +113,7 @@ export function Portfolio() {
       projetos: opcoesNomeadas(ps.filter(p => passa(f.clientes, p.cliente_id)).map(p => [p.id, `${p.cliente} · ${p.nome}`])),
     };
   }, [demandas, ps, porId, f.clientes, et]);
-  const limparTudo = () => { limpar(); setStatus(ABERTAS); };
+  const limparTudo = () => { limpar(); setStatusSel(STATUS_PADRAO); };
   const aguardaDemandas = filtraPorDemanda(f, statusRestringe) && !demandas;
   const planos = useMemo(() => planosPorCliente(c.dados?.riscos ?? [], ps), [c.dados, ps]);
   const podePlano = pode('demanda.criar');
@@ -156,16 +153,7 @@ export function Portfolio() {
       <header className="pagina-topo"><div><h1>Portfólio de projetos</h1><p className="ajuda">Projetos ativos por fase e GP, Go Live, atraso, horas e riscos ativos. Os filtros são os mesmos da tela de Demandas: status, etapa, responsável, tipo, prioridade e "só atrasadas" mostram os projetos que têm demanda assim. Toque nos cartões e nas barras para filtrar (vários de uma vez). No Gantt, projeto Avulso só aparece com cronograma.</p></div></header>
       <BarraFiltros nome="projetos" n={c.dados ? lista.length : null} total={c.dados ? ps.length : null} ativos={ativos + (statusFora ? 1 : 0)} aoLimpar={limparTudo}>
         <input type="search" value={f.texto} onChange={e => mudar({ texto: e.target.value })} placeholder="Buscar projeto, cliente, GP ou fase" aria-label="Buscar projeto" />
-        <details className="filtro-status">
-          <summary>Status: {rotuloStatus(status)}</summary>
-          <div className="filtro-status-caixa">
-            <div className="linha">
-              <button type="button" className="link" onClick={() => setStatus(ABERTAS)}>Abertas</button>
-              <button type="button" className="link" onClick={() => setStatus(TODOS)}>Todas</button>
-            </div>
-            {STATUS_V4.map(s => <label key={s.valor} className="check"><input type="checkbox" checked={s.banco.every(v => status.includes(v))} onChange={() => trocar(s.banco)} /> {s.rotulo}</label>)}
-          </div>
-        </details>
+        <SelecaoMultipla ocultar rotulo="Status" opcoes={OPCOES_STATUS} sel={statusSel} aoMudar={setStatusSel} resumo={mesmos(status, ABERTAS) ? 'abertas' : undefined} />
         <SelecaoMultipla ocultar rotulo="Fase" opcoes={fasesDe(ps)} sel={f.fases} aoMudar={setFases} />
         <SelecaoMultipla ocultar rotulo="GP" opcoes={gpsDe(ps)} sel={f.gps} aoMudar={setGps} />
         <SelecaoMultipla ocultar rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
@@ -175,8 +163,8 @@ export function Portfolio() {
         <SelecaoMultipla ocultar rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />
         <SelecaoMultipla ocultar rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
         <label className="check"><input type="checkbox" checked={f.atrasadas} onChange={e => mudar({ atrasadas: e.target.checked })} /> Só atrasadas</label>
-        <FiltrosSalvos tela="portfolio" atuais={{ ...f, statusLista: status }}
-          aoAplicar={x => { aplicar(x); setStatus(Array.isArray(x.statusLista) ? lerStatus(JSON.stringify(x.statusLista)) : ABERTAS); }} />
+        <FiltrosSalvos tela="portfolio" atuais={{ ...f, statusSel }}
+          aoAplicar={x => { aplicar(x); setStatusSel(selDeStatus(x.statusSel ?? x.statusLista)); }} />
         <span className="filtro-nivel" role="group" aria-label="Nível em que os filtros são aplicados" title="Vale para os filtros de demanda (status, etapa, responsável, tipo, prioridade, só atrasadas)">
           Aplicar filtros em
           <span className="filtro-nivel-ops">

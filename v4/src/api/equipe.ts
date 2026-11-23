@@ -5,7 +5,7 @@ import { STATUS_DEMANDA, type Autoria } from './execucao';
 import { diaNum, hojeIso, somarDias } from './projeto';
 import { temTexto } from '../estado/filtro';
 import { SEM } from '../estado/filtrosLista';
-import { marcadosDe, ocultando, passa as naSelecao } from '../util/selecao';
+import { marcadosDe, ocultando, passa as naSelecao, passaEm as naSelecaoEm } from '../util/selecao';
 
 // ---------------------------------------------------------------- tipos
 export interface TarefaGrade {
@@ -94,7 +94,7 @@ const RANK_PRIORIDADE = ['urgente', 'alta', 'normal', 'baixa'];
  * Filtros do backlog além do texto e do status. `etapas` e `tipos`: os mesmos filtros Etapa e Tipo da tela de Demandas
  * (lista vazia = todos; SEM = sem etapa). `nivel`: o mesmo "Aplicar filtros em" de lá.
  */
-export interface FiltroBacklogExtra { nivel?: string; gp?: string; soSemAgenda?: boolean; etapas?: readonly string[]; tipos?: readonly string[] }
+export interface FiltroBacklogExtra { nivel?: string; /** GP responsável: lista (Exibir/Ocultar) ou o id único antigo. */ gp?: string | readonly string[]; soSemAgenda?: boolean; etapas?: readonly string[]; tipos?: readonly string[] }
 type RegEtapa = { etapa_id?: string | null; etapa?: string | null };
 /**
  * Põe em cada item a etapa do app (dele e da mãe) pelo mesmo cadastro e de/para que a tela de Demandas usa — é o que faz as
@@ -124,7 +124,7 @@ export function filtrarBacklog(itens: ItemBacklog[], texto = '', statusFora: Rea
   { nivel = '', gp = '', soSemAgenda = false, etapas = [], tipos = [] }: FiltroBacklogExtra = {}): ItemBacklog[] {
   const ids = new Set(itens.map(i => i.id));
   const ehSub = (i: ItemBacklog) => !!i.pai_id && ids.has(i.pai_id);
-  const passa = (i: ItemBacklog) => !statusFora.has(i.status) && (!gp || i.gp_id === gp)
+  const passa = (i: ItemBacklog) => !statusFora.has(i.status) && naSelecaoEm(gp, i.gp_id)
     && naSelecao(etapas, etapaItem(i) || etapaMae(i) || SEM)
     && naSelecao(tipos, i.tipo || 'entregavel')
     && (!soSemAgenda || !i.agendas)

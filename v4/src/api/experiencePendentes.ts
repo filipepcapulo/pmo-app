@@ -3,6 +3,7 @@
 // Ajuste = alterar ("Alterar"), Exclusão = excluir ("Lixeira"). São as mesmas tarefas que o Sync com o Experience trata.
 import { rpc } from './cliente';
 import type { AcaoSync, Modo, ResultadoSync } from './syncExperience';
+import { passaEm } from '../util/selecao';
 
 export interface LinhaPendente extends Record<string, unknown> {
   id: string; tarefa: string; consultor_id: string; consultor: string; data: string; periodo: string; ini: string | null; fim: string | null;
@@ -49,9 +50,10 @@ export function avisosPendente(l: Pick<LinhaPendente, 'fap' | 'projeto_inativo' 
   return a;
 }
 
-export interface FiltroPendentes { acao: AcaoSync | ''; consultor: string; apontamento: string }
+/** consultor e apontamento: lista (seleção múltipla com Exibir/Ocultar) ou o valor único antigo ('' = todos). */
+export interface FiltroPendentes { acao: AcaoSync | ''; consultor: string | readonly string[]; apontamento: string | readonly string[] }
 export function filtrarPendentes(ls: LinhaPendente[], f: FiltroPendentes): LinhaPendente[] {
-  return ls.filter(l => (!f.acao || l.acao === f.acao) && (!f.consultor || l.consultor_id === f.consultor) && (!f.apontamento || l.apontamento === f.apontamento));
+  return ls.filter(l => (!f.acao || l.acao === f.acao) && passaEm(f.consultor, l.consultor_id) && passaEm(f.apontamento, l.apontamento));
 }
 export function totaisPendentes(ls: Pick<LinhaPendente, 'acao'>[]): Record<AcaoSync, number> {
   const t: Record<AcaoSync, number> = { criar: 0, alterar: 0, excluir: 0 };

@@ -11,6 +11,7 @@ import { Popup } from '../componentes/Popup';
 import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
 import { useSessao } from '../estado/sessao';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 
 type Rascunho = { id?: string; versao?: number; titulo: string; descricao: string; status: string; resposta: string };
 
@@ -18,7 +19,7 @@ export function Sugestoes() {
   const esc = useSessao().eu!.escritorio_id!;
   const avisar = useToast();
   const c = useCarga(() => sug.listar(esc), [esc]);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState<string[]>([]);
   const [minhas, setMinhas] = useState(false);
   const [r, setR] = useState<Rascunho | null>(null);
   const [gravando, setGravando] = useState(false);
@@ -66,10 +67,7 @@ export function Sugestoes() {
         <Botao variante="primario" onClick={() => setR({ titulo: '', descricao: '', status: 'nova', resposta: '' })}>+ Sugestão</Botao>
       </header>
       <div className="barra-filtros">
-        <select value={status} onChange={e => setStatus(e.target.value)} aria-label="Status">
-          <option value="">Todos os status</option>
-          {STATUS_SUGESTAO.map(s => <option key={s.valor} value={s.valor}>{s.rotulo}</option>)}
-        </select>
+        <SelecaoMultipla ocultar rotulo="Status" opcoes={STATUS_SUGESTAO} sel={status} aoMudar={setStatus} />
         <label className="ajuda"><input type="checkbox" checked={minhas} onChange={e => setMinhas(e.target.checked)} /> Só as minhas</label>
       </div>
       {c.erro && <p className="msg-erro">{c.erro}</p>}

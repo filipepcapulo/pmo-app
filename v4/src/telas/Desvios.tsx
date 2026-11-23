@@ -3,18 +3,19 @@ import { useMemo, useState } from 'react';
 import { horas } from '../api/cadastros';
 import { desvios, type IndicadorDesvio } from '../api/desvios';
 import { hojeIso, somarDias } from '../api/projeto';
-import { ListaDesvios } from '../componentes/ListaDesvios';
+import { ListaDesvios, SITUACOES_DESVIO } from '../componentes/ListaDesvios';
 import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { useSessao } from '../estado/sessao';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 
 export function Desvios() {
   const esc = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
   const [de, setDe] = useState(() => somarDias(hojeIso(), -30));
   const [ate, setAte] = useState(hojeIso);
-  const [situacao, setSituacao] = useState('');
+  const [situacao, setSituacao] = useState<string[]>([]);
   const ind = useCarga(() => desvios.indicador(esc, de, ate), [esc, de, ate, ed.geracao]);
   const colunas = useMemo<Coluna<IndicadorDesvio>[]>(() => [
     { chave: 'consultor', titulo: 'Consultor' },
@@ -29,9 +30,7 @@ export function Desvios() {
     <div className="pagina">
       <header className="pagina-topo"><div><h1>Desvios de agenda</h1><p className="ajuda">Aprove ou recuse os desvios dos seus projetos. Quantidade e horas somam pendentes e aprovados.</p></div></header>
       <div className="barra-filtros">
-        <select value={situacao} onChange={e => setSituacao(e.target.value)} aria-label="Situação">
-          <option value="">Todas as situações</option><option value="pendente">Pendentes</option><option value="aprovado">Aprovados</option><option value="recusado">Recusados</option>
-        </select>
+        <SelecaoMultipla ocultar rotulo="Situação" opcoes={SITUACOES_DESVIO} sel={situacao} aoMudar={setSituacao} />
         <label className="ajuda">De <input type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} aria-label="De" /></label>
         <label className="ajuda">Até <input type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} aria-label="Até" /></label>
       </div>

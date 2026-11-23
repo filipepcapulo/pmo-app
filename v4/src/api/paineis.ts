@@ -6,6 +6,7 @@ import { novaOperacao, rpc } from './cliente';
 import type { Gravado } from './cadastros';
 import { rotuloPeriodo, rotuloPrioridade, rotuloStatusDemanda, rotuloStatusTarefa } from './execucao';
 import { rotuloAgenda } from './equipe';
+import { passa, semSelecao } from '../util/selecao';
 
 export type Fonte = 'tarefas' | 'demandas' | 'chamados' | 'apontamentos';
 export type TipoPainel = 'tabela' | 'linha_tempo' | 'graficos';
@@ -99,11 +100,11 @@ export function normalizar(fonte: Fonte, linhas: Record<string, unknown>[]): Lin
 const texto = (v: string | number | null | undefined) => (v === null || v === undefined || v === '' ? VAZIO : String(v));
 export const num = (v: string | number | null | undefined) => (typeof v === 'number' ? v : v ? Number(v) || 0 : 0);
 
-/** Filtro por campo: lista vazia = todos; a linha passa se o valor do campo estiver entre os escolhidos. */
+/** Filtro por campo: lista vazia = todos; Exibir = o valor está entre os marcados; Ocultar = não está (util/selecao). */
 export function filtrar(linhas: Linha[], filtros: Filtros | undefined): Linha[] {
-  const ativos = Object.entries(filtros ?? {}).filter(([, v]) => v.length > 0);
+  const ativos = Object.entries(filtros ?? {}).filter(([, v]) => !semSelecao(v));
   if (!ativos.length) return linhas;
-  return linhas.filter(l => ativos.every(([c, v]) => v.includes(texto(l[c]))));
+  return linhas.filter(l => ativos.every(([c, v]) => passa(v, texto(l[c]))));
 }
 /** Valores que existem num campo, em ordem alfabética (para montar o filtro). */
 export function valoresDe(linhas: Linha[], campo: string): string[] {

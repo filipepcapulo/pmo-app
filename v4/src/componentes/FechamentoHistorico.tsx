@@ -3,13 +3,15 @@
 // Vem do "Produtividade SK" (tela Histórico). Papéis dono e fechamento do cofre.
 import { useEffect, useMemo, useState } from 'react';
 import { data } from '../api/cadastros';
-import { fech, filtrarHistorico, hm, planilhaHistorico, ROTULO_CAT, totaisHistorico, type FiltroHistorico, type LinhaFech, type Recorte } from '../api/fechamentoFin';
+import { fech, filtrarHistorico, hm, ORIGENS_HISTORICO, planilhaHistorico, ROTULO_CAT, totaisHistorico, type FiltroHistorico, type LinhaFech, type Recorte } from '../api/fechamentoFin';
 import { reais } from '../api/financeiro';
 import { useCarga } from '../estado/carga';
 import { baixarXlsx } from '../util/xlsx';
 import { AjusteHoras } from './AjusteHoras';
 import { Botao } from './Botao';
 import { Popup } from './Popup';
+import { comoSelecao } from '../util/selecao';
+import { SelecaoMultipla } from './SelecaoMultipla';
 
 const PAGINA = 150;
 
@@ -33,13 +35,8 @@ export function FechamentoHistorico({ esc, recorte, oculto, inicial, aoMudar }: 
   return (
     <>
       <div className="barra-filtros">
-        <select aria-label="Consultor" value={f.consultor} onChange={e => setF({ ...f, consultor: e.target.value })}>
-          <option value="">Todos os consultores</option>
-          {consultores.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
-        </select>
-        <select aria-label="Origem" value={f.origem} onChange={e => setF({ ...f, origem: e.target.value as FiltroHistorico['origem'] })}>
-          <option value="">Todas as origens</option><option value="OS">OS</option><option value="Planilha">Planilha</option>
-        </select>
+        <SelecaoMultipla ocultar rotulo="Consultor" opcoes={consultores.map(([id, n]) => ({ valor: id, rotulo: n }))} sel={comoSelecao(f.consultor)} aoMudar={v => setF({ ...f, consultor: v })} />
+        <SelecaoMultipla ocultar rotulo="Origem" opcoes={ORIGENS_HISTORICO} sel={comoSelecao(f.origem)} aoMudar={v => setF({ ...f, origem: v })} />
         <input type="search" aria-label="Buscar" placeholder="Buscar cliente, OS, atividade, observação…" value={f.busca} onChange={e => setF({ ...f, busca: e.target.value })} />
         <label className="ajuda fin-marcar"><input type="checkbox" checked={f.soAjustados} onChange={e => setF({ ...f, soAjustados: e.target.checked })} /> Só ajustados</label>
         <span className="a-esquerda" />

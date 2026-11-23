@@ -8,7 +8,7 @@
 // são os mesmos filtros da tela de Demandas, pelo mesmo cadastro de etapas; o backlog não tem mais "Origem".
 import { useEffect, useMemo, useState } from 'react';
 import { arvoreBacklog, comEtapasBacklog, porProjeto, rotuloAgendas, statusBacklog, type ItemBacklog } from '../api/equipe';
-import { rotuloPrioridade } from '../api/execucao';
+import { rotuloPrioridade, STATUS_DEMANDA } from '../api/execucao';
 import { relatorioBacklog } from '../api/relatorios';
 import { baixarRelatorioHtml } from '../util/relatorioHtml';
 import { useEdicao } from '../estado/edicao';
@@ -20,9 +20,17 @@ import { Icone } from './Icone';
 import { PilulaEtapa } from './Pilulas';
 import { Resumo } from './Resumo';
 import { SelecaoMultipla } from './SelecaoMultipla';
-import { semSelecao, textoSelecao } from '../util/selecao';
+import { montarSelecao, passa, semSelecao, textoSelecao } from '../util/selecao';
 
-const lerFora = (k: string) => { try { return new Set<string>(JSON.parse(localStorage.getItem(k) || '[]')); } catch { return new Set<string>(); } };
+/** Status do backlog guardado no aparelho: a seleção nova ou, de antes da 4.28.0, a lista dos status escondidos (= Ocultar). */
+const lerStatusSel = (k: string): string[] => {
+  try {
+    const novo = JSON.parse(localStorage.getItem(`${k}.sel`) ?? 'null');
+    if (Array.isArray(novo)) return novo.filter((x): x is string => typeof x === 'string');
+    const fora = JSON.parse(localStorage.getItem(k) || '[]');
+    return Array.isArray(fora) ? montarSelecao(fora.filter((x): x is string => typeof x === 'string'), true) : [];
+  } catch { return []; }
+};
 
 function IrPara({ entidade, id, nome }: { entidade: Entidade; id: string; nome: string }) {
   return <a className="bl-editar" href={hashDe(caminhoEntidade(entidade, id))} aria-label={`Abrir ${entidade} ${nome}`} title={`Abrir ${entidade}`}><Icone nome="lapis" tam={15} /></a>;
@@ -66,15 +74,16 @@ export function BacklogLateral({ itens: brutos, erro, marcados, aoMarcar, aoArra
   const [texto, setTexto] = useState('');
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   const chaveStatus = 'pmo4.backlog.status.geral';
-  const [fora, setFora] = useState(() => lerFora(chaveStatus));
+  const [statusSel, setStatusSel] = useState(() => lerStatusSel(chaveStatus));
   const [soSemAgenda, setSoSemAgenda] = useState(false);
   // "Aplicar filtros em": o mesmo da tela de Demandas (guardado no aparelho)
   const chaveNivel = 'pmo4.backlog.nivel.geral';
   const [nivel, setNivel] = useState(() => { try { const v = localStorage.getItem(chaveNivel) ?? ''; return NIVEIS_FILTRO.some(n => n.valor === v) ? v : ''; } catch { return ''; } });
   useEffect(() => { try { localStorage.setItem(chaveNivel, nivel); } catch { /* */ } }, [nivel, chaveNivel]);
   const { lista } = useEquipe();
-  const [gp, setGp] = useState('');
-  useEffect(() => { try { localStorage.setItem(chaveStatus, JSON.stringify([...fora])); } catch { /* */ } }, [fora, chaveStatus]);
+  const [gp, setGp] = useState<string[]>([]);
+  useEffect(() => { try { localStorage.setItem(`${chaveStatus}.sel`, JSON.stringify(statusSel)); } catch { /* */ } }, [statusSel, chaveStatus]);
+  const fora = useMemo(() => new Set(STATUS_DEMANDA.map(s => s.valor as string).filter(v => !passa(statusSel, v))), [statusSel]);
   const arvore = useMemo(() => arvoreBacklog(itens ?? [], texto, fora, { nivel, gp, soSemAgenda, etapas, tipos }), [itens, etapas, tipos, texto, fora, soSemAgenda, gp, nivel]);
   // as mesmas opções de Etapa da tela de Demandas: etapas ativas (ou em uso) do cadastro e "(sem etapa)"
   const opcoesEtapa = useMemo(() => [...et.lista.filter(e => e.ativo || (itens ?? []).some(i => i.etapa_app_id === e.id)).map(e => ({ valor: e.id, rotulo: e.nome })),
@@ -92,13 +101,12 @@ export function BacklogLateral({ itens: brutos, erro, marcados, aoMarcar, aoArra
       semSelecao(etapas) ? '' : `Etapa: ${textoSelecao(etapas, e => opcoesEtapa.find(o => o.valor === e)?.rotulo ?? e)}`,
       semSelecao(tipos) ? '' : `Tipo: ${textoSelecao(tipos, t => TIPOS_DEMANDA.find(o => o.valor === t)?.rotulo ?? t)}`,
       `Status: ${escolhidos.length === opcoesStatus.length ? 'todos' : escolhidos.map(o => o.rotulo).join(', ') || 'nenhum'}`,
-      gp ? `GP: ${lista.find(m => m.id === gp)?.nome ?? ''}` : '', texto.trim() ? `Busca: ${texto.trim()}` : '',
+      semSelecao(gp) ? '' : `GP: ${textoSelecao(gp, id => lista.find(m => m.id === id)?.nome ?? id)}`, texto.trim() ? `Busca: ${texto.trim()}` : '',
       soSemAgenda ? 'Sem agenda em aberto' : '',
       nivel ? `Nível dos filtros: ${NIVEIS_FILTRO.find(n => n.valor === nivel)?.rotulo ?? nivel}` : '',
     ].filter(Boolean);
     baixarRelatorioHtml(relatorioBacklog(arvore, f));
   }
-  const trocarStatus = (v: string) => setFora(s => { const n = new Set(s); if (n.has(v)) n.delete(v); else n.add(v); return n; });
   const alternar = (id: string) => setAbertos(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   // com filtro de texto tudo abre: quem busca quer ver o item
   const aberto = (id: string) => !!texto.trim() || abertos.has(id);
@@ -120,17 +128,9 @@ export function BacklogLateral({ itens: brutos, erro, marcados, aoMarcar, aoArra
       <div className="bl-filtros">
         <SelecaoMultipla ocultar rotulo="Etapa" opcoes={opcoesEtapa} sel={etapas} aoMudar={setEtapas} />
         <SelecaoMultipla ocultar rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={tipos} aoMudar={setTipos} />
-        <select value={gp} onChange={e => setGp(e.target.value)} aria-label="GP responsável">
-          <option value="">GP responsável: todos</option>
-          {opcoesGp.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
-        </select>
+        <SelecaoMultipla ocultar rotulo="GP responsável" opcoes={opcoesGp.map(m => ({ valor: m.id, rotulo: m.nome }))} sel={gp} aoMudar={setGp} />
         <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Buscar demanda, cliente, projeto ou etapa" aria-label="Buscar no backlog" />
-        <details className="bl-status">
-          <summary>Status: {escolhidos.length === opcoesStatus.length ? 'todos' : `${escolhidos.length} de ${opcoesStatus.length}`}</summary>
-          {opcoesStatus.map(o => (
-            <label key={o.valor} className="check"><input type="checkbox" checked={!fora.has(o.valor)} onChange={() => trocarStatus(o.valor)} /> {o.rotulo} <small>{o.total}</small></label>
-          ))}
-        </details>
+        <SelecaoMultipla ocultar rotulo="Status" opcoes={opcoesStatus.map(o => ({ valor: o.valor, rotulo: `${o.rotulo} (${o.total})` }))} sel={statusSel} aoMudar={setStatusSel} />
         <label className="check bl-so-sem"><input type="checkbox" checked={soSemAgenda} onChange={e => setSoSemAgenda(e.target.checked)} /> Esconder o que já tem agenda</label>
         <span className="filtro-nivel bl-nivel" role="group" aria-label="Nível em que os filtros são aplicados" title="Vale para todos os filtros acima">
           Aplicar filtros em

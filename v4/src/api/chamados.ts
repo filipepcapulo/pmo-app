@@ -2,6 +2,7 @@
 // `api.v1_chamado*` (0032) e as regras puras da tela (validação do formulário, matriz, relógio de SLA e extrato).
 import { novaOperacao, rpc } from './cliente';
 import { rotuloPrioridade, type Anexo, type Demanda, type Tarefa, type TotaisDemanda } from './execucao';
+import { passa, semSelecao } from '../util/selecao';
 
 // ---------------------------------------------------------------- opções (as mesmas do formulário do 2.x)
 type Op = { valor: string; rotulo: string; detalhe?: string };
@@ -84,6 +85,26 @@ export interface Indicadores {
 }
 export interface FiltrosChamado {
   texto?: string; situacao?: string[]; cliente?: string; fila?: string; prioridade?: string; abertos?: boolean; sem_agenda?: boolean; vencidos?: boolean; ordem?: 'backlog';
+}
+
+/** Escolhas da busca de chamados no padrão dos filtros (seleção múltipla com Exibir/Ocultar). */
+export interface SelecaoChamados { situacoes: readonly string[]; prioridades: readonly string[]; filas: readonly string[] }
+/**
+ * O que pedir ao banco e o que recortar na tela. O banco aceita várias situações, mas uma prioridade e uma fila só:
+ * com uma escolhida vai no filtro; com várias, a tela busca tudo (`local`) e recorta as linhas. `nada` = a escolha
+ * esconde todos os valores de algum filtro.
+ */
+export function planoBuscaChamados(base: FiltrosChamado, s: SelecaoChamados, prioridades: readonly string[]) {
+  const efetivos = (todos: readonly string[], sel: readonly string[]) => {
+    if (semSelecao(sel)) return null;
+    const v = todos.filter(x => passa(sel, x));
+    return v.length === todos.length ? null : v;
+  };
+  const sit = efetivos(SITUACOES.map(x => x.valor), s.situacoes), pri = efetivos(prioridades, s.prioridades), fila = efetivos(FILAS.map(x => x.valor), s.filas);
+  const varios = (v: string[] | null) => !!v && v.length > 1;
+  const filtro: FiltrosChamado = { ...base, situacao: sit ?? undefined, prioridade: pri?.length === 1 ? pri[0] : undefined, fila: fila?.length === 1 ? fila[0] : undefined };
+  const local = varios(pri) || varios(fila) ? (c: Pick<ChamadoLinha, 'prioridade' | 'fila'>) => (!pri || pri.includes(c.prioridade)) && (!fila || fila.includes(c.fila)) : null;
+  return { nada: [sit, pri, fila].some(v => v?.length === 0), filtro, local };
 }
 
 const salvar = <T = unknown>(funcao: string, esc: string, d: unknown) =>

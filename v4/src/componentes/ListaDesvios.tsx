@@ -13,6 +13,7 @@ import { Campo, Formulario } from './Campo';
 import { Popup } from './Popup';
 import { Tabela, type Coluna } from './Tabela';
 import { useToast } from './Toasts';
+import { passaEm } from '../util/selecao';
 
 function Decidir({ d, decisao, aoFechar, aoGravar }: { d: Desvio; decisao: 'aprovar' | 'recusar'; aoFechar: () => void; aoGravar: () => void }) {
   const esc = useSessao().eu!.escritorio_id!;
@@ -52,10 +53,16 @@ function Decidir({ d, decisao, aoFechar, aoGravar }: { d: Desvio; decisao: 'apro
   );
 }
 
-export function ListaDesvios({ meus, de, ate, situacao = '' }: { meus?: boolean; de: string; ate: string; situacao?: string }) {
+/** Situações do desvio, para o filtro da tela. */
+export const SITUACOES_DESVIO = [{ valor: 'pendente', rotulo: 'Pendentes' }, { valor: 'aprovado', rotulo: 'Aprovados' }, { valor: 'recusado', rotulo: 'Recusados' }];
+
+/** situacao: lista (seleção múltipla com Exibir/Ocultar; filtra aqui) ou o valor único antigo (filtra no banco). */
+export function ListaDesvios({ meus, de, ate, situacao = '' }: { meus?: boolean; de: string; ate: string; situacao?: string | readonly string[] }) {
   const esc = useSessao().eu!.escritorio_id!;
   const ed = useEdicao();
-  const c = useCarga(() => desvios.lista(esc, { de, ate, situacao, meus }), [esc, de, ate, situacao, meus, ed.geracao]);
+  const noBanco = typeof situacao === 'string' ? situacao : '';
+  const c = useCarga(() => desvios.lista(esc, { de, ate, situacao: noBanco, meus }), [esc, de, ate, noBanco, meus, ed.geracao]);
+  const linhas = useMemo(() => (c.dados ?? []).filter(d => passaEm(situacao, d.situacao)), [c.dados, situacao]);
   const [acao, setAcao] = useState<{ d: Desvio; decisao: 'aprovar' | 'recusar' } | null>(null);
   const colunas = useMemo<Coluna<Desvio>[]>(() => [
     { chave: 'data', titulo: 'Data', texto: d => data(d.data) },
@@ -80,8 +87,8 @@ export function ListaDesvios({ meus, de, ate, situacao = '' }: { meus?: boolean;
     <>
       {c.erro && <p className="msg-erro">{c.erro}</p>}
       {c.carregando && !c.dados && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}
-      {c.dados && (c.dados.length
-        ? <Tabela id={meus ? 'meus-desvios' : 'desvios'} nome={meus ? 'Meus desvios' : 'Desvios de agenda'} colunas={colunas} linhas={c.dados} chave={d => d.id} />
+      {c.dados && (linhas.length
+        ? <Tabela id={meus ? 'meus-desvios' : 'desvios'} nome={meus ? 'Meus desvios' : 'Desvios de agenda'} colunas={colunas} linhas={linhas} chave={d => d.id} />
         : <p className="ajuda">Nenhum desvio no período.</p>)}
       {acao && <Decidir d={acao.d} decisao={acao.decisao} aoFechar={() => setAcao(null)} aoGravar={() => { setAcao(null); ed.mudou(); }} />}
     </>

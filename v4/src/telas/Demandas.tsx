@@ -151,9 +151,13 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
         <SelecaoMultipla ocultar rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
         <SelecaoMultipla ocultar rotulo="Cliente" opcoes={ops.clientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
         <SelecaoMultipla ocultar rotulo="Projeto" opcoes={ops.projetos} sel={f.projetos} aoMudar={v => mudar({ projetos: v })} />
-        <select aria-label="Situação do projeto" value={f.sitProjeto} onChange={e => mudar({ sitProjeto: e.target.value })}>
-          {SIT_PROJETO.map(o => <option key={o.valor || 'todos'} value={o.valor}>{o.rotulo}</option>)}
-        </select>
+        <details className="pf-multi" data-filtro="sit-projeto">
+          <summary aria-label={`Situação do projeto: ${SIT_PROJETO.find(o => o.valor === f.sitProjeto)?.rotulo ?? ''}`}>Projetos: {f.sitProjeto || 'todos'}</summary>
+          <div className="pf-multi-lista" role="radiogroup" aria-label="Situação do projeto">
+            {SIT_PROJETO.map(o => <label key={o.valor || 'todos'} className="check"><input type="radio" name="sit-projeto" checked={f.sitProjeto === o.valor}
+              onChange={e => { mudar({ sitProjeto: o.valor }); e.currentTarget.closest('details')?.removeAttribute('open'); }} /> {o.rotulo.replace('Projetos a', 'A').replace('Projetos i', 'I')}</label>)}
+          </div>
+        </details>
         <SelecaoMultipla ocultar rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />
         <SelecaoMultipla ocultar rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
         <label className="check"><input type="checkbox" checked={f.atrasadas} onChange={e => mudar({ atrasadas: e.target.checked })} /> Só atrasadas</label>

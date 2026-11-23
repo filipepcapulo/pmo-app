@@ -225,6 +225,18 @@ export async function urlAnexo(caminho: string, segundos = 3600): Promise<string
   if (r.error || !r.data) throw new Error('Não foi possível abrir o anexo.');
   return r.data.signedUrl;
 }
+/** Link assinado que baixa em vez de abrir: o Storage devolve o arquivo como download, com o nome original (4.24.0). */
+export const linkDownload = (url: string, nome: string) => `${url}${url.includes('?') ? '&' : '?'}download=${encodeURIComponent(nome)}`;
+/** Baixa o anexo com o nome original, sem sair da tela (link assinado de 2 min). */
+export async function baixarAnexo(a: Pick<Anexo, 'caminho' | 'nome'>) {
+  const link = document.createElement('a');
+  link.href = linkDownload(await urlAnexo(a.caminho, 120), a.nome);
+  link.download = a.nome;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
 /** Como o anexo aparece na galeria: o tipo informado no envio vale; sem ele, a extensão do nome. */
 export type VisualAnexo = 'imagem' | 'pdf' | 'video' | 'outro';
 export function visualAnexo(a: Pick<Anexo, 'nome' | 'tipo'>): VisualAnexo {

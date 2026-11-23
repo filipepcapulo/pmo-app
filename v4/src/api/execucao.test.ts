@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreDemandas, caminhoAnexo, cascataDemandas, fatiasBarra, horarioInvalido, mencoesNoTexto, semAlerta } from './execucao';
+import { arvoreDemandas, caminhoAnexo, linkDownload, cascataDemandas, fatiasBarra, horarioInvalido, mencoesNoTexto, semAlerta } from './execucao';
 
 describe('Atendimento Avulso sem alerta (0073)', () => {
   it('a marca vem na demanda ou nos totais dela', () => {
@@ -107,5 +107,15 @@ describe('horas do período na edição da tarefa (4.16.1)', () => {
     expect(ajudaHorasPeriodo('dia', false, { periodo: 'dia', horas_previstas: 8 }, periodos)).toBe('8 h previstas');
     expect(ajudaHorasPeriodo('dia', false, null, periodos)).toBe('8 h previstas');
     expect(ajudaHorasPeriodo('livre', false, semPeriodo, periodos)).toBeUndefined();
+  });
+});
+
+describe('link de download do anexo (4.24.0)', () => {
+  it('acrescenta download com o nome original codificado ao link assinado', () => {
+    expect(linkDownload('https://x.supabase.co/storage/v1/object/sign/anexos/e/d/u-a.pdf?token=T', 'Ata reunião & final #2.pdf'))
+      .toBe('https://x.supabase.co/storage/v1/object/sign/anexos/e/d/u-a.pdf?token=T&download=Ata%20reuni%C3%A3o%20%26%20final%20%232.pdf');
+  });
+  it('link sem parâmetros recebe ?download', () => {
+    expect(linkDownload('https://x/arq', 'a.txt')).toBe('https://x/arq?download=a.txt');
   });
 });

@@ -34,7 +34,7 @@ Acima da tabela:
 - **Buscar cliente**: filtra pelo nome.
 - **Fase**: uma ou mais fases. Mostra os clientes com projeto aberto naquela fase.
 - **GP**: um ou mais GPs. A opção *(sem GP)* acha os clientes sem responsável.
-- **Situação**: **Ativos** (padrão), **Inativos** ou **Ativos e inativos**.
+- **Situação**: começa em **Ativo**; marque também **Inativo** ou toque em **Limpar** para ver todos. Como em todo filtro, **Exibir** mostra só os marcados e **Ocultar** mostra todos menos os marcados; nada marcado mostra todos.
 
 À direita, o contador mostra quantos clientes passaram no filtro (por exemplo, *8 de 40 clientes*). **Limpar filtros** volta ao padrão.
 
@@ -85,7 +85,7 @@ Os contatos do cliente, com **Nome**, **Papel**, **E-mail** e **Telefone/WhatsAp
 
 Os projetos do cliente, com **Projeto**, **Fase**, **Situação**, **GP**, **Contratadas** e **Saldo** (em horas). Toque na linha para abrir o projeto em outra aba.
 
-- Filtros: **Buscar projeto**, **Fase**, **GP** e **Situação** (*Todas as situações*, *Ativos e suspensos*, Ativo, Suspenso, Encerrado, Cancelado).
+- Filtros: **Buscar projeto**, **Fase**, **GP** e **Situação** (Ativo, Suspenso, Encerrado, Cancelado; aceita vários e tem Exibir/Ocultar; nada marcado mostra todas).
 - **+ Projeto** cria um projeto já ligado a este cliente. Aparece para quem tem a permissão `projeto.criar`, e só em cliente ativo.
 
 ## 7. Editar o cliente
@@ -103,7 +103,7 @@ Use **Inativar** quando o cliente deixa de ser atendido.
 1. Na ficha, toque em **Inativar** e confirme.
 1. O cliente some das listas de seleção e dos backlogs. O histórico fica guardado.
 
-- Na lista, o cliente inativo só aparece com a **Situação** em **Inativos** ou **Ativos e inativos**.
+- Na lista, o cliente inativo só aparece com **Inativo** marcado na **Situação** (ou com ela limpa).
 - Para voltar, abra a ficha e toque em **Reativar**.
 - Não existe exclusão de cliente: o caminho é inativar.
 
@@ -127,7 +127,7 @@ A Rentabilidade tem manual próprio.
 ## 11. Dúvidas comuns
 
 - **Não vejo o botão + Novo cliente ou Editar.** Falta a permissão `cliente.criar` ou `cliente.editar`. Peça ao administrador.
-- **O cliente sumiu da lista.** Ele pode estar inativo. Troque a **Situação** para **Ativos e inativos**. Confira também se há um filtro salvo aplicado.
+- **O cliente sumiu da lista.** Ele pode estar inativo. Na **Situação**, toque em **Limpar** para ver ativos e inativos. Confira também se há um filtro salvo aplicado.
 - **Não aparece o botão + Projeto.** O cliente está inativo ou falta a permissão `projeto.criar`.
 - **A coluna Fases está vazia.** O cliente não tem projeto aberto.
 

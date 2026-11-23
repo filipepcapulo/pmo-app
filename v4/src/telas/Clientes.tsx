@@ -15,7 +15,8 @@ import { gps, useEquipe, usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
 import { caminhoEntidade } from '../estado/rotas';
 import { Resumo } from '../componentes/Resumo';
-import { fasesPorCliente, filtrarClientes, opcoesPessoas, opcoesTexto, PADRAO_CLIENTES, useFiltroLista, type FiltroClientes } from '../estado/filtrosLista';
+import { fasesPorCliente, filtrarClientes, opcoesPessoas, opcoesTexto, PADRAO_CLIENTES, sitCliente, SITUACOES_CLIENTE, useFiltroLista } from '../estado/filtrosLista';
+import { passa } from '../util/selecao';
 
 type L = ClienteLinha & { fases: string } & Record<string, unknown>;
 
@@ -24,12 +25,12 @@ export function Clientes({ ir }: { ir: (caminho: string, titulo?: string) => voi
   const pode = usePode();
   const { f, mudar, limpar, aplicar, ativos } = useFiltroLista('clientes', PADRAO_CLIENTES);
   const [novo, setNovo] = useState(false);
-  const inativos = f.situacao !== 'ativos';
+  const inativos = passa(f.situacoes, 'inativo');   // só busca os inativos no banco quando o filtro os deixa passar
   const c = useCarga(() => api.clientes(esc, inativos), [esc, inativos]);
   // as fases de cada cliente vêm dos projetos abertos dele (a lista de clientes não traz a fase)
   const pj = useCarga(() => api.projetos(esc), [esc]);
   const fases = useMemo(() => fasesPorCliente(pj.dados ?? [], FASES), [pj.dados]);
-  const todos = useMemo(() => (c.dados ?? []).filter(l => f.situacao === 'todos' || (f.situacao === 'ativos') === l.ativo), [c.dados, f.situacao]);
+  const todos = useMemo(() => (c.dados ?? []).filter(l => passa(f.situacoes, sitCliente(l.ativo))), [c.dados, f.situacoes]);
   const linhas = useMemo<L[]>(() => filtrarClientes(c.dados ?? [], f, fases).map(l => ({ ...l, fases: (fases.get(l.id) ?? []).join(', ') })), [c.dados, f, fases]);
   const opGps = useMemo(() => opcoesPessoas(todos.map(l => l.gp?.id), id => todos.find(l => l.gp?.id === id)?.gp?.nome, '(sem GP)'), [todos]);
   const opFases = useMemo(() => opcoesTexto([...fases.values()].flat(), FASES), [fases]);
@@ -51,9 +52,7 @@ export function Clientes({ ir }: { ir: (caminho: string, titulo?: string) => voi
         <input type="search" aria-label="Buscar cliente" placeholder="Buscar cliente" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
         <SelecaoMultipla ocultar rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
         <SelecaoMultipla ocultar rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
-        <select aria-label="Situação" value={f.situacao} onChange={e => mudar({ situacao: e.target.value as FiltroClientes['situacao'] })}>
-          <option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Ativos e inativos</option>
-        </select>
+        <SelecaoMultipla ocultar rotulo="Situação" opcoes={SITUACOES_CLIENTE} sel={f.situacoes} aoMudar={v => mudar({ situacoes: v })} />
         <FiltrosSalvos tela="clientes" atuais={f as unknown as Record<string, unknown>} aoAplicar={aplicar} />
       </BarraFiltros>
       {c.erro ? <p className="msg-erro">{c.erro}</p>

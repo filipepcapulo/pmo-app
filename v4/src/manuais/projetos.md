@@ -34,8 +34,8 @@ Cada linha mostra **Cliente**, **Projeto**, **Fase**, **Situação**, **GP**, **
 Filtros no topo:
 
 - Busca por cliente, projeto ou fase.
-- **Fase**, **GP** e **Cliente**: aceitam vários de uma vez.
-- **Situação**: começa em **Ativos e suspensos**; troque para Ativo, Suspenso, Encerrado, Cancelado ou **Todos**.
+- **Fase**, **GP** e **Cliente**: aceitam vários de uma vez. Como em todo filtro, **Exibir** mostra só os marcados e **Ocultar** mostra todos menos os marcados; nada marcado mostra todos.
+- **Situação** (Ativo, Suspenso, Encerrado, Cancelado): começa com **Ativo** e **Suspenso** marcados; aceita vários de uma vez e **Limpar** mostra todas.
 - **Filtros salvos…**: escolha um filtro guardado. **Salvar filtro** guarda o filtro atual com um nome; marque **Abrir a tela com este filtro** para ele virar o padrão.
 
 ## 3. Criar um projeto

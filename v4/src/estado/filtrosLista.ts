@@ -40,8 +40,11 @@ export function opcoesNomeadas(pares: [string, string][]): Opcao[] {
 }
 
 // ---------------------------------------------------------------- clientes
-export interface FiltroClientes { texto: string; gps: string[]; fases: string[]; situacao: 'ativos' | 'inativos' | 'todos' }
-export const PADRAO_CLIENTES: FiltroClientes = { texto: '', gps: [], fases: [], situacao: 'ativos' };
+/** situacoes: 'ativo' e/ou 'inativo' (seleção múltipla com Exibir/Ocultar, como todo filtro); vazio = todos. */
+export interface FiltroClientes { texto: string; gps: string[]; fases: string[]; situacoes: string[] }
+export const SITUACOES_CLIENTE: Opcao[] = [{ valor: 'ativo', rotulo: 'Ativo' }, { valor: 'inativo', rotulo: 'Inativo' }];
+export const sitCliente = (ativo: boolean) => (ativo ? 'ativo' : 'inativo');
+export const PADRAO_CLIENTES: FiltroClientes = { texto: '', gps: [], fases: [], situacoes: ['ativo'] };
 interface ClienteFiltravel { id: string; nome: string; ativo: boolean; gp?: { id: string } | null }
 
 /** Fases dos projetos abertos (ativo/suspenso) de cada cliente, na ordem de `ordem`. */
@@ -59,22 +62,24 @@ export function fasesPorCliente(projetos: { cliente_id: string; fase: string; si
 }
 export function filtrarClientes<T extends ClienteFiltravel>(linhas: T[], f: FiltroClientes, fases: Map<string, string[]> = new Map()): T[] {
   return linhas.filter(l =>
-    (f.situacao === 'todos' || (f.situacao === 'ativos') === l.ativo)
+    passa(f.situacoes, sitCliente(l.ativo))
     && em(f.gps, l.gp?.id)
     && passaAlgum(f.fases, fases.get(l.id) ?? [])
     && temTexto(f.texto, l.nome));
 }
 
 // ---------------------------------------------------------------- projetos
-/** situacao: 'abertos' (ativo + suspenso), uma situação ou '' (todas). */
-export interface FiltroProjetos { texto: string; fases: string[]; gps: string[]; clientes: string[]; situacao: string }
-export const PADRAO_PROJETOS: FiltroProjetos = { texto: '', fases: [], gps: [], clientes: [], situacao: 'abertos' };
-export const PADRAO_PROJETOS_CLIENTE: FiltroProjetos = { ...PADRAO_PROJETOS, situacao: '' };
+/** Situações que contam como projeto em aberto: o padrão das telas (Projetos e Demandas). */
+export const SITUACOES_ABERTAS = ['ativo', 'pausado'];
+/** situacoes: Ativo, Suspenso, Encerrado, Cancelado (seleção múltipla com Exibir/Ocultar); vazio = todas. */
+export interface FiltroProjetos { texto: string; fases: string[]; gps: string[]; clientes: string[]; situacoes: string[] }
+export const PADRAO_PROJETOS: FiltroProjetos = { texto: '', fases: [], gps: [], clientes: [], situacoes: SITUACOES_ABERTAS };
+export const PADRAO_PROJETOS_CLIENTE: FiltroProjetos = { ...PADRAO_PROJETOS, situacoes: [] };
 interface ProjetoFiltravel { nome: string; fase: string; situacao: string; gp?: { id: string } | null; cliente_id?: string; cliente?: string }
 
 export function filtrarProjetos<T extends ProjetoFiltravel>(linhas: T[], f: FiltroProjetos): T[] {
   return linhas.filter(l =>
-    (f.situacao === '' || (f.situacao === 'abertos' ? l.situacao === 'ativo' || l.situacao === 'pausado' : l.situacao === f.situacao))
+    passa(f.situacoes, l.situacao)
     && em(f.fases, l.fase) && em(f.gps, l.gp?.id)
     && passa(f.clientes, l.cliente_id)
     && temTexto(f.texto, l.cliente, l.nome, l.fase));
@@ -91,12 +96,9 @@ export interface FiltroDemandas {
    * responsável, onde as tarefas estão à mão).
    */
   nivel: string;
-  /** 4.26.0: situação do projeto da demanda — 'ativos' (Ativo e Suspenso), 'inativos' (Encerrado e Cancelado) ou '' (todos). */
-  sitProjeto: string;
+  /** Situação do projeto da demanda (Ativo, Suspenso, Encerrado, Cancelado), como na tela de Projetos; vazio = todas. */
+  sitProjetos: string[];
 }
-export const SIT_PROJETO: Opcao[] = [
-  { valor: 'ativos', rotulo: 'Projetos ativos' }, { valor: 'inativos', rotulo: 'Projetos inativos' }, { valor: '', rotulo: 'Projetos ativos e inativos' },
-];
 export const NIVEIS_FILTRO: Opcao[] = [
   { valor: '', rotulo: 'Demandas e subdemandas' }, { valor: 'demanda', rotulo: 'Demandas' }, { valor: 'subdemanda', rotulo: 'Subdemandas' },
 ];
@@ -105,17 +107,17 @@ export const NIVEIS_RESPONSAVEL: Opcao[] = [
 ];
 export const NIVEL_TAREFA: Opcao = { valor: 'tarefa', rotulo: 'Só tarefas' };
 export const PADRAO_DEMANDAS: FiltroDemandas = {
-  texto: '', fases: [], etapas: [], responsaveis: [], status: [], tipos: [], prioridades: [], clientes: [], projetos: [], atrasadas: false, nivel: '', sitProjeto: '',
+  texto: '', fases: [], etapas: [], responsaveis: [], status: [], tipos: [], prioridades: [], clientes: [], projetos: [], atrasadas: false, nivel: '', sitProjetos: [],
 };
-/** Tela de Demandas: abre só com os projetos ativos (como Clientes e Projetos); as outras listas não olham a situação. */
-export const PADRAO_DEMANDAS_TELA: FiltroDemandas = { ...PADRAO_DEMANDAS, sitProjeto: 'ativos' };
+/** Tela de Demandas: abre com os projetos Ativos e Suspensos (como a tela de Projetos); as outras listas não olham a situação. */
+export const PADRAO_DEMANDAS_TELA: FiltroDemandas = { ...PADRAO_DEMANDAS, sitProjetos: SITUACOES_ABERTAS };
 export interface DemandaFiltravel {
   id: string; pai_id: string | null; nome: string; status: string; projeto_id?: string; tipo?: string; prioridade?: string;
   responsavel_id?: string | null; etapa?: string | null; fase?: string; cliente_id?: string; cliente?: string; projeto?: string;
   /** V4: etapa do app (id); quando vem preenchida o filtro de etapa compara por ela, senão pelo texto. */
   etapa_app_id?: string | null;
-  /** Projeto Encerrado ou Cancelado (a tela preenche); sem ele, o projeto conta como ativo. */
-  projeto_inativo?: boolean;
+  /** Situação do projeto (a tela preenche); sem ela, o projeto conta como ativo. */
+  projeto_situacao?: string;
   /** Nome da etapa do app (a tela preenche); entra na busca por texto. Sem ele, vale o texto de `etapa`. */
   etapa_nome?: string | null;
   totais?: { atrasada?: boolean; avulso_base?: boolean } | null; avulso_base?: boolean;
@@ -172,7 +174,7 @@ function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string
     && passa(f.prioridades, d.prioridade ?? 'normal')
     && passa(f.clientes, d.cliente_id)
     && passa(f.projetos, d.projeto_id)
-    && (!f.sitProjeto || (f.sitProjeto === 'inativos') === !!d.projeto_inativo)
+    && passa(f.sitProjetos, d.projeto_situacao ?? 'ativo')
     && (!f.atrasadas || (!!d.totais?.atrasada && !semAlerta(d)))
     && temTexto(f.texto, d.nome, mae?.nome, d.cliente, d.projeto, ...etapasTexto(d, mae));
 }
@@ -274,8 +276,12 @@ export function normalizarFiltro<T extends object>(padrao: T, bruto: unknown): T
     if (Array.isArray(p)) { if (Array.isArray(v)) r[k] = v.filter(x => typeof x === 'string'); }
     else if (v != null && typeof v === typeof p) r[k] = v;
   }
+  // filtro guardado antes da 4.27.0: a situação era um valor só (`situacao`) e virou lista (`situacoes`)
+  const antiga = (bruto as Record<string, unknown>).situacao;
+  if ('situacoes' in padrao && !Array.isArray((bruto as Record<string, unknown>).situacoes) && typeof antiga === 'string') r.situacoes = SITUACAO_ANTIGA[antiga] ?? [antiga];
   return r as T;
 }
+const SITUACAO_ANTIGA: Record<string, string[]> = { abertos: SITUACOES_ABERTAS, ativos: ['ativo'], inativos: ['inativo'], todos: [], '': [] };
 const chave = (tela: string) => `pmo4:filtros:${tela}`;
 export function lerFiltro<T extends object>(tela: string, padrao: T): T {
   try { return normalizarFiltro(padrao, JSON.parse(localStorage.getItem(chave(tela)) ?? 'null')); } catch { return { ...padrao }; }

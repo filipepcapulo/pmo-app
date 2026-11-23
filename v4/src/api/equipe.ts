@@ -5,6 +5,7 @@ import { STATUS_DEMANDA, type Autoria } from './execucao';
 import { diaNum, hojeIso, somarDias } from './projeto';
 import { temTexto } from '../estado/filtro';
 import { SEM } from '../estado/filtrosLista';
+import { marcadosDe, ocultando, passa as naSelecao } from '../util/selecao';
 
 // ---------------------------------------------------------------- tipos
 export interface TarefaGrade {
@@ -124,8 +125,8 @@ export function filtrarBacklog(itens: ItemBacklog[], texto = '', statusFora: Rea
   const ids = new Set(itens.map(i => i.id));
   const ehSub = (i: ItemBacklog) => !!i.pai_id && ids.has(i.pai_id);
   const passa = (i: ItemBacklog) => !statusFora.has(i.status) && (!gp || i.gp_id === gp)
-    && (etapas.length === 0 || etapas.includes(etapaItem(i) || etapaMae(i) || SEM))
-    && (tipos.length === 0 || tipos.includes(i.tipo || 'entregavel'))
+    && naSelecao(etapas, etapaItem(i) || etapaMae(i) || SEM)
+    && naSelecao(tipos, i.tipo || 'entregavel')
     && (!soSemAgenda || !i.agendas)
     && temTexto(texto, i.nome, i.pai, i.cliente, i.projeto, ...(i.etapa_nome || i.etapa ? [i.etapa_nome, i.etapa] : [i.pai_etapa_nome, i.pai_etapa]));
   if (nivel === 'demanda') {
@@ -315,14 +316,16 @@ export const ORDEM_FILTROS: Record<AgrupaKanban, DimKanban[]> = {
 const valorDim = (t: AgendaAberta, d: DimKanban): string | null => ({
   consultores: t.consultor_id, clientes: t.cliente_id, projetos: t.projeto_id, demandas: t.pai_id ?? t.demanda_id, subdemandas: t.pai_id ? t.demanda_id : null,
 })[d];
-const casa = (t: AgendaAberta, d: DimKanban, sel: ReadonlySet<string>) => !sel.size || sel.has(valorDim(t, d) ?? '');
+/** Seleção de uma dimensão: os ids marcados e o modo (Exibir = só eles; Ocultar = todos menos eles). */
+interface SelDim { ids: Set<string>; oculta: boolean }
+const casa = (t: AgendaAberta, d: DimKanban, sel: SelDim) => !sel.ids.size || sel.ids.has(valorDim(t, d) ?? '') !== sel.oculta;
 
 /** Seleção válida por dimensão: só os ids que existem nas agendas (os demais não filtram). */
-function selecaoValida(lista: AgendaAberta[], f: Partial<FiltroKanban>): Record<DimKanban, Set<string>> {
-  const out = {} as Record<DimKanban, Set<string>>;
+function selecaoValida(lista: AgendaAberta[], f: Partial<FiltroKanban>): Record<DimKanban, SelDim> {
+  const out = {} as Record<DimKanban, SelDim>;
   for (const { dim } of DIMENSOES) {
     const existe = new Set(lista.map(t => valorDim(t, dim)).filter((x): x is string => !!x));
-    out[dim] = new Set((f[dim] ?? []).filter(id => existe.has(id)));
+    out[dim] = { ids: new Set(marcadosDe(f[dim] ?? []).filter(id => existe.has(id))), oculta: ocultando(f[dim] ?? []) };
   }
   return out;
 }
@@ -352,7 +355,7 @@ export function opcoesKanban(lista: AgendaAberta[], f: Partial<FiltroKanban>, no
       m.set(v, rotulo(t, dim));
     }
     // o que está marcado continua na lista, mesmo que a cascata o esconda (para poder desmarcar)
-    for (const id of sel[dim]) if (!m.has(id)) { const t = lista.find(x => valorDim(x, dim) === id); if (t) m.set(id, rotulo(t, dim)); }
+    for (const id of sel[dim].ids) if (!m.has(id)) { const t = lista.find(x => valorDim(x, dim) === id); if (t) m.set(id, rotulo(t, dim)); }
     out[dim] = [...m].map(([valor, rotulo]) => ({ valor, rotulo: rotulo ?? '' })).sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
   }
   return out;

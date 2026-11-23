@@ -11,7 +11,7 @@
 // módulo 09 da Central), fase do projeto, etapa, responsável, tipo, prioridade, cliente, projeto, atrasadas e texto
 // (3.36.0: a lista inteira é carregada e filtrada na tela); "Relatório HTML" baixa o que está na tela.
 import { useEffect, useMemo, useState } from 'react';
-import { FASES } from '../api/cadastros';
+import { api, FASES, projetoInativo } from '../api/cadastros';
 import { consultor } from '../api/consultor';
 import { arvoreDemandas, PRIORIDADES, STATUS_V4, todasDemandas, type DemandaLinha } from '../api/execucao';
 import { useEtapas } from '../estado/etapas';
@@ -25,18 +25,24 @@ import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { useEquipe, usePode } from '../estado/equipe';
-import { contarPorCliente, filtrarDemandas, itensDoNivel, NIVEIS_FILTRO, SEM, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
+import { contarPorCliente, filtrarDemandas, itensDoNivel, NIVEIS_FILTRO, SEM, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS_TELA, SIT_PROJETO, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
 import { ABERTAS, lerStatus, relatorioDemandas, rotuloStatus, TODOS } from '../api/relatorios';
 import { baixarRelatorioHtml } from '../util/relatorioHtml';
+import { passa, textoSelecao } from '../util/selecao';
 
 const CHAVE_STATUS = 'pmo4.demandas.status';
 const CHAVE_ABA = 'pmo4.demandas.aba';
 type Aba = 'grafico' | 'lista';
 const ABAS: [Aba, string][] = [['grafico', 'Gráfico'], ['lista', 'Lista']];
 const PROJETOS_POR_VEZ = 40;
+/** "Rótulo: A, B" ou "Rótulo: todos menos A" para o relatório; nada marcado = ''. */
+const desc = (rotulo: string, sel: string[], ops: readonly { valor: string; rotulo: string }[] = []) => {
+  const t = textoSelecao(sel, v => ops.find(o => o.valor === v)?.rotulo ?? v);
+  return t ? `${rotulo}: ${t}` : '';
+};
 const mesmos = (a: string[], b: string[]) => a.length === b.length && a.every(x => b.includes(x));
 
 export function Demandas({ minhas }: { minhas?: boolean }) {
@@ -52,7 +58,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
     const n = banco.every(v => l.includes(v)) ? l.filter(x => !banco.includes(x)) : [...new Set([...l, ...banco])];
     return n.length ? TODOS.filter(x => n.includes(x)) : l;
   });
-  const { f, mudar, limpar, aplicar, ativos } = useFiltroLista(minhas ? 'minhas-demandas' : 'demandas', PADRAO_DEMANDAS);
+  const { f, mudar, limpar, aplicar, ativos } = useFiltroLista(minhas ? 'minhas-demandas' : 'demandas', PADRAO_DEMANDAS_TELA);
   const [mostrar, setMostrar] = useState(PROJETOS_POR_VEZ);
   // "Minhas demandas" (dentro de Minha agenda) continua só com a lista
   const [aba, setAba] = useState<Aba>(() => { try { return !minhas && localStorage.getItem(CHAVE_ABA) !== 'lista' ? 'grafico' : 'lista'; } catch { return minhas ? 'lista' : 'grafico'; } });
@@ -61,7 +67,10 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
   const filtro = status.length === TODOS.length ? null : status;
   const c = useCarga(() => (minhas ? consultor.demandas(esc, filtro, null) : todasDemandas(esc, filtro)),
     [esc, minhas, status.join(), ed.geracao]);
-  const todas = useMemo(() => (c.dados?.itens ?? []).map(d => ({ ...d, etapa_app_id: et.idDe(d), etapa_nome: et.de(d)?.nome ?? d.etapa })), [c.dados, et]);
+  // 4.26.0: situação dos projetos (para o filtro Projetos ativos/inativos); projeto fora da lista conta como ativo
+  const pr = useCarga(() => api.projetos(esc), [esc, ed.geracao]);
+  const inativos = useMemo(() => new Set((pr.dados ?? []).filter(p => projetoInativo(p.situacao)).map(p => p.id)), [pr.dados]);
+  const todas = useMemo(() => (c.dados?.itens ?? []).map(d => ({ ...d, etapa_app_id: et.idDe(d), etapa_nome: et.de(d)?.nome ?? d.etapa, projeto_inativo: inativos.has(d.projeto_id) })), [c.dados, et, inativos]);
   const itens = useMemo(() => filtrarDemandas(todas, f), [todas, f]);
   useEffect(() => setMostrar(PROJETOS_POR_VEZ), [f, status]);
   const grupos = useMemo(() => {
@@ -99,18 +108,19 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
       ...(todas.some(d => !d.etapa_app_id) ? [{ valor: SEM, rotulo: '(sem etapa)' }] : [])],
     responsaveis: opcoesPessoas(todas.map(d => d.responsavel_id), id => porId.get(id)?.nome),
     clientes: opcoesNomeadas(todas.map(d => [d.cliente_id, d.cliente])),
-    projetos: opcoesNomeadas(todas.filter(d => !f.clientes.length || f.clientes.includes(d.cliente_id)).map(d => [d.projeto_id, `${d.cliente} · ${d.projeto}`])),
-  }), [todas, porId, f.clientes, et]);
+    projetos: opcoesNomeadas(todas.filter(d => passa(f.clientes, d.cliente_id) && (!f.sitProjeto || (f.sitProjeto === 'inativos') === d.projeto_inativo)).map(d => [d.projeto_id, `${d.cliente} · ${d.projeto}`])),
+  }), [todas, porId, f.clientes, f.sitProjeto, et]);
   const statusFora = !mesmos(status, ABERTAS);
   const limparTudo = () => { limpar(); setStatus(ABERTAS); };
   const descricao = [`Status: ${rotuloStatus(status)}`,
-    f.fases.length ? `Fase: ${f.fases.join(', ')}` : '', f.etapas.length ? `Etapa: ${f.etapas.map(e => ops.etapas.find(o => o.valor === e)?.rotulo ?? e).join(', ')}` : '',
-    f.responsaveis.length ? `Responsável: ${f.responsaveis.map(r => ops.responsaveis.find(o => o.valor === r)?.rotulo ?? r).join(', ')}` : '',
+    desc('Fase', f.fases), desc('Etapa', f.etapas, ops.etapas),
+    desc('Responsável', f.responsaveis, ops.responsaveis),
     f.nivel ? `Nível dos filtros: ${NIVEIS_FILTRO.find(n => n.valor === f.nivel)?.rotulo ?? f.nivel}` : '',
-    f.tipos.length ? `Tipo: ${f.tipos.map(t => TIPOS_DEMANDA.find(o => o.valor === t)?.rotulo ?? t).join(', ')}` : '',
-    f.prioridades.length ? `Prioridade: ${f.prioridades.map(t => PRIORIDADES.find(o => o.valor === t)?.rotulo ?? t).join(', ')}` : '',
-    f.clientes.length ? `Cliente: ${f.clientes.map(t => ops.clientes.find(o => o.valor === t)?.rotulo ?? t).join(', ')}` : '',
-    f.projetos.length ? `Projeto: ${f.projetos.map(t => ops.projetos.find(o => o.valor === t)?.rotulo ?? t).join(', ')}` : '',
+    desc('Tipo', f.tipos, TIPOS_DEMANDA),
+    desc('Prioridade', f.prioridades, PRIORIDADES),
+    desc('Cliente', f.clientes, ops.clientes),
+    desc('Projeto', f.projetos, ops.projetos),
+    f.sitProjeto ? SIT_PROJETO.find(o => o.valor === f.sitProjeto)?.rotulo ?? '' : '',
     f.atrasadas ? 'Só atrasadas' : '', f.texto.trim() ? `Busca: ${f.texto.trim()}` : '', minhas ? 'Minhas demandas' : ''].filter(Boolean);
   return (
     <div className={minhas ? undefined : 'pagina'}>
@@ -136,13 +146,16 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
             {STATUS_V4.map(s => <label key={s.valor} className="check"><input type="checkbox" checked={s.banco.every(v => status.includes(v))} onChange={() => trocar(s.banco)} /> {s.rotulo}</label>)}
           </div>
         </details>
-        <SelecaoMultipla rotulo="Fase" opcoes={ops.fases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
-        <SelecaoMultipla rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
-        <SelecaoMultipla rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
-        <SelecaoMultipla rotulo="Cliente" opcoes={ops.clientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
-        <SelecaoMultipla rotulo="Projeto" opcoes={ops.projetos} sel={f.projetos} aoMudar={v => mudar({ projetos: v })} />
-        <SelecaoMultipla rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />
-        <SelecaoMultipla rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
+        <SelecaoMultipla ocultar rotulo="Fase" opcoes={ops.fases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
+        <SelecaoMultipla ocultar rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
+        <SelecaoMultipla ocultar rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
+        <SelecaoMultipla ocultar rotulo="Cliente" opcoes={ops.clientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
+        <SelecaoMultipla ocultar rotulo="Projeto" opcoes={ops.projetos} sel={f.projetos} aoMudar={v => mudar({ projetos: v })} />
+        <select aria-label="Situação do projeto" value={f.sitProjeto} onChange={e => mudar({ sitProjeto: e.target.value })}>
+          {SIT_PROJETO.map(o => <option key={o.valor || 'todos'} value={o.valor}>{o.rotulo}</option>)}
+        </select>
+        <SelecaoMultipla ocultar rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />
+        <SelecaoMultipla ocultar rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
         <label className="check"><input type="checkbox" checked={f.atrasadas} onChange={e => mudar({ atrasadas: e.target.checked })} /> Só atrasadas</label>
         {!minhas && <FiltrosSalvos tela="demandas" atuais={{ ...f, statusLista: status }}
           aoAplicar={x => { aplicar(x); setStatus(Array.isArray(x.statusLista) ? lerStatus(JSON.stringify(x.statusLista)) : ABERTAS); }} />}

@@ -27,6 +27,7 @@ import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
+import { passa } from '../util/selecao';
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const COR_NIVEL = { critico: 'var(--vermelho)', alto: 'var(--laranja)', moderado: 'var(--texto-2)' };
@@ -108,7 +109,7 @@ export function Portfolio() {
         ...(ds.some(d => !d.etapa_app_id) ? [{ valor: SEM, rotulo: '(sem etapa)' }] : [])],
       responsaveis: opcoesPessoas(ds.map(d => d.responsavel_id), id => porId.get(id)?.nome),
       clientes: opcoesNomeadas(ps.map(p => [p.cliente_id, p.cliente])),
-      projetos: opcoesNomeadas(ps.filter(p => !f.clientes.length || f.clientes.includes(p.cliente_id)).map(p => [p.id, `${p.cliente} · ${p.nome}`])),
+      projetos: opcoesNomeadas(ps.filter(p => passa(f.clientes, p.cliente_id)).map(p => [p.id, `${p.cliente} · ${p.nome}`])),
     };
   }, [demandas, ps, porId, f.clientes, et]);
   const limparTudo = () => { limpar(); setStatus(ABERTAS); };
@@ -163,12 +164,12 @@ export function Portfolio() {
         </details>
         <SelecaoMultipla rotulo="Fase" opcoes={fasesDe(ps)} sel={f.fases} aoMudar={setFases} />
         <SelecaoMultipla rotulo="GP" opcoes={gpsDe(ps)} sel={f.gps} aoMudar={setGps} />
-        <SelecaoMultipla rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
-        <SelecaoMultipla rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
-        <SelecaoMultipla rotulo="Cliente" opcoes={ops.clientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
-        <SelecaoMultipla rotulo="Projeto" opcoes={ops.projetos} sel={f.projetos} aoMudar={v => mudar({ projetos: v })} />
-        <SelecaoMultipla rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />
-        <SelecaoMultipla rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
+        <SelecaoMultipla ocultar rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
+        <SelecaoMultipla ocultar rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
+        <SelecaoMultipla ocultar rotulo="Cliente" opcoes={ops.clientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
+        <SelecaoMultipla ocultar rotulo="Projeto" opcoes={ops.projetos} sel={f.projetos} aoMudar={v => mudar({ projetos: v })} />
+        <SelecaoMultipla ocultar rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />
+        <SelecaoMultipla ocultar rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
         <label className="check"><input type="checkbox" checked={f.atrasadas} onChange={e => mudar({ atrasadas: e.target.checked })} /> Só atrasadas</label>
         <FiltrosSalvos tela="portfolio" atuais={{ ...f, statusLista: status }}
           aoAplicar={x => { aplicar(x); setStatus(Array.isArray(x.statusLista) ? lerStatus(JSON.stringify(x.statusLista)) : ABERTAS); }} />

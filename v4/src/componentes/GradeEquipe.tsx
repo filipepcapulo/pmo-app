@@ -210,7 +210,7 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
   return (
     <section className="eq-grade-caixa" aria-label="Grade da equipe">
       <div className="barra-filtros">
-        <SelecaoMultipla rotulo="Equipe" opcoes={candidatos.map(m => ({ valor: m.id, rotulo: m.nome }))} sel={escolha.pessoas} aoMudar={v => mudarEscolha({ pessoas: v })} />
+        <SelecaoMultipla ocultar rotulo="Equipe" opcoes={candidatos.map(m => ({ valor: m.id, rotulo: m.nome }))} sel={escolha.pessoas} aoMudar={v => mudarEscolha({ pessoas: v })} />
         <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Consultor…" aria-label="Filtrar consultor" />
         <input type="date" value={de} onChange={e => setDe(e.target.value)} aria-label="De" />
         <input type="date" value={ate} onChange={e => setAte(e.target.value)} aria-label="Até" />

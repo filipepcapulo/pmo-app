@@ -49,8 +49,8 @@ export function Clientes({ ir }: { ir: (caminho: string, titulo?: string) => voi
       </header>
       <BarraFiltros nome="clientes" n={c.dados ? linhas.length : null} total={c.dados ? todos.length : null} ativos={ativos} aoLimpar={limpar}>
         <input type="search" aria-label="Buscar cliente" placeholder="Buscar cliente" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
-        <SelecaoMultipla rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
-        <SelecaoMultipla rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
+        <SelecaoMultipla ocultar rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
+        <SelecaoMultipla ocultar rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
         <select aria-label="Situação" value={f.situacao} onChange={e => mudar({ situacao: e.target.value as FiltroClientes['situacao'] })}>
           <option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Ativos e inativos</option>
         </select>

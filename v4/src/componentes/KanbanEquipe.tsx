@@ -19,6 +19,7 @@ import { Resumo } from './Resumo';
 import { SelecaoMultipla } from './SelecaoMultipla';
 import { useToast } from './Toasts';
 import type { Soltar } from './GradeEquipe';
+import { semSelecao } from '../util/selecao';
 
 const TELA = 'agenda.kanban', NOME_PREF = 'Última escolha';
 const chaveLocal = (u: string) => `pmo4.kanban.pref.${u}`;
@@ -74,14 +75,14 @@ export function KanbanEquipe({ backlogMarcado, aoSoltarBacklog }: { backlogMarca
   const trocar = (v: AgrupaKanban) => setPref({ ...pref, por: v });
   const mudarFiltro = (dim: DimKanban, sel: string[]) => setPref({ ...pref, filtros: { ...pref.filtros, [por]: { ...filtro, [dim]: sel } } });
   const opcoes = useMemo(() => opcoesKanban(c.dados ?? [], filtro, id => porId.get(id)?.nome), [c.dados, filtro, porId]);
-  const filtrado = DIMENSOES.some(({ dim }) => filtro[dim].length > 0);
+  const filtrado = DIMENSOES.some(({ dim }) => !semSelecao(filtro[dim]));
   const colunas = useMemo(() => {
     const t = semAcento(texto.trim());
     const itens = filtrarKanban(c.dados ?? [], filtro)
       .filter(x => !t || [x.nome, x.cliente, x.projeto, x.demanda, x.pai ?? '', porId.get(x.consultor_id)?.nome ?? ''].some(v => semAcento(v).includes(t)));
     // por consultor, quem atende e está sem agenda em aberto também tem coluna (alvo do backlog); com consultores escolhidos, só eles
     const escolhidos = new Set(filtro.consultores);
-    const outros = DIMENSOES.some(({ dim }) => dim !== 'consultores' && filtro[dim].length > 0);
+    const outros = DIMENSOES.some(({ dim }) => dim !== 'consultores' && !semSelecao(filtro[dim]));
     const vazias = por === 'consultor' && !t && !outros
       ? lista.filter(m => m.ativo && m.papeis.some(p => p === 'consultor' || p === 'desenvolvedor') && (!escolhidos.size || escolhidos.has(m.id))).map(m => m.id) : [];
     return colunasKanban(itens, por, id => porId.get(id)?.nome, vazias);
@@ -116,7 +117,7 @@ export function KanbanEquipe({ backlogMarcado, aoSoltarBacklog }: { backlogMarca
       </div>
       <div className="barra-filtros kb-filtros" aria-label="Filtros do Kanban" role="group">
         {ORDEM_FILTROS[por].map(dim => (
-          <SelecaoMultipla key={dim} rotulo={DIMENSOES.find(d => d.dim === dim)!.rotulo} opcoes={opcoes[dim]}
+          <SelecaoMultipla key={dim} ocultar rotulo={DIMENSOES.find(d => d.dim === dim)!.rotulo} opcoes={opcoes[dim]}
             sel={filtro[dim]} aoMudar={s => mudarFiltro(dim, s)} />
         ))}
         {filtrado && <button type="button" className="link" onClick={() => setPref({ ...pref, filtros: { ...pref.filtros, [por]: PREF_KANBAN_PADRAO.filtros[por] } })}>Limpar filtros</button>}

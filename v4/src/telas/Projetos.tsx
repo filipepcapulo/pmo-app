@@ -48,9 +48,9 @@ export function Projetos({ ir }: { ir: (caminho: string, titulo?: string) => voi
       </header>
       <BarraFiltros nome="projetos" n={c.dados ? linhas.length : null} total={c.dados ? todos.length : null} ativos={ativos} aoLimpar={limpar}>
         <input type="search" aria-label="Buscar projeto" placeholder="Buscar cliente, projeto ou fase" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
-        <SelecaoMultipla rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
-        <SelecaoMultipla rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
-        <SelecaoMultipla rotulo="Cliente" opcoes={opClientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
+        <SelecaoMultipla ocultar rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
+        <SelecaoMultipla ocultar rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
+        <SelecaoMultipla ocultar rotulo="Cliente" opcoes={opClientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
         <select aria-label="Situação" value={f.situacao} onChange={e => mudar({ situacao: e.target.value })}>
           <option value="abertos">Ativos e suspensos</option>
           {SITUACOES.map(s => <option key={s.valor} value={s.valor}>{s.rotulo}</option>)}

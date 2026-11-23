@@ -20,6 +20,7 @@ import { Icone } from './Icone';
 import { PilulaEtapa } from './Pilulas';
 import { Resumo } from './Resumo';
 import { SelecaoMultipla } from './SelecaoMultipla';
+import { semSelecao, textoSelecao } from '../util/selecao';
 
 const lerFora = (k: string) => { try { return new Set<string>(JSON.parse(localStorage.getItem(k) || '[]')); } catch { return new Set<string>(); } };
 
@@ -88,8 +89,8 @@ export function BacklogLateral({ itens: brutos, erro, marcados, aoMarcar, aoArra
   const visiveis = arvore.reduce((s, c) => s + c.total, 0);
   function relatorio() {
     const f = [
-      etapas.length ? `Etapa: ${etapas.map(e => opcoesEtapa.find(o => o.valor === e)?.rotulo ?? e).join(', ')}` : '',
-      tipos.length ? `Tipo: ${tipos.map(t => TIPOS_DEMANDA.find(o => o.valor === t)?.rotulo ?? t).join(', ')}` : '',
+      semSelecao(etapas) ? '' : `Etapa: ${textoSelecao(etapas, e => opcoesEtapa.find(o => o.valor === e)?.rotulo ?? e)}`,
+      semSelecao(tipos) ? '' : `Tipo: ${textoSelecao(tipos, t => TIPOS_DEMANDA.find(o => o.valor === t)?.rotulo ?? t)}`,
       `Status: ${escolhidos.length === opcoesStatus.length ? 'todos' : escolhidos.map(o => o.rotulo).join(', ') || 'nenhum'}`,
       gp ? `GP: ${lista.find(m => m.id === gp)?.nome ?? ''}` : '', texto.trim() ? `Busca: ${texto.trim()}` : '',
       soSemAgenda ? 'Sem agenda em aberto' : '',
@@ -117,8 +118,8 @@ export function BacklogLateral({ itens: brutos, erro, marcados, aoMarcar, aoArra
         <button type="button" className="bl-recolher" aria-expanded aria-label="Recolher backlog" title="Recolher backlog" onClick={() => aoRecolher(true)}><Icone nome="baixo" tam={16} /></button>
       </div>
       <div className="bl-filtros">
-        <SelecaoMultipla rotulo="Etapa" opcoes={opcoesEtapa} sel={etapas} aoMudar={setEtapas} />
-        <SelecaoMultipla rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={tipos} aoMudar={setTipos} />
+        <SelecaoMultipla ocultar rotulo="Etapa" opcoes={opcoesEtapa} sel={etapas} aoMudar={setEtapas} />
+        <SelecaoMultipla ocultar rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={tipos} aoMudar={setTipos} />
         <select value={gp} onChange={e => setGp(e.target.value)} aria-label="GP responsável">
           <option value="">GP responsável: todos</option>
           {opcoesGp.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}

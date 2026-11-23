@@ -117,8 +117,8 @@ export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t
         {c.dados!.projetos.length > 0 && (
           <BarraFiltros nome="projetos" n={projFiltrados.length} total={c.dados!.projetos.length} ativos={ativos} aoLimpar={limpar}>
             <input type="search" aria-label="Buscar projeto" placeholder="Buscar projeto" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
-            <SelecaoMultipla rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
-            <SelecaoMultipla rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
+            <SelecaoMultipla ocultar rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
+            <SelecaoMultipla ocultar rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
             <select aria-label="Situação" value={f.situacao} onChange={e => mudar({ situacao: e.target.value })}>
               <option value="">Todas as situações</option>
               <option value="abertos">Ativos e suspensos</option>

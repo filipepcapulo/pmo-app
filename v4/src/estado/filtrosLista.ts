@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { semAlerta, statusV4 } from '../api/execucao';
 import { temTexto } from './filtro';
+import { marcadosDe, montarSelecao, ocultando, passa, passaAlgum, semSelecao } from '../util/selecao';
 
 export { temTexto };
 
@@ -11,7 +12,8 @@ export const SEM = '-';
 export interface Opcao { valor: string; rotulo: string }
 
 // ---------------------------------------------------------------- peças comuns
-const em = (sel: readonly string[], v: string | null | undefined) => sel.length === 0 || sel.includes(v || SEM);
+/** Exibir (só os marcados) ou Ocultar (todos menos os marcados): ver util/selecao. */
+const em = (sel: readonly string[], v: string | null | undefined) => passa(sel, v || SEM);
 const col = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
 /** Opções de pessoa a partir dos ids que aparecem na lista (nome pelo `nomeDe`); nulo vira "(sem …)" no fim. */
 export function opcoesPessoas(ids: (string | null | undefined)[], nomeDe: (id: string) => string | null | undefined, semRotulo = '(sem responsável)'): Opcao[] {
@@ -59,7 +61,7 @@ export function filtrarClientes<T extends ClienteFiltravel>(linhas: T[], f: Filt
   return linhas.filter(l =>
     (f.situacao === 'todos' || (f.situacao === 'ativos') === l.ativo)
     && em(f.gps, l.gp?.id)
-    && (f.fases.length === 0 || (fases.get(l.id) ?? []).some(x => f.fases.includes(x)))
+    && passaAlgum(f.fases, fases.get(l.id) ?? [])
     && temTexto(f.texto, l.nome));
 }
 
@@ -74,7 +76,7 @@ export function filtrarProjetos<T extends ProjetoFiltravel>(linhas: T[], f: Filt
   return linhas.filter(l =>
     (f.situacao === '' || (f.situacao === 'abertos' ? l.situacao === 'ativo' || l.situacao === 'pausado' : l.situacao === f.situacao))
     && em(f.fases, l.fase) && em(f.gps, l.gp?.id)
-    && (f.clientes.length === 0 || (!!l.cliente_id && f.clientes.includes(l.cliente_id)))
+    && passa(f.clientes, l.cliente_id)
     && temTexto(f.texto, l.cliente, l.nome, l.fase));
 }
 
@@ -142,8 +144,8 @@ export function consultoresPorDemanda(tarefas: { demanda_id: string; responsavel
  * - todos (''): a soma dos três.
  */
 export function idsDoResponsavel(lista: DemandaFiltravel[], f: Pick<FiltroDemandas, 'responsaveis' | 'nivel'>, consultores?: Map<string, Set<string>>): Set<string> | null {
-  if (f.responsaveis.length === 0) return null;
-  const dele = (d: DemandaFiltravel) => f.responsaveis.includes(d.responsavel_id || SEM);
+  if (semSelecao(f.responsaveis)) return null;
+  const dele = (d: DemandaFiltravel) => em(f.responsaveis, d.responsavel_id);
   const nivel = (n: string) => f.nivel === '' || f.nivel === n;
   const ids = new Set<string>();
   if (nivel('demanda')) {
@@ -151,7 +153,7 @@ export function idsDoResponsavel(lista: DemandaFiltravel[], f: Pick<FiltroDemand
     for (const d of lista) if (maes.has(d.id) || (d.pai_id && maes.has(d.pai_id))) ids.add(d.id);
   }
   if (nivel('subdemanda')) for (const d of lista) if (d.pai_id && dele(d)) ids.add(d.id);
-  if (nivel('tarefa') && consultores) for (const d of lista) if ([...(consultores.get(d.id) ?? [])].some(c => f.responsaveis.includes(c))) ids.add(d.id);
+  if (nivel('tarefa') && consultores) for (const d of lista) if (passaAlgum(f.responsaveis, [...(consultores.get(d.id) ?? [])])) ids.add(d.id);
   return ids;
 }
 
@@ -166,10 +168,10 @@ const etapasTexto = (d: DemandaFiltravel, mae?: DemandaFiltravel) =>
 function demandaPassa(d: DemandaFiltravel, f: FiltroDemandas, doResp: Set<string> | null, mae?: DemandaFiltravel): boolean {
   return (!doResp || doResp.has(d.id)) && em(f.status, statusV4(d.status)) && em(f.fases, d.fase)
     && em(f.etapas, etapaDe(d) || (mae ? etapaDe(mae) : null))   // sem etapa própria vale a da mãe (como no backlog da Agenda)
-    && (f.tipos.length === 0 || f.tipos.includes(d.tipo ?? 'entregavel'))
-    && (f.prioridades.length === 0 || f.prioridades.includes(d.prioridade ?? 'normal'))
-    && (f.clientes.length === 0 || (!!d.cliente_id && f.clientes.includes(d.cliente_id)))
-    && (f.projetos.length === 0 || (!!d.projeto_id && f.projetos.includes(d.projeto_id)))
+    && passa(f.tipos, d.tipo ?? 'entregavel')
+    && passa(f.prioridades, d.prioridade ?? 'normal')
+    && passa(f.clientes, d.cliente_id)
+    && passa(f.projetos, d.projeto_id)
     && (!f.sitProjeto || (f.sitProjeto === 'inativos') === !!d.projeto_inativo)
     && (!f.atrasadas || (!!d.totais?.atrasada && !semAlerta(d)))
     && temTexto(f.texto, d.nome, mae?.nome, d.cliente, d.projeto, ...etapasTexto(d, mae));
@@ -184,7 +186,7 @@ export function filtrarDemandas<T extends DemandaFiltravel>(lista: T[], f: Filtr
   if (f.nivel === 'demanda' || f.nivel === 'subdemanda') {
     // V4: o nível vale para todos os filtros. Responsável aqui é o do próprio item.
     const ehSub = (d: T) => !!d.pai_id && porId.has(d.pai_id);
-    const dele = f.responsaveis.length ? new Set(lista.filter(d => f.responsaveis.includes(d.responsavel_id || SEM)).map(d => d.id)) : null;
+    const dele = semSelecao(f.responsaveis) ? null : new Set(lista.filter(d => em(f.responsaveis, d.responsavel_id)).map(d => d.id));
     if (f.nivel === 'demanda') {
       const maes = new Set(lista.filter(d => !ehSub(d) && demandaPassa(d, f, dele)).map(d => d.id));
       return lista.filter(d => maes.has(d.id) || (!!d.pai_id && maes.has(d.pai_id)));
@@ -206,7 +208,7 @@ export const PADRAO_PORTFOLIO: FiltroPortfolio = { ...PADRAO_DEMANDAS, gps: [] }
 interface ProjetoDoPortfolio { id: string; nome: string; fase: string; cliente_id: string; cliente: string; gp: string | null }
 /** Há filtro que olha as demandas do projeto (etapa, responsável, tipo, prioridade, só atrasadas)? O status entra por `statusRestringe`. */
 export const filtraPorDemanda = (f: FiltroPortfolio, statusRestringe = false) =>
-  statusRestringe || f.etapas.length > 0 || f.responsaveis.length > 0 || f.tipos.length > 0 || f.prioridades.length > 0 || f.atrasadas;
+  statusRestringe || !semSelecao(f.etapas) || !semSelecao(f.responsaveis) || !semSelecao(f.tipos) || !semSelecao(f.prioridades) || f.atrasadas;
 /**
  * Projetos do Portfólio que passam no filtro. Fase, cliente, projeto, GP e texto valem para o projeto; etapa, responsável,
  * tipo, prioridade e "só atrasadas" (e o status, quando `statusRestringe`) pedem ao menos uma demanda do projeto que
@@ -221,9 +223,9 @@ export function filtrarPortfolio<P extends ProjetoDoPortfolio>(ps: P[], demandas
     comDemanda = new Set(passam.map(d => d.projeto_id).filter((x): x is string => !!x));
   }
   return ps.filter(p =>
-    (fora.fases || em(f.fases, p.fase)) && (fora.gps || f.gps.length === 0 || f.gps.includes(p.gp ?? semGp))
-    && (f.clientes.length === 0 || f.clientes.includes(p.cliente_id))
-    && (f.projetos.length === 0 || f.projetos.includes(p.id))
+    (fora.fases || em(f.fases, p.fase)) && (fora.gps || passa(f.gps, p.gp ?? semGp))
+    && passa(f.clientes, p.cliente_id)
+    && passa(f.projetos, p.id)
     && (!comDemanda || comDemanda.has(p.id))
     && temTexto(f.texto, p.nome, p.cliente, p.gp, p.fase));
 }
@@ -254,8 +256,8 @@ export function candidatosGrade<T extends MembroGrade>(lista: T[], comTarefa: Se
 }
 /** Linhas da grade: os escolhidos (nenhum escolhido, ou escolhidos que já não estão na equipe = todos) e o texto do nome. */
 export function pessoasDaGrade<T extends MembroGrade>(candidatos: T[], escolhidos: readonly string[], texto = ''): T[] {
-  const validos = escolhidos.filter(id => candidatos.some(m => m.id === id));
-  return candidatos.filter(m => (validos.length === 0 || validos.includes(m.id)) && temTexto(texto, m.nome));
+  const validos = montarSelecao(marcadosDe(escolhidos).filter(id => candidatos.some(m => m.id === id)), ocultando(escolhidos));
+  return candidatos.filter(m => passa(validos, m.id) && temTexto(texto, m.nome));
 }
 
 // ---------------------------------------------------------------- lembrar por tela

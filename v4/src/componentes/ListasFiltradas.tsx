@@ -32,11 +32,11 @@ export function DemandasDoProjeto({ demandas, tarefas, vazio }: { demandas: Dema
     <>
       <BarraFiltros nome="demandas" n={itens.length} total={demandas.length} ativos={ativos} aoLimpar={limpar}>
         <input type="search" aria-label="Buscar demanda" placeholder="Buscar demanda" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
-        <SelecaoMultipla rotulo="Status" opcoes={STATUS_V4} sel={f.status} aoMudar={v => mudar({ status: v })} />
-        <SelecaoMultipla rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
-        <SelecaoMultipla rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
-        {ops.tipos.length > 1 && <SelecaoMultipla rotulo="Tipo" opcoes={ops.tipos} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />}
-        <SelecaoMultipla rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
+        <SelecaoMultipla ocultar rotulo="Status" opcoes={STATUS_V4} sel={f.status} aoMudar={v => mudar({ status: v })} />
+        <SelecaoMultipla ocultar rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
+        <SelecaoMultipla ocultar rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
+        {ops.tipos.length > 1 && <SelecaoMultipla ocultar rotulo="Tipo" opcoes={ops.tipos} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />}
+        <SelecaoMultipla ocultar rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
         <label className="check"><input type="checkbox" checked={f.atrasadas} onChange={e => mudar({ atrasadas: e.target.checked })} /> Só atrasadas</label>
         <span className="filtro-nivel" role="group" aria-label="Nível em que os filtros são aplicados" title="Vale para todos os filtros acima (em Tarefas, só o responsável)">
           Aplicar filtros em
@@ -63,8 +63,8 @@ export function TarefasDaDemanda({ tarefas, nomeDemanda }: { tarefas: Tarefa[]; 
     <>
       <BarraFiltros nome="tarefas" n={itens.length} total={tarefas.length} ativos={ativos} aoLimpar={limpar}>
         <input type="search" aria-label="Buscar tarefa" placeholder="Buscar tarefa" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
-        <SelecaoMultipla rotulo="Responsável" opcoes={responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
-        <SelecaoMultipla rotulo="Status" opcoes={STATUS_TAREFA} sel={f.status} aoMudar={v => mudar({ status: v })} />
+        <SelecaoMultipla ocultar rotulo="Responsável" opcoes={responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
+        <SelecaoMultipla ocultar rotulo="Status" opcoes={STATUS_TAREFA} sel={f.status} aoMudar={v => mudar({ status: v })} />
         <span className="periodo">
           <label>De <input type="date" aria-label="De" value={f.de} onChange={e => mudar({ de: e.target.value })} /></label>
           <label>até <input type="date" aria-label="Até" value={f.ate} onChange={e => mudar({ ate: e.target.value })} /></label>

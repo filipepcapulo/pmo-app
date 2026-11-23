@@ -91,6 +91,16 @@ describe('demandas', () => {
   ];
   const ids = (f: Partial<typeof PADRAO_DEMANDAS>, cons?: Map<string, Set<string>>) => filtrarDemandas(dem, { ...PADRAO_DEMANDAS, ...f }, cons).map(d => d.id);
   it('sem filtro devolve tudo, na ordem', () => expect(ids({})).toEqual(['d1', 'd2', 'd3', 'd4']));
+  it('4.26.0 modo Ocultar: todos menos os marcados (fase, cliente, projeto, tipo, prioridade, etapa e responsável)', () => {
+    expect(ids({ fases: ['!', 'P1'] })).toEqual(['d3', 'd4']);
+    expect(ids({ clientes: ['!', 'c2'] })).toEqual(['d1', 'd2', 'd3']);
+    expect(ids({ projetos: ['!', 'p1', 'p3'] })).toEqual(['d3']);
+    expect(ids({ tipos: ['!', 'entregavel'] })).toEqual(['d3', 'd4']);
+    expect(ids({ prioridades: ['!', 'normal'] })).toEqual(['d1', 'd3']);
+    expect(ids({ etapas: ['!', 'Homologação'] })).toEqual(['d3', 'd4']);   // d2 herda a etapa da mãe e sai junto
+    expect(ids({ responsaveis: ['!', 'ana'], nivel: 'subdemanda' })).toEqual(['d1', 'd2']);   // d2 (bia) passa; d1 vem de contexto
+    expect(ids({ fases: ['!'] })).toEqual(['d1', 'd2', 'd3', 'd4']);       // só o modo, sem marcados, não filtra
+  });
   it('4.26.0 situação do projeto: ativos, inativos ou todos; sem a marca o projeto conta como ativo', () => {
     const lista = dem.map(d => (d.projeto_id === 'p2' ? { ...d, projeto_inativo: true } : d.projeto_id === 'p1' ? { ...d, projeto_inativo: false } : d));
     const com = (sitProjeto: string) => filtrarDemandas(lista, { ...PADRAO_DEMANDAS, sitProjeto }).map(d => d.id);

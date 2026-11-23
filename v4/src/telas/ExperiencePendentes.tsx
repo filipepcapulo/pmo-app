@@ -14,6 +14,7 @@ import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 
 const REGRAS = 'Entram as agendas com Apontamento "OS Experience" ou "Hora Dobrada" cujo campo Experience ainda pede uma ação: vazio ou "Não lançado" = '
   + 'Abertura, "Alterar" = Ajuste, "Lixeira" = Exclusão — não importa se a tarefa veio de chamado, demanda ou subdemanda. Depois de sincronizada no modo real '
@@ -26,8 +27,8 @@ export function ExperiencePendentes() {
   const hoje = hojeIso();
   const [periodo, setPeriodo] = useState(() => periodoPendentes(hoje));
   const [acao, setAcao] = useState<AcaoSync | ''>('');
-  const [consultor, setConsultor] = useState('');
-  const [apontamento, setApontamento] = useState('');
+  const [consultor, setConsultor] = useState<string[]>([]);
+  const [apontamento, setApontamento] = useState<string[]>([]);
   const erroP = erroPeriodoPendentes(periodo.de, periodo.ate);
   const c = useCarga(() => (erroP ? Promise.resolve(null) : experiencePendentes.painel(escritorio, periodo.de, periodo.ate)),
     [escritorio, periodo.de, periodo.ate, erroP, ed.geracao]);
@@ -73,12 +74,8 @@ export function ExperiencePendentes() {
         <div className="barra-filtros">
           <label className="ajuda">De <input type="date" aria-label="Data inicial" value={periodo.de} onChange={e => setPeriodo(p => ({ ...p, de: e.target.value }))} /></label>
           <label className="ajuda">Até <input type="date" aria-label="Data final" value={periodo.ate} onChange={e => setPeriodo(p => ({ ...p, ate: e.target.value }))} /></label>
-          <label className="ajuda">Consultor <select aria-label="Consultor executante" value={consultor} onChange={e => setConsultor(e.target.value)}>
-            <option value="">Todos</option>{opcoes.consultores.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
-          </select></label>
-          <label className="ajuda">Apontamento <select aria-label="Apontamento" value={apontamento} onChange={e => setApontamento(e.target.value)}>
-            <option value="">Todos</option>{opcoes.apontamentos.map(a => <option key={a} value={a}>{a}</option>)}
-          </select></label>
+          <SelecaoMultipla ocultar rotulo="Consultor executante" opcoes={opcoes.consultores.map(m => ({ valor: m.id, rotulo: m.nome }))} sel={consultor} aoMudar={setConsultor} />
+          <SelecaoMultipla ocultar rotulo="Apontamento" opcoes={opcoes.apontamentos} sel={apontamento} aoMudar={setApontamento} />
           {erroP && <small className="msg-erro">{erroP}</small>}
         </div>
         <div className="chips" role="group" aria-label="Tipo de pendência">

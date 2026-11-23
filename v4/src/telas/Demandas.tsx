@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, FASES, SITUACOES } from '../api/cadastros';
 import { consultor } from '../api/consultor';
-import { arvoreDemandas, PRIORIDADES, STATUS_V4, todasDemandas, type DemandaLinha } from '../api/execucao';
+import { arvoreDemandas, PRIORIDADES, todasDemandas, type DemandaLinha } from '../api/execucao';
 import { useEtapas } from '../estado/etapas';
 import { ArvoreDemandas, itemLoteDemanda } from '../componentes/ArvoreDemandas';
 import { AcoesEdicaoMultipla, EdicaoMultipla } from '../componentes/EdicaoMultipla';
@@ -29,9 +29,10 @@ import { contarPorCliente, filtrarDemandas, itensDoNivel, NIVEIS_FILTRO, SEM, op
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
-import { ABERTAS, lerStatus, relatorioDemandas, rotuloStatus, TODOS } from '../api/relatorios';
+import { ABERTAS, relatorioDemandas, rotuloStatus, TODOS } from '../api/relatorios';
 import { baixarRelatorioHtml } from '../util/relatorioHtml';
 import { passa, textoSelecao } from '../util/selecao';
+import { OPCOES_STATUS, selDeStatus, STATUS_PADRAO, useStatusFiltro } from '../estado/statusFiltro';
 
 const CHAVE_STATUS = 'pmo4.demandas.status';
 const CHAVE_ABA = 'pmo4.demandas.aba';
@@ -51,13 +52,8 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
   const ed = useEdicao();
   const { porId } = useEquipe();
   const et = useEtapas();
-  const [status, setStatus] = useState<string[]>(() => { try { return lerStatus(localStorage.getItem(CHAVE_STATUS)); } catch { return ABERTAS; } });
-  useEffect(() => { try { localStorage.setItem(CHAVE_STATUS, JSON.stringify(status)); } catch { /* sem armazenamento */ } }, [status]);
-  // um status da V4 pode valer por mais de um do banco ("Não iniciado" = backlog + planejada)
-  const trocar = (banco: string[]) => setStatus(l => {
-    const n = banco.every(v => l.includes(v)) ? l.filter(x => !banco.includes(x)) : [...new Set([...l, ...banco])];
-    return n.length ? TODOS.filter(x => n.includes(x)) : l;
-  });
+  // Status no padrão dos filtros: escolha nos status da V4 (com Exibir/Ocultar); `status` é a lista do banco
+  const { sel: statusSel, setSel: setStatusSel, status } = useStatusFiltro(CHAVE_STATUS);
   const { f, mudar, limpar, aplicar, ativos } = useFiltroLista(minhas ? 'minhas-demandas' : 'demandas', PADRAO_DEMANDAS_TELA);
   const [mostrar, setMostrar] = useState(PROJETOS_POR_VEZ);
   // "Minhas demandas" (dentro de Minha agenda) continua só com a lista
@@ -111,7 +107,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
     projetos: opcoesNomeadas(todas.filter(d => passa(f.clientes, d.cliente_id) && passa(f.sitProjetos, d.projeto_situacao)).map(d => [d.projeto_id, `${d.cliente} · ${d.projeto}`])),
   }), [todas, porId, f.clientes, f.sitProjetos, et]);
   const statusFora = !mesmos(status, ABERTAS);
-  const limparTudo = () => { limpar(); setStatus(ABERTAS); };
+  const limparTudo = () => { limpar(); setStatusSel(STATUS_PADRAO); };
   const descricao = [`Status: ${rotuloStatus(status)}`,
     desc('Fase', f.fases), desc('Etapa', f.etapas, ops.etapas),
     desc('Responsável', f.responsaveis, ops.responsaveis),
@@ -136,16 +132,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
       </div>}
       <BarraFiltros nome="demandas" n={c.dados ? itens.length : null} total={c.dados ? todas.length : null} ativos={ativos + (statusFora ? 1 : 0)} aoLimpar={limparTudo}>
         <input type="search" value={f.texto} onChange={e => mudar({ texto: e.target.value })} placeholder="Buscar demanda, cliente, projeto ou etapa" aria-label="Buscar demanda" />
-        <details className="filtro-status">
-          <summary>Status: {rotuloStatus(status)}</summary>
-          <div className="filtro-status-caixa">
-            <div className="linha">
-              <button type="button" className="link" onClick={() => setStatus(ABERTAS)}>Abertas</button>
-              <button type="button" className="link" onClick={() => setStatus(TODOS)}>Todas</button>
-            </div>
-            {STATUS_V4.map(s => <label key={s.valor} className="check"><input type="checkbox" checked={s.banco.every(v => status.includes(v))} onChange={() => trocar(s.banco)} /> {s.rotulo}</label>)}
-          </div>
-        </details>
+        <SelecaoMultipla ocultar rotulo="Status" opcoes={OPCOES_STATUS} sel={statusSel} aoMudar={setStatusSel} resumo={mesmos(status, ABERTAS) ? 'abertas' : undefined} />
         <SelecaoMultipla ocultar rotulo="Fase" opcoes={ops.fases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
         <SelecaoMultipla ocultar rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
         <SelecaoMultipla ocultar rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
@@ -155,8 +142,8 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
         <SelecaoMultipla ocultar rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />
         <SelecaoMultipla ocultar rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
         <label className="check"><input type="checkbox" checked={f.atrasadas} onChange={e => mudar({ atrasadas: e.target.checked })} /> Só atrasadas</label>
-        {!minhas && <FiltrosSalvos tela="demandas" atuais={{ ...f, statusLista: status }}
-          aoAplicar={x => { aplicar(x); setStatus(Array.isArray(x.statusLista) ? lerStatus(JSON.stringify(x.statusLista)) : ABERTAS); }} />}
+        {!minhas && <FiltrosSalvos tela="demandas" atuais={{ ...f, statusSel }}
+          aoAplicar={x => { aplicar(x); setStatusSel(selDeStatus(x.statusSel ?? x.statusLista)); }} />}
         <Botao disabled={!itens.length} onClick={() => baixarRelatorioHtml(relatorioDemandas(itens, descricao))}>Relatório HTML</Botao>
         <span className="filtro-nivel" role="group" aria-label="Nível em que os filtros são aplicados" title="Vale para todos os filtros acima">
           Aplicar filtros em

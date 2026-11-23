@@ -7,6 +7,8 @@ import { reais } from '../api/financeiro';
 import { useCarga } from '../estado/carga';
 import { baixarXlsx } from '../util/xlsx';
 import { Botao } from './Botao';
+import { textoSelecao } from '../util/selecao';
+import { SelecaoMultipla } from './SelecaoMultipla';
 
 const COR: Record<Cat, string> = { prod: 'gha-c0', com: 'gha-c1', int: 'gha-c2' };
 const TITULO: Record<Cat, string> = { prod: 'Horas produtivas', com: 'Horas de apoio comercial', int: 'Horas internas' };
@@ -45,7 +47,7 @@ export function FechamentoIndicadores({ esc, periodos, oculto }: { esc: string; 
   // `periodos` vem do mais recente para o mais antigo; o padrão são os 12 últimos já encerrados
   const [ate, setAte] = useState(periodos[Math.min(1, periodos.length - 1)].key);
   const [de, setDe] = useState(periodos[Math.min(12, periodos.length - 1)].key);
-  const [consultor, setConsultor] = useState('');
+  const [consultor, setConsultor] = useState<string[]>([]);
   const c = useCarga(() => fech.indicadores(esc, Math.min(de, ate), Math.max(de, ate)), [esc, de, ate]);
   const d = c.dados;
   const r = useMemo(() => (d ? resumoIndicadores(d, consultor) : null), [d, consultor]);
@@ -59,10 +61,7 @@ export function FechamentoIndicadores({ esc, periodos, oculto }: { esc: string; 
           <select aria-label="De" value={de} onChange={e => setDe(Number(e.target.value))}>{periodos.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}</select></label>
         <label className="periodo">Até
           <select aria-label="Até" value={ate} onChange={e => setAte(Number(e.target.value))}>{periodos.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}</select></label>
-        <select aria-label="Consultor" value={consultor} onChange={e => setConsultor(e.target.value)}>
-          <option value="">Todos os consultores</option>
-          {(d?.consultores ?? []).map(x => <option key={x.id} value={x.id}>{x.nome}</option>)}
-        </select>
+        <SelecaoMultipla ocultar rotulo="Consultor" opcoes={(d?.consultores ?? []).map(x => ({ valor: x.id, rotulo: x.nome }))} sel={consultor} aoMudar={setConsultor} />
         <span className="chips">
           {[[1, 'Último'], [3, 'Últimos 3'], [6, 'Últimos 6'], [12, 'Últimos 12']].map(([n, t]) => (
             <button key={n} type="button" className="chip" onClick={() => ultimos(n as number)}>{t}</button>))}
@@ -73,7 +72,7 @@ export function FechamentoIndicadores({ esc, periodos, oculto }: { esc: string; 
       {c.erro && <p className="msg-erro" role="alert">{c.erro}</p>}
       {!d && !c.erro && <div className="carregando-tela"><span className="giro" /> Calculando os períodos…</div>}
       {d && r && <>
-        <p className="ajuda">{d.periodos[0]?.label} a {d.periodos[d.periodos.length - 1]?.label} · {consultor ? d.consultores.find(x => x.id === consultor)?.nome : 'todos os consultores'} · horas consideradas (com ajustes).
+        <p className="ajuda">{d.periodos[0]?.label} a {d.periodos[d.periodos.length - 1]?.label} · {textoSelecao(consultor, id => d.consultores.find(x => x.id === id)?.nome ?? id) || 'todos os consultores'} · horas consideradas (com ajustes).
           {d.ilegiveis > 0 && <> {d.ilegiveis} registro(s) do cofre não puderam ser decifrados e ficaram de fora.</>}</p>
         <div className="ind-cartoes">
           {CATS.map(cat => {

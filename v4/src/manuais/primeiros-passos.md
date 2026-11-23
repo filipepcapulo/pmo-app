@@ -57,6 +57,8 @@ Cada tela que você abre (um módulo, um cliente, um projeto, uma tarefa) vira u
 - O **Início** nunca vira aba: ele aparece quando nenhuma aba está ativa.
 - As abas abertas ficam guardadas neste aparelho. Ao voltar ao app, elas continuam lá.
 
+**Filtros das listas.** Todo filtro de lista tem o mesmo formato: uma pílula (por exemplo **Cliente: todos**) que abre a lista de valores. Marque quantos quiser. No topo da lista, **Exibir** mostra só os marcados e **Ocultar** mostra todos menos os marcados — para ver tudo menos um cliente, toque em **Ocultar** e marque só ele. **Limpar** desfaz a escolha; nada marcado mostra tudo.
+
 ## 5. Favoritos
 
 Na ficha de um cliente, projeto, demanda, tarefa ou chamado, toque em **☆ Favoritar**. O botão vira **★ Favorito**; toque de novo para tirar.

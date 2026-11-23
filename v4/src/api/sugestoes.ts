@@ -3,6 +3,7 @@
 import { novaOperacao, rpc } from './cliente';
 import type { Pessoa } from './cadastros';
 import type { Anexo } from './execucao';
+import { passaEm } from '../util/selecao';
 
 export type StatusSugestao = 'nova' | 'em_analise' | 'planejada' | 'concluida' | 'recusada';
 export const STATUS_SUGESTAO: { valor: StatusSugestao; rotulo: string }[] = [
@@ -19,8 +20,9 @@ export interface Sugestao {
 /** Quem sugeriu mexe enquanto está nova; quem gerencia mexe sempre. */
 export const podeEditarSugestao = (s: Pick<Sugestao, 'minha' | 'status'>, gerencia: boolean) => gerencia || (s.minha && s.status === 'nova');
 /** Filtra por status ('' = todas) e por "só as minhas". */
-export const filtrarSugestoes = (l: Sugestao[], status: string, minhas: boolean) =>
-  l.filter(s => (!status || s.status === status) && (!minhas || s.minha));
+/** status: lista (seleção múltipla com Exibir/Ocultar) ou o valor único antigo ('' = todos). */
+export const filtrarSugestoes = (l: Sugestao[], status: string | readonly string[], minhas: boolean) =>
+  l.filter(s => passaEm(status, s.status) && (!minhas || s.minha));
 
 export const sug = {
   listar: (esc: string) => rpc<{ gerencia: boolean; linhas: Sugestao[] }>('v1_sugestoes', { p_escritorio: esc }),

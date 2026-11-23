@@ -6,6 +6,7 @@ import { reais } from './financeiro';
 import { traduzirErro } from './mensagens';
 import type { DocumentoPdf, TabelaDoc } from '../util/documentoPdf';
 import type { Planilha } from '../util/xlsx';
+import { passaEm } from '../util/selecao';
 
 export interface Periodo { key: number; label: string; ini: string; fim: string }
 export interface Taxa { vh: number; int: boolean; min: number }
@@ -264,11 +265,13 @@ export const NAO_CONSIDERAR = 'Não considerar: ';
 export const obsAjusteValida = (obs: string) => { const t = obs.trim(); return t.length >= 3 && t !== NAO_CONSIDERAR.trim(); };
 
 // ---------------------------------------------------------------- histórico (atendimentos de todos)
-export interface FiltroHistorico { consultor: string; origem: '' | 'OS' | 'Planilha'; busca: string; soAjustados: boolean }
+/** consultor e origem: lista (seleção múltipla com Exibir/Ocultar) ou o valor único antigo ('' = todos). */
+export interface FiltroHistorico { consultor: string | string[]; origem: string | string[]; busca: string; soAjustados: boolean }
+export const ORIGENS_HISTORICO = ['OS', 'Planilha'];
 const semAcento = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 export function filtrarHistorico(linhas: LinhaFech[], f: FiltroHistorico): LinhaFech[] {
   const q = semAcento(f.busca.trim());
-  return linhas.filter(r => (!f.consultor || r.usuario_id === f.consultor) && (!f.origem || r.orig === f.origem) && (!f.soAjustados || r.aj)
+  return linhas.filter(r => passaEm(f.consultor, r.usuario_id) && passaEm(f.origem, r.orig) && (!f.soAjustados || r.aj)
     && (!q || semAcento([r.nome, r.cli, r.os, r.desc, r.serv, r.ajobs].join(' ')).includes(q)));
 }
 export function totaisHistorico(linhas: LinhaFech[]) {
@@ -305,7 +308,7 @@ export interface ResumoInd {
   porPeriodo: { key: number; label: string; min: Record<Cat, number>; valor: Record<Cat, number> }[];
 }
 /** Agrupa as células da função (período × consultor × categoria × origem) para os cartões, o ranking e os gráficos. */
-export function resumoIndicadores(d: Indicadores, consultor = ''): ResumoInd {
+export function resumoIndicadores(d: Indicadores, consultor: string | readonly string[] = ''): ResumoInd {
   const zero = () => ({ prod: 0, com: 0, int: 0 });
   const r: ResumoInd = { total: 0, cat: { prod: { min: 0, valor: 0, n: 0 }, com: { min: 0, valor: 0, n: 0 }, int: { min: 0, valor: 0, n: 0 } }, ranking: [],
     porPeriodo: d.periodos.map(p => ({ key: p.key, label: p.label, min: zero(), valor: zero() })) };
@@ -313,7 +316,7 @@ export function resumoIndicadores(d: Indicadores, consultor = ''): ResumoInd {
   const nomes = new Map(d.consultores.map(c => [c.id, c.nome]));
   const rk = new Map<string, ResumoInd['ranking'][number]>();
   for (const c of d.celulas) {
-    if (consultor && c.usuario_id !== consultor) continue;
+    if (!passaEm(consultor, c.usuario_id)) continue;
     r.total += c.min;
     r.cat[c.cat].min += c.min; r.cat[c.cat].valor += c.valor; r.cat[c.cat].n += c.n;
     const p = per.get(c.periodo);
@@ -325,12 +328,12 @@ export function resumoIndicadores(d: Indicadores, consultor = ''): ResumoInd {
   return r;
 }
 /** Planilha Excel dos indicadores: uma linha por período × consultor × categoria × origem. */
-export function planilhaIndicadores(d: Indicadores, consultor = ''): Planilha {
+export function planilhaIndicadores(d: Indicadores, consultor: string | readonly string[] = ''): Planilha {
   const nomes = new Map(d.consultores.map(c => [c.id, c.nome])), rot = new Map(d.periodos.map(p => [p.key, p.label]));
   return {
     aba: 'Indicadores',
     colunas: [{ titulo: 'Período' }, { titulo: 'Consultor' }, { titulo: 'Categoria' }, { titulo: 'Origem' }, { titulo: 'Horas', tipo: 'V' }, { titulo: 'Lançamentos', tipo: 'I' }, { titulo: 'Custo', tipo: 'V' }],
-    linhas: d.celulas.filter(c => !consultor || c.usuario_id === consultor)
+    linhas: d.celulas.filter(c => passaEm(consultor, c.usuario_id))
       .map(c => [rot.get(c.periodo) ?? String(c.periodo), nomes.get(c.usuario_id) ?? '—', ROTULO_CAT[c.cat], c.orig, h(c.min), c.n, Math.round(c.valor * 100) / 100]),
   };
 }

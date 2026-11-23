@@ -14,6 +14,10 @@ export function passaAlgum(sel: readonly string[], valores: readonly (string | n
   if (m.length === 0) return true;
   return valores.some(v => v != null && m.includes(v)) !== ocultando(sel);
 }
+/** Filtro antigo de um valor só ('' = todos) ou a lista nova: sempre devolve a lista. */
+export const comoSelecao = (s: string | readonly string[]) => (typeof s === 'string' ? (s ? [s] : []) : s);
+/** `passa` para quem ainda aceita o filtro de um valor só. */
+export const passaEm = (s: string | readonly string[], valor: string | null | undefined) => passaAlgum(comoSelecao(s), [valor]);
 export const passa = (sel: readonly string[], valor: string | null | undefined) => passaAlgum(sel, [valor]);
 /** Texto para descrever o filtro (relatório): "A, B" ou "todos menos A, B"; nada marcado = ''. */
 export function textoSelecao(sel: readonly string[], nome: (v: string) => string = v => v): string {

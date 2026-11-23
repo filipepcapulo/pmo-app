@@ -117,7 +117,7 @@ Lista o que há para agendar, em Cliente › Projeto › Demanda › Subdemanda.
 
 ## 6. Desvios de agenda
 
-- Filtros: situação (**Todas as situações**, **Pendentes**, **Aprovados**, **Recusados**) e período **De** / **Até** (abre com os últimos 30 dias).
+- Filtros: **Situação** (Pendentes, Aprovados, Recusados; aceita vários, com Exibir/Ocultar; nada marcado mostra todas) e período **De** / **Até** (abre com os últimos 30 dias).
 - **Indicador por consultor**: Desvios, Pendentes, Recusados, Horas desviadas, Horas agendadas e % da agenda. Quantidade e horas somam pendentes e aprovados.
 - **Log**: Data, Período, Consultor, Horas, Previsto, Atendido, Quem orientou, Motivo, Situação e Decidido por. O **Previsto** abre a tarefa prevista; depois de aprovado, o **Atendido** abre a tarefa criada.
 - **Aprovar** e **Recusar** aparecem só na linha pendente de projeto em que você é o GP do projeto atendido.

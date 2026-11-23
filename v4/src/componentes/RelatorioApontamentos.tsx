@@ -6,7 +6,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
 import { traduzirErro } from '../api/mensagens';
-import { consultor, ORIGENS, origemParam, podeApontar, rotuloOrigens, temOrigem, type LinhaApontamento } from '../api/consultor';
+import { consultor, ORIGENS, origemParam, podeApontar, recortarApontamentos, rotuloOrigens, temOrigem, type LinhaApontamento } from '../api/consultor';
 import { rotuloStatusTarefa } from '../api/execucao';
 import { hojeIso, somarDias } from '../api/projeto';
 import { useCarga } from '../estado/carga';
@@ -17,6 +17,7 @@ import { useSessao } from '../estado/sessao';
 import { Botao } from './Botao';
 import { SelecaoMultipla } from './SelecaoMultipla';
 import { Tabela, type Coluna } from './Tabela';
+import { marcadosDe, ocultando } from '../util/selecao';
 
 const ROTULO_ORIGEM = { sankhya_om: 'Sankhya OM', app: 'Apontamento no APP', manual: 'Manual', previsto: 'Agenda prevista' };
 const janela = (a: LinhaApontamento) => (a.hora_ini && a.hora_fim ? `${a.hora_ini.slice(0, 5)}–${a.hora_fim.slice(0, 5)}` : '');
@@ -31,7 +32,9 @@ export function RelatorioApontamentos({ equipe, origens, aoMudarOrigens }: { equ
   const origem = origemParam(sel), comPrevisto = temOrigem(sel, 'previsto');
   const [de, setDe] = useState(() => somarDias(hojeIso(), -30));
   const [ate, setAte] = useState(hojeIso);
-  const [pessoa, setPessoa] = useState('');
+  const [pessoa, setPessoa] = useState<string[]>([]);
+  // o banco filtra um consultor só; com vários (ou no modo Ocultar) pede todos e recorta na tela
+  const umConsultor = !ocultando(pessoa) && marcadosDe(pessoa).length === 1 ? marcadosDe(pessoa)[0] : '';
   const [erro, setErro] = useState<string | null>(null);
   const pode = usePode();
   const conferente = !!equipe && pode('relatorio.produtividade');
@@ -39,7 +42,7 @@ export function RelatorioApontamentos({ equipe, origens, aoMudarOrigens }: { equ
     setErro(null);
     try { await consultor.conferir(esc, ids, sim); ed.mudou(); } catch (e) { setErro(traduzirErro(e).mensagem); }
   }, [esc, ed]);
-  const c = useCarga(() => consultor.apontamentos(esc, { de, ate, origem, equipe, consultor: pessoa }), [esc, de, ate, origem, equipe, pessoa, ed.geracao]);
+  const c = useCarga(() => consultor.apontamentos(esc, { de, ate, origem, equipe, consultor: umConsultor }), [esc, de, ate, origem, equipe, umConsultor, ed.geracao]);
   const colunas = useMemo<Coluna<LinhaApontamento>[]>(() => [
     { chave: 'data', titulo: 'Data', texto: a => data(a.data) },
     ...(equipe ? [{ chave: 'consultor', titulo: 'Consultor' }] : []),
@@ -65,18 +68,15 @@ export function RelatorioApontamentos({ equipe, origens, aoMudarOrigens }: { equ
       {conferente && <button type="button" className="link" onClick={() => conferir([a.apontamento_id!], !a.conferido_em)}>{a.conferido_em ? 'Reabrir' : 'Conferir'}</button>}
     </span>) },
   ], [equipe, ed, eu, conferente, conferir]);
-  const pendentes = (c.dados?.itens ?? []).filter(a => a.origem === 'app' && !a.conferido_em);
-  const r = c.dados;
+  const r = useMemo(() => (c.dados ? (umConsultor ? c.dados : recortarApontamentos(c.dados, pessoa)) : null), [c.dados, umConsultor, pessoa]);
+  const pendentes = (r?.itens ?? []).filter(a => a.origem === 'app' && !a.conferido_em);
   return (
     <>
       <div className="barra-filtros">
         {equipe && (
-          <select value={pessoa} onChange={e => setPessoa(e.target.value)} aria-label="Consultor">
-            <option value="">Todos os consultores</option>
-            {lista.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
-          </select>
+          <SelecaoMultipla ocultar rotulo="Consultor" opcoes={lista.map(m => ({ valor: m.id, rotulo: m.nome }))} sel={pessoa} aoMudar={setPessoa} />
         )}
-        <SelecaoMultipla rotulo="Origem" opcoes={ORIGENS} sel={sel} aoMudar={mudarOrigens} />
+        <SelecaoMultipla ocultar rotulo="Origem" opcoes={ORIGENS} sel={sel} aoMudar={mudarOrigens} />
         <label className="ajuda">De <input type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} aria-label="De" /></label>
         <label className="ajuda">Até <input type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} aria-label="Até" /></label>
         {conferente && pendentes.length > 0 && <Botao variante="primario" onClick={() => conferir(pendentes.map(a => a.apontamento_id!), true)}>Conferir {pendentes.length} do filtro</Botao>}

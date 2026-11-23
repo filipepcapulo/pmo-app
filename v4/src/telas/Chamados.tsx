@@ -3,8 +3,8 @@
 // Módulo Chamados (#/chamados, escopo §7): Busca paginada (10/15/30/50) em qualquer campo, Backlog por prioridade ×
 // antiguidade (ordem escolhida clicando nas colunas, guardada por usuário — V13a-2), e Indicadores (dos chamados e, desde a
 // V13a-4, dos atendimentos WhatsApp do Total Chat). "+ Chamado" abre o formulário do 2.x.
-import { useEffect, useState } from 'react';
-import { cham, FILAS, rotuloFila, rotuloSituacao, SITUACOES, slaDaLinha, type ChamadoLinha, type FiltrosChamado, type OpcoesChamado } from '../api/chamados';
+import { useEffect, useMemo, useState } from 'react';
+import { cham, FILAS, planoBuscaChamados, rotuloFila, rotuloSituacao, SITUACOES, slaDaLinha, type ChamadoLinha, type FiltrosChamado, type OpcoesChamado, type SelecaoChamados } from '../api/chamados';
 import { PRIORIDADES, rotuloPrioridade } from '../api/execucao';
 import { hojeIso, somarDias } from '../api/projeto';
 import { Botao } from '../componentes/Botao';
@@ -19,6 +19,7 @@ import { Resumo } from '../componentes/Resumo';
 import { AtendimentosWhatsapp } from '../componentes/AtendimentosWhatsapp';
 import { ChamadosPortal } from '../componentes/ChamadosPortal';
 import { BacklogFluxo, KanbanChamados, MeusChamados, Triagem } from './ChamadosFluxo';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 
 type Aba = 'busca' | 'triagem' | 'backlog' | 'kanban' | 'meus' | 'indicadores' | 'portal';
 
@@ -62,27 +63,30 @@ function Busca({ geracao }: { geracao: number }) {
   const esc = useSessao().eu!.escritorio_id!;
   const [texto, setTexto] = useState('');
   const [filtro, setFiltro] = useState<FiltrosChamado>({ abertos: true });
+  // padrão dos filtros: seleção múltipla com Exibir/Ocultar (o banco recebe o que entende; o resto é recortado aqui)
+  const [sel, setSel] = useState<SelecaoChamados>({ situacoes: [], prioridades: [], filas: [] });
   const [pagina, setPagina] = useState(0);
   const [tamanho, setTamanho] = useState<number>(15);
-  const c = useCarga(() => cham.buscar(esc, filtro, tamanho, pagina), [esc, filtro, tamanho, pagina, geracao]);
+  const plano = useMemo(() => planoBuscaChamados(filtro, sel, PRIORIDADES.map(p => p.valor)), [filtro, sel]);
+  const c = useCarga(async () => {
+    if (plano.nada) return { total: 0, itens: [] as ChamadoLinha[] };
+    if (!plano.local) return cham.buscar(esc, plano.filtro, tamanho, pagina);
+    const itens = (await cham.buscarTodos(esc, plano.filtro)).itens.filter(plano.local);
+    return { total: itens.length, itens: itens.slice(pagina * tamanho, (pagina + 1) * tamanho) };
+  }, [esc, plano, tamanho, pagina, geracao]);
   const total = c.dados?.total ?? 0, paginas = Math.max(1, Math.ceil(total / tamanho));
   const mudar = (f: Partial<FiltrosChamado>) => { setFiltro(a => ({ ...a, ...f })); setPagina(0); };
-  const situacao = filtro.vencidos ? 'vencidos' : filtro.abertos ? 'abertos' : filtro.situacao?.[0] ?? 'todos';
+  // escolher situações tira o "Só abertos" (como antes, quando a situação escolhida substituía "Abertos")
+  const mudarSel = (m: Partial<SelecaoChamados>) => { setSel(a => ({ ...a, ...m })); if (m.situacoes?.length) setFiltro(a => ({ ...a, abertos: undefined })); setPagina(0); };
   return (
     <section className="cartao">
       <form className="barra-filtros" onSubmit={e => { e.preventDefault(); mudar({ texto: texto.trim() || undefined }); }}>
         <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Número, cliente, assunto, ticket, solicitante, interação…" aria-label="Buscar chamado" />
-        <select aria-label="Situação" value={situacao}
-          onChange={e => { const v = e.target.value; mudar({ abertos: v === 'abertos' || undefined, vencidos: v === 'vencidos' || undefined, situacao: ['abertos', 'vencidos', 'todos'].includes(v) ? undefined : [v] }); }}>
-          <option value="abertos">Abertos</option><option value="vencidos">SLA vencido</option><option value="todos">Todos</option>
-          {SITUACOES.map(s => <option key={s.valor} value={s.valor}>{s.rotulo}</option>)}
-        </select>
-        <select aria-label="Prioridade" value={filtro.prioridade ?? ''} onChange={e => mudar({ prioridade: e.target.value || undefined })}>
-          <option value="">Toda prioridade</option>{PRIORIDADES.map(p => <option key={p.valor} value={p.valor}>{p.rotulo}</option>)}
-        </select>
-        <select aria-label="Fila" value={filtro.fila ?? ''} onChange={e => mudar({ fila: e.target.value || undefined })}>
-          <option value="">Toda fila</option>{FILAS.map(f => <option key={f.valor} value={f.valor}>{f.rotulo}</option>)}
-        </select>
+        <SelecaoMultipla ocultar rotulo="Situação" opcoes={SITUACOES} sel={sel.situacoes} aoMudar={v => mudarSel({ situacoes: v })} />
+        <SelecaoMultipla ocultar rotulo="Prioridade" opcoes={PRIORIDADES} sel={sel.prioridades} aoMudar={v => mudarSel({ prioridades: v })} />
+        <SelecaoMultipla ocultar rotulo="Fila" opcoes={FILAS} sel={sel.filas} aoMudar={v => mudarSel({ filas: v })} />
+        <label className="check"><input type="checkbox" checked={!!filtro.abertos} onChange={e => mudar({ abertos: e.target.checked || undefined })} /> Só abertos</label>
+        <label className="check"><input type="checkbox" checked={!!filtro.vencidos} onChange={e => mudar({ vencidos: e.target.checked || undefined })} /> Só SLA vencido</label>
         <Botao type="submit">Buscar</Botao>
       </form>
       {c.erro && <p className="msg-erro">{c.erro}</p>}

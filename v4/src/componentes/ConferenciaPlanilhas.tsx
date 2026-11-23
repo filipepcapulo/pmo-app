@@ -15,6 +15,8 @@ import { useToast } from './Toasts';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { useSessao } from '../estado/sessao';
+import { passa } from '../util/selecao';
+import { SelecaoMultipla } from './SelecaoMultipla';
 
 const ORIGEM = 'Planilhas: "PLANILHA DE HORAS" de cada pasta em "01. Planilhas Consultores" (Drive), todas as abas menos CONF-. '
   + 'Agendas: tarefas do banco com Apontamento Bonificado (Planilha), Planilha - Serviços, Treinamento ou Faturado (Planilha); canceladas e gestores ficam fora. '
@@ -62,13 +64,13 @@ export function ConferenciaPlanilhas() {
   const [execucao, setExecucao] = useState<string | undefined>(undefined);
   const [periodo, setPeriodo] = useState(() => periodoPadrao(hoje));
   const [filtro, setFiltro] = useState<Filtro>('pendencias');
-  const [consultor, setConsultor] = useState('');
+  const [consultor, setConsultor] = useState<string[]>([]);
   const [rodando, setRodando] = useState<'' | 'conferir' | 'fechar' | 'aba'>('');
   const c = useCarga(() => planilhas.listar(escritorio, execucao), [escritorio, execucao, ed.geracao]);
   const d = c.dados;
   const linhas = d?.linhas ?? [];
   const consultores = useMemo(() => [...new Set(linhas.map(l => l.consultor ?? '—'))].sort(), [linhas]);
-  const doConsultor = useMemo(() => (consultor ? linhas.filter(l => (l.consultor ?? '—') === consultor) : linhas), [linhas, consultor]);
+  const doConsultor = useMemo(() => linhas.filter(l => passa(consultor, (l.consultor ?? '—'))), [linhas, consultor]);
   const vistas = useMemo(() => doConsultor.filter(l => (filtro === 'todas' ? true : filtro === 'pendencias' ? pendentePl(l)
     : filtro === 'com_os' ? !!l.os : l.situacao === filtro)), [doConsultor, filtro]);
   const t = totaisPl(doConsultor);
@@ -84,7 +86,7 @@ export function ConferenciaPlanilhas() {
     try {
       const r = await planilhas.conferir(escritorio, periodo.de, periodo.ate);
       avisar(textoConferirPl(r), r.ok ? 'ok' : 'erro');
-      if (r.ok) { setExecucao(undefined); setFiltro('pendencias'); setConsultor(''); ed.mudou(); }
+      if (r.ok) { setExecucao(undefined); setFiltro('pendencias'); setConsultor([]); ed.mudou(); }
     } catch (e) { avisar((e as Error).message, 'erro'); }
     setRodando('');
   }
@@ -195,9 +197,7 @@ export function ConferenciaPlanilhas() {
             {chip('todas', 'Todas', doConsultor.length)}
           </div>
           {d!.todos && consultores.length > 1 && (
-            <label className="ajuda">Consultor <select aria-label="Filtrar consultor" value={consultor} onChange={e => setConsultor(e.target.value)}>
-              <option value="">Todos</option>{consultores.map(n => <option key={n} value={n}>{n}</option>)}
-            </select></label>)}
+            <SelecaoMultipla ocultar rotulo="Consultor" opcoes={consultores} sel={consultor} aoMudar={setConsultor} />)}
         </div>
       )}
       {ex && <section className="indicadores" aria-label="Totais da conferência de planilhas">

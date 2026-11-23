@@ -57,7 +57,7 @@ A demanda ou subdemanda que tem tarefas mostra a pílula **N tarefas** (as cance
 Filtros:
 
 - Busca por demanda, cliente ou projeto.
-- **Status**: começa em **Abertas** (Backlog, Planejada, Em andamento e Pausada). Marque os que quiser ou toque em **Todas**. O app guarda a escolha no aparelho.
+- **Status**: começa em **abertas** (Não iniciado, Em andamento, Em validação e Suspenso). Marque os que quiser, com **Exibir** ou **Ocultar**; **Limpar** mostra todos. O app guarda a escolha no aparelho.
 - **Fase**, **Responsável**, **Etapa**, **Cliente**, **Projeto**, **Tipo** (Entregável, Plano de ação, Chamado) e **Prioridade**: aceitam vários de uma vez. Dentro de cada um há os botões **Exibir** (mostra só os marcados) e **Ocultar** (mostra todos, menos os marcados): para ver tudo menos um cliente, toque em **Ocultar** e marque só ele.
 - **Situação do projeto** (Ativo, Suspenso, Encerrado, Cancelado — as mesmas da tela de Projetos): a tela abre com **Ativo** e **Suspenso** marcados. Para ver as demandas de projetos encerrados ou cancelados, marque-os; **Limpar** mostra todas as situações.
 - Com um responsável escolhido, aparece o nível: **Todos os níveis**, **Só demandas (com as subdemandas)** ou **Só subdemandas**.

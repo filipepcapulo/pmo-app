@@ -8,10 +8,12 @@ import { marcadosDe, montarSelecao, ocultando } from '../util/selecao';
 export interface OpcaoMultipla { valor: string; rotulo: string }
 const semAcento = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
-export function SelecaoMultipla({ rotulo, opcoes, sel, aoMudar, ocultar }: {
+export function SelecaoMultipla({ rotulo, opcoes, sel, aoMudar, ocultar, resumo: resumoFixo }: {
   rotulo: string; opcoes: readonly (string | OpcaoMultipla)[]; sel: readonly string[]; aoMudar: (s: string[]) => void;
   /** Oferece o modo Ocultar; só para telas cujo filtro entende a marca (util/selecao). */
   ocultar?: boolean;
+  /** Texto do resumo no lugar do padrão (ex.: "abertas" quando a escolha é a de sempre). */
+  resumo?: string;
 }) {
   const [busca, setBusca] = useState('');
   const [modoVazio, setModoVazio] = useState(false);   // modo escolhido antes de marcar o primeiro item
@@ -28,7 +30,7 @@ export function SelecaoMultipla({ rotulo, opcoes, sel, aoMudar, ocultar }: {
   const resumo = marcados.length === 0 ? 'todos' : marcados.length === 1 ? menos + nome(marcados[0]) : oculta ? `todos menos ${marcados.length}` : `${marcados.length} selecionados`;
   return (
     <details className="pf-multi">
-      <summary aria-label={`${rotulo}: ${marcados.length ? menos + marcados.map(nome).join(', ') : 'todos'}`}>{rotulo}: {resumo}</summary>
+      <summary aria-label={`${rotulo}: ${marcados.length ? menos + marcados.map(nome).join(', ') : 'todos'}`}>{rotulo}: {resumoFixo ?? resumo}</summary>
       <div className="pf-multi-lista" role="group" aria-label={rotulo}>
         {ocultar && <div className="pf-multi-modo" role="group" aria-label={`Modo de ${rotulo}`}>
           <button type="button" aria-pressed={!oculta} title="Mostra só os marcados" onClick={() => trocarModo(false)}>Exibir</button>

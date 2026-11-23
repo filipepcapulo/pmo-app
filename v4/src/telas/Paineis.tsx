@@ -21,6 +21,7 @@ import { useCarga } from '../estado/carga';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { baixarCsv, nomeArquivo } from '../util/csv';
+import { marcadosDe } from '../util/selecao';
 
 type Rascunho = Pick<Painel, 'nome' | 'tipo' | 'config' | 'compartilhado'> & Partial<Pick<Painel, 'id' | 'versao' | 'meu'>>;
 const rotuloTipo = (t: TipoPainel) => TIPOS_PAINEL.find(x => x.valor === t)?.rotulo ?? t;
@@ -178,7 +179,7 @@ function FiltrosForm({ fonte, filtros, linhas, aoMudar }: { fonte: Fonte; filtro
       <div className="linha">
         {usados.map(k => (
           <span key={k} className="pd-filtro">
-            <SelecaoMultipla rotulo={rotuloCampo(fonte, k)} opcoes={[...new Set([...valoresDe(linhas, k), ...f[k]])]} sel={f[k]} aoMudar={s => aoMudar({ ...f, [k]: s })} />
+            <SelecaoMultipla ocultar rotulo={rotuloCampo(fonte, k)} opcoes={[...new Set([...valoresDe(linhas, k), ...marcadosDe(f[k])])]} sel={f[k]} aoMudar={s => aoMudar({ ...f, [k]: s })} />
             <button type="button" className="link" aria-label={`Tirar o filtro ${rotuloCampo(fonte, k)}`} onClick={() => { const { [k]: _fora, ...resto } = f; aoMudar(resto); }}>×</button>
           </span>
         ))}

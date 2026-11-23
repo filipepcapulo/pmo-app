@@ -81,7 +81,7 @@ function Fechamento({ todos, origens, aoMudarOrigens }: { todos: boolean; origen
   return (
     <>
       <div className="barra-filtros">
-        <SelecaoMultipla rotulo="Origem" opcoes={ORIGENS} sel={origens} aoMudar={aoMudarOrigens} />
+        <SelecaoMultipla ocultar rotulo="Origem" opcoes={ORIGENS} sel={origens} aoMudar={aoMudarOrigens} />
         <label className="ajuda">De <input type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} aria-label="De" /></label>
         <label className="ajuda">Até <input type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} aria-label="Até" /></label>
         {(de !== p0.de || ate !== p0.ate) && <button type="button" className="link" onClick={() => { setDe(p0.de); setAte(p0.ate); }}>Período do fechamento (21 a 20)</button>}

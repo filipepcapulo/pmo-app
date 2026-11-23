@@ -18,6 +18,8 @@ import { useToast } from '../componentes/Toasts';
 import { useCarga } from '../estado/carga';
 import { useEquipe, usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
+import { passaAlgum } from '../util/selecao';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 const rotuloPapel = (p: string) => PAPEIS.find(x => x.valor === p)?.rotulo ?? p;
@@ -59,9 +61,9 @@ export function Equipe() {
 function Pessoas({ aoAbrir }: { aoAbrir: (id: string) => void }) {
   const { lista, carregada } = useEquipe();
   const [texto, setTexto] = useState('');
-  const [papel, setPapel] = useState('');
+  const [papel, setPapel] = useState<string[]>([]);
   const [inativos, setInativos] = useState(false);
-  const linhas = useMemo(() => lista.filter(m => (inativos || m.ativo) && (!papel || m.papeis.includes(papel as Papel))
+  const linhas = useMemo(() => lista.filter(m => (inativos || m.ativo) && passaAlgum(papel, m.papeis)
     && (!texto || semAcento(`${m.nome} ${m.email} ${m.email_clickup ?? ''}`).includes(semAcento(texto)))), [lista, texto, papel, inativos]);
   type L = Membro & Record<string, unknown>;
   const cols: Coluna<L>[] = [
@@ -76,10 +78,7 @@ function Pessoas({ aoAbrir }: { aoAbrir: (id: string) => void }) {
     <>
       <div className="barra-filtros">
         <input type="search" aria-label="Buscar pessoa" placeholder="Buscar nome ou e-mail" value={texto} onChange={e => setTexto(e.target.value)} />
-        <select aria-label="Papel" value={papel} onChange={e => setPapel(e.target.value)}>
-          <option value="">Todos os papéis</option>
-          {PAPEIS.map(p => <option key={p.valor} value={p.valor}>{p.rotulo}</option>)}
-        </select>
+        <SelecaoMultipla ocultar rotulo="Papel" opcoes={PAPEIS} sel={papel} aoMudar={setPapel} />
         <label className="check"><input type="checkbox" checked={inativos} onChange={e => setInativos(e.target.checked)} /> Mostrar inativos</label>
       </div>
       <Tabela id="equipe" nome="Equipe" colunas={cols} linhas={linhas as L[]} chave={l => l.id} tamanhoInicial={30}

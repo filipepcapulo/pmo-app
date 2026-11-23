@@ -24,7 +24,7 @@ Cada sugestão aparece em um cartão com:
 
 Para achar uma sugestão, use os filtros no alto:
 
-- **Todos os status**: escolha um status para ver só as sugestões naquela situação.
+- **Status**: marque os status que quer ver. Aceita vários de uma vez, com **Exibir** (só os marcados) e **Ocultar** (todos menos os marcados); nada marcado mostra todos.
 - **Só as minhas**: mostra apenas as que você enviou.
 
 ## 3. Enviar uma sugestão

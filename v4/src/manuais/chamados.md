@@ -105,7 +105,7 @@ Nas listas, a coluna **SLA** mostra a 1ª resposta enquanto ninguém respondeu; 
 ## 5. Aba Busca
 
 - Busque por número, cliente, assunto, ticket, solicitante ou texto de interação e toque em **Buscar**.
-- **Situação**: **Abertos** (padrão), **SLA vencido**, **Todos** ou uma situação específica.
+- **Situação**, **Prioridade** e **Fila**:Aceita vários de uma vez, com **Exibir** (só os marcados) e **Ocultar** (todos menos os marcados); nada marcado mostra todos. As caixas **Só abertos** (marcada ao abrir) e **Só SLA vencido** restringem a busca; ao escolher situações, o **Só abertos** é desmarcado.
 - **Prioridade** e **Fila** (Backlog Consultores ou Backlog Personalização).
 - **Por página**: escolha quantos chamados ver por vez e use ‹ › para navegar.
 

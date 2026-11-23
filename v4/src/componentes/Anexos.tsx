@@ -1,8 +1,9 @@
 // Anexos de projeto/demanda/tarefa/chamado/sugestão: o arquivo sobe ao Storage (pasta do escritório) e o registro vai pela API.
 // Abrir = link assinado de 2 min. Em demanda/tarefa já espelhada, o anexo também vai para o ClickUp.
+// Baixar (4.24.0): todo anexo tem o botão de download ao lado (lista, galeria e pré-visualização); baixa com o nome original.
 // Com `galeria` (4.14.0, ficha do chamado): miniaturas mostrando o conteúdo e pré-visualização grande ao clicar.
 import { useEffect, useRef, useState } from 'react';
-import { abrirAnexo, enviarAnexo, exec, extensaoAnexo, urlAnexo, visualAnexo, type Anexo, type EntidadeAnexo } from '../api/execucao';
+import { abrirAnexo, baixarAnexo, enviarAnexo, exec, extensaoAnexo, urlAnexo, visualAnexo, type Anexo, type EntidadeAnexo } from '../api/execucao';
 import { usePode } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
 import { Botao } from './Botao';
@@ -49,6 +50,7 @@ function Previa({ itens, urls, indice, aoMudar, aoFechar }: { itens: Anexo[]; ur
     <Popup aberto titulo={`${a.nome}${itens.length > 1 ? ` (${indice + 1} de ${itens.length})` : ''}`} aoFechar={aoFechar} largura={1100}
       rodape={<>
         {itens.length > 1 && <><Botao className="a-esquerda" onClick={() => ir(-1)}>← Anterior</Botao><Botao onClick={() => ir(1)}>Próximo →</Botao></>}
+        <Botao onClick={() => baixarAnexo(a).catch(e => avisar((e as Error).message, 'erro'))}>⬇ Baixar</Botao>
         <Botao onClick={() => abrirAnexo(a.caminho).catch(e => avisar((e as Error).message, 'erro'))}>Abrir em outra aba</Botao>
         <Botao variante="primario" onClick={aoFechar}>Fechar</Botao></>}>
       <div className="anexo-previa" data-testid="anexo-previa">
@@ -56,7 +58,7 @@ function Previa({ itens, urls, indice, aoMudar, aoFechar }: { itens: Anexo[]; ur
         {v === 'imagem' && url && <img src={url} alt={a.nome} />}
         {v === 'video' && url && <video src={url} controls />}
         {v === 'pdf' && url && <iframe src={url} title={a.nome} />}
-        {v === 'outro' && <p className="ajuda">Este tipo de arquivo não tem pré-visualização: use “Abrir em outra aba”.</p>}
+        {v === 'outro' && <p className="ajuda">Este tipo de arquivo não tem pré-visualização: use “Baixar” ou “Abrir em outra aba”.</p>}
       </div>
     </Popup>
   );
@@ -86,6 +88,8 @@ export function Anexos({ entidade, id, itens, aoMudar, galeria = false }: { enti
     if (!confirm(`Remover o anexo ${a.nome}?`)) return;
     try { await exec.anexoSalvar(esc, { id: a.id, excluir: true }); aoMudar(); } catch (e) { avisar((e as Error).message, 'erro'); }
   };
+  const botaoBaixar = (a: Anexo) => <button type="button" className="link anexo-baixar" aria-label={`Baixar ${a.nome}`} title="Baixar"
+    onClick={() => baixarAnexo(a).catch(e => avisar((e as Error).message, 'erro'))}>⬇ Baixar</button>;
   const podeRemover = (a: Anexo) => (a.criado_por === eu!.usuario.id || pode('demanda.editar')) && pode('anexo.gravar');
   return (
     <section className="anexos" aria-label="Anexos">
@@ -96,7 +100,7 @@ export function Anexos({ entidade, id, itens, aoMudar, galeria = false }: { enti
             <li key={a.id}>
               <button type="button" className="anexo-mini" aria-label={`Ver ${a.nome}`} title={a.nome} onClick={() => setPrevia(i)}><Miniatura a={a} url={urls[a.id]} /></button>
               <span className="anexo-nome" title={a.nome}>{a.nome}</span>
-              <small className="ajuda">{tamanho(a.tamanho)}
+              <small className="ajuda">{tamanho(a.tamanho)} {botaoBaixar(a)}
                 {podeRemover(a) && <> <button type="button" className="link" aria-label={`Remover ${a.nome}`} onClick={() => remover(a)}>×</button></>}</small>
             </li>
           ))}
@@ -107,6 +111,7 @@ export function Anexos({ entidade, id, itens, aoMudar, galeria = false }: { enti
             <li key={a.id}>
               <button type="button" className="link" onClick={() => abrirAnexo(a.caminho).catch(e => avisar((e as Error).message, 'erro'))}>📎 {a.nome}</button>
               <small className="ajuda"> {tamanho(a.tamanho)}</small>
+              {botaoBaixar(a)}
               {podeRemover(a) && <button type="button" className="link" aria-label={`Remover ${a.nome}`} onClick={() => remover(a)}>×</button>}
             </li>
           ))}

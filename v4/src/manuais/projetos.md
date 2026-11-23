@@ -134,7 +134,8 @@ Os detalhes de demanda e tarefa estão no Manual de Demandas.
 1. Toque em **+ Anexar** e escolha um ou mais arquivos.
 2. Cada arquivo pode ter até 20 MB. O app avisa "nome do arquivo anexado".
 
-- Para abrir ou baixar, toque no nome do anexo (📎). O arquivo abre em outra aba; o link vale por 2 minutos, então toque de novo se expirar.
+- Para abrir, toque no nome do anexo (📎). O arquivo abre em outra aba; o link vale por 2 minutos, então toque de novo se expirar.
+- Para baixar, toque em **⬇ Baixar** ao lado do anexo. O arquivo vai para os downloads com o nome original.
 - Para remover, toque no **×** ao lado do anexo e confirme. Só quem anexou, ou Admin, GP e Líder Tech, remove.
 - Anexa quem tem a permissão de anexo: por padrão, todos os perfis, desde que enxerguem o projeto.
 

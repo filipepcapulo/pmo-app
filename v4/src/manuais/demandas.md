@@ -120,7 +120,7 @@ O quadro **Subdemandas** lista as filhas (só na demanda mãe). Abaixo, as abas:
 
 - **Tarefas**: data, tarefa, responsável, período, tipo de agenda, status e horas. Filtros por busca, **Responsável**, **Status** e período (**De** / **até**). Horas em negrito são reais; em cinza, previstas.
 - **Checklist**: quem edita a demanda cria itens em **Novo item…** + **Adicionar**, marca e exclui.
-- **Anexos**: **+ Anexar** (até 20 MB por arquivo). Toque no nome para abrir; **×** remove (quem anexou, ou Admin, GP e Líder Tech).
+- **Anexos**: **+ Anexar** (até 20 MB por arquivo). Toque no nome para abrir e em **⬇ Baixar** para baixar; **×** remove (quem anexou, ou Admin, GP e Líder Tech).
 - **Comentários**: veja a seção 9.
 - **Rentabilidade**: só para quem tem o papel no cofre financeiro; tem manual próprio.
 

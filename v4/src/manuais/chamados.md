@@ -131,7 +131,7 @@ Botões:
 - **Editar chamado** (chamado já triado, para quem pode editar demandas): abre a subdemanda do chamado no mesmo popup de Demandas, sem sair da tela de Chamados. Dá para mudar nome, status, **prioridade**, etapa, responsável, horas, datas e descrição. Mudar a prioridade ali muda a prioridade do chamado e recalcula o SLA.
 - **Triagem**, **Recusar** e **Reabrir**: veja a seção 8.
 
-Abaixo dos dados fica o quadro **Detalhamento** e **Anexos**: o texto do chamado e os arquivos em miniatura (a imagem, a 1ª página do PDF ou o vídeo aparecem na própria miniatura; outros arquivos mostram a extensão). Toque na miniatura para ver em tamanho grande; **Anterior** e **Próximo** (ou as setas do teclado) passam pelos anexos e **Abrir em outra aba** baixa ou abre o arquivo. **+ Anexar** aceita até 20 MB por arquivo.
+Abaixo dos dados fica o quadro **Detalhamento** e **Anexos**: o texto do chamado e os arquivos em miniatura (a imagem, a 1ª página do PDF ou o vídeo aparecem na própria miniatura; outros arquivos mostram a extensão). Toque na miniatura para ver em tamanho grande; **Anterior** e **Próximo** (ou as setas do teclado) passam pelos anexos, **⬇ Baixar** baixa o arquivo e **Abrir em outra aba** abre. O **⬇ Baixar** também fica embaixo de cada miniatura. **+ Anexar** aceita até 20 MB por arquivo.
 
 Abas:
 

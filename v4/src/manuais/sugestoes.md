@@ -45,6 +45,7 @@ Os anexos só podem ser incluídos depois de enviar a sugestão.
 
 - Cada arquivo pode ter até 20 MB.
 - Toque no nome do anexo para abrir.
+- Toque em **⬇ Baixar** ao lado do anexo para baixar o arquivo.
 - Toque no **×** ao lado do anexo para remover. O app pede confirmação.
 - O botão **+ Anexar** só aparece para quem tem a permissão de anexar (`anexo.gravar`).
 

@@ -5,15 +5,18 @@
 // Tarefa já lançada: "+ Mais agenda" duplica a agenda (mesmos cliente/demanda/subdemanda, título, tipo e detalhes) pedindo só a
 // nova data e o horário, como o "Alocar mais" do 2.x.
 // Usuário do cliente (0051): contato do cliente da demanda, escolhido da lista ou cadastrado na hora; vai para todas as combinações.
+// Anexos (4.25.0): na tarefa nova os arquivos são escolhidos no popup e sobem depois de gravar, para todas as tarefas criadas;
+// na tarefa já lançada o popup mostra os anexos dela e anexa na hora.
 // Antes de gravar, os choques de horário (agenda, ausência, o próprio lote) aparecem para confirmar ou voltar ao lançamento.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { etapasApi } from '../api/etapas';
 import { useEtapas } from '../estado/etapas';
 import { horas } from '../api/cadastros';
-import { ajudaHorasPeriodo, AVISO_HORARIO, exec, horarioInvalido, horasDoPeriodoEscolhido, MODALIDADES, PADRAO_TAREFA, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, tarefaTravadaOs, AVISO_TAREFA_OS, PERMISSAO_EDITAR_COM_OS, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
+import { ajudaHorasPeriodo, AVISO_HORARIO, enviarAnexoEmVarias, exec, horarioInvalido, juntarArquivos, MAX_ARQ_LANCAMENTO, MAX_MB_ANEXO, horasDoPeriodoEscolhido, MODALIDADES, PADRAO_TAREFA, PERIODOS, rotuloModalidade, rotuloPeriodo, STATUS_TAREFA, tarefaTravadaOs, AVISO_TAREFA_OS, PERMISSAO_EDITAR_COM_OS, type Anexo, type Conflito, type ItemConflito, type OpcoesExecucao, type Tarefa } from '../api/execucao';
 import type { AlvoTarefa } from '../estado/edicao';
 import { usePode, useEquipe } from '../estado/equipe';
 import { useSessao } from '../estado/sessao';
+import { Anexos } from './Anexos';
 import { Botao } from './Botao';
 import { Campo, Formulario } from './Campo';
 import { EscolhaChips } from './Chips';
@@ -30,8 +33,8 @@ const horarioCurto = (c: Combinacao) => /\(([^)]+)\)/.exec(rotuloPeriodo(c.perio
 const chave = (c: Combinacao) => [c.resp, c.data, c.periodo, c.ini, c.fim, c.modalidade].join('|');
 const AGENDAS = MODALIDADES.filter(m => m.valor);
 
-export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { alvo: AlvoTarefa; opcoes: OpcoesExecucao | null; aoFechar: () => void; aoGravar: () => void;
-  aoConcluir?: (demandaId: string) => void }) {
+export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir, aoMudarAnexos }: { alvo: AlvoTarefa; opcoes: OpcoesExecucao | null; aoFechar: () => void; aoGravar: () => void;
+  aoConcluir?: (demandaId: string) => void; aoMudarAnexos?: () => void }) {
   const eu = useSessao().eu;
   const esc = eu!.escritorio_id!;
   const pode = usePode();
@@ -56,6 +59,28 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
   const [mais, setMais] = useState<{ data: string; periodo: string; ini: string; fim: string } | null>(null);
   const [conf, setConf] = useState<{ lista: Conflito[]; seguir: () => void } | null>(null);
   const novo = !alvo.id;
+  // anexos: `arquivos` espera a tarefa nova ser gravada; `anexos` são os da tarefa já lançada
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const [anexos, setAnexos] = useState<Anexo[]>([]);
+  const entrada = useRef<HTMLInputElement>(null);
+  const escolher = (l: FileList | null) => {
+    const r = juntarArquivos(arquivos, Array.from(l ?? []));
+    setArquivos(r.lista);
+    r.avisos.forEach(a => avisar(a, 'erro'));
+    if (entrada.current) entrada.current.value = '';
+  };
+  // falha num anexo não desfaz a tarefa: avisa e segue (dá para anexar depois, abrindo a tarefa)
+  const anexar = async (ids: string[]) => {
+    if (!ids.length) return;
+    for (const a of arquivos) {
+      try { await enviarAnexoEmVarias(esc, 'tarefa', ids, a); }
+      catch (e) { avisar(`Tarefa gravada, mas ${a.name} não foi anexado: ${(e as Error).message}`, 'erro'); }
+    }
+  };
+  const recarregarAnexos = () => {
+    if (alvo.id) exec.anexos(esc, 'tarefa', alvo.id).then(setAnexos).catch(() => {});
+    aoMudarAnexos?.();
+  };
   // 0105/0113: tarefa apontada no Sankhya (tem nº de OS) só altera o Admin ou quem tem tarefa.editar_com_os
   const travadaOs = !novo && tarefaTravadaOs(orig, pode(PERMISSAO_EDITAR_COM_OS));
   const podeGravar = pode(novo ? 'tarefa.criar' : 'tarefa.editar') && !travadaOs;
@@ -66,6 +91,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
     if (alvo.id) exec.tarefa(esc, alvo.id).then(r => {
       const t = r.tarefa;
       setOrig(t);
+      setAnexos(r.anexos ?? []);
       setF({ demanda: t.demanda_id, nome: t.nome, periodo: t.periodo, ini: t.hora_ini?.slice(0, 5) ?? '', fim: t.hora_fim?.slice(0, 5) ?? '',
         modalidade: t.modalidade ?? '', status: t.status, detalhamento: t.detalhamento ?? '', etapa: t.etapa ?? '', etapaApp: et.idDe(t) ?? '', agendamento: t.agendamento ?? '',
         experience: t.experience ?? '', apontamento: t.apontamento ?? '', data: t.data, resp: t.responsavel_id, usuario: t.usuario_cliente_id ?? '' });
@@ -141,17 +167,22 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
       ({ periodo: c.periodo, hora_ini: c.periodo === 'livre' ? c.ini : null, hora_fim: c.periodo === 'livre' ? c.fim : null });
     if (novo) {
       let feitas = 0;
+      const criadas: string[] = [];
       try {
         for (const c of lista) {
           const r = await exec.tarefasSalvar(esc, { demanda_id: f.demanda, ...comuns, ...horario(c), modalidade: c.modalidade || null, responsaveis: [c.resp], datas: [c.data], ...forcar });
           feitas++;
+          criadas.push(...idsCriadas(r));
           if (f.etapaApp) await definirEtapa(idsCriadas(r), f.etapaApp);
         }
+        await anexar(criadas);
         avisar(`${feitas} tarefa(s) criada(s)`, 'ok');
         aoGravar();
       } catch (e) {
         // as que já foram gravadas saem da lista; o resto fica para corrigir e gravar de novo
         setCombos(lista.slice(feitas));
+        // as que entraram já levam os anexos; os arquivos ficam escolhidos para as que faltam
+        await anexar(criadas);
         setErro(`${feitas ? `${feitas} de ${lista.length} criada(s). ` : ''}${(e as Error).message}`);
       }
       setGravando(false);
@@ -281,6 +312,21 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir }: { a
         </div>
         <Campo rotulo="Detalhamento" tipo="textarea" valor={f.detalhamento} aoMudar={v => setF({ ...f, detalhamento: v })} maxLength={20000}
           placeholder="Observações da tarefa (vão no campo Detalhamento)" />
+        {novo ? pode('anexo.gravar') && (
+          <div className="campo" data-testid="form-tarefa-anexos"><span className="rotulo">Anexos</span>
+            {arquivos.length > 0 && <ul className="lista-simples">
+              {arquivos.map((a, i) => <li key={a.name + i}>📎 {a.name} <button type="button" className="link" aria-label={`Tirar ${a.name}`}
+                onClick={() => setArquivos(l => l.filter((_, n) => n !== i))}>×</button></li>)}
+            </ul>}
+            <input ref={entrada} type="file" multiple hidden aria-label="Escolher arquivos" onChange={e => escolher(e.target.files)} />
+            {arquivos.length < MAX_ARQ_LANCAMENTO && <div className="linha"><Botao onClick={() => entrada.current?.click()}>+ Anexar</Botao></div>}
+            <small className="ajuda">Até {MAX_ARQ_LANCAMENTO} arquivos de {MAX_MB_ANEXO} MB; sobem ao gravar{nNovas > 1 ? ` e vão para as ${nNovas} tarefas` : ''}.</small>
+          </div>
+        ) : orig && (
+          <div className="campo" data-testid="form-tarefa-anexos"><span className="rotulo">Anexos</span>
+            <Anexos entidade="tarefa" id={orig.id} itens={anexos} aoMudar={recarregarAnexos} />
+          </div>
+        )}
         {mais && (
           <fieldset className="campo chips-campo montador mais-agenda" aria-label="Mais agenda">
             <legend>Mais agenda <small>— mesma demanda, título, tipo e detalhes; escolha a nova data e o horário</small></legend>

@@ -58,7 +58,7 @@ export function ProvedorEdicao({ children }: { children: ReactNode }) {
       {dem && <FormDemanda alvo={dem.alvo} opcoes={opcoes} aoFechar={() => setDem(null)}
         aoGravar={id => { const cb = dem.cb; setDem(null); mudou(); cb?.(id); }} />}
       {perg && <PerguntaChamado chamado={perg} aoFechar={m => { setPerg(null); if (m) mudou(); }} />}
-      {tar && <FormTarefa alvo={tar.alvo} opcoes={opcoes} aoFechar={() => setTar(null)} aoConcluir={tarefaConcluida}
+      {tar && <FormTarefa alvo={tar.alvo} opcoes={opcoes} aoFechar={() => setTar(null)} aoConcluir={tarefaConcluida} aoMudarAnexos={mudou}
         aoGravar={() => { const cb = tar.cb; setTar(null); mudou(); cb?.(); }} />}
       {apt && <FormApontamento alvo={apt} aoFechar={() => setApt(null)} aoGravar={() => { setApt(null); mudou(); }} />}
       {ped && <FormPedidoAgenda alvo={ped} aoFechar={() => setPed(null)} aoGravar={() => { setPed(null); mudou(); }} />}

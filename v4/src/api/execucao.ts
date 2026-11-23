@@ -207,12 +207,32 @@ export function caminhoAnexo(esc: string, entidade: string, nome: string, id: st
   const limpo = nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\-]+/g, '_').slice(-120) || 'arquivo';
   return `${esc}/${entidade}/${id}-${limpo}`;
 }
-export async function enviarAnexo(esc: string, entidade: EntidadeAnexo, entidadeId: string, arquivo: File) {
-  if (arquivo.size > 20 * 1024 * 1024) throw new Error('Arquivo acima de 20 MB.');
+export const MAX_MB_ANEXO = 20;
+/** 4.25.0: o mesmo arquivo em várias entidades do mesmo tipo (tarefas criadas juntas no popup): sobe uma vez ao Storage e
+ *  registra em cada uma. Remover o anexo de uma não tira o das outras (a exclusão é só do registro). */
+export async function enviarAnexoEmVarias(esc: string, entidade: EntidadeAnexo, ids: string[], arquivo: File) {
+  if (arquivo.size > MAX_MB_ANEXO * 1024 * 1024) throw new Error(`Arquivo acima de ${MAX_MB_ANEXO} MB.`);
   const caminho = caminhoAnexo(esc, entidade, arquivo.name);
   const up = await sb.storage.from(BUCKET).upload(caminho, arquivo, { contentType: arquivo.type || undefined, upsert: false });
   if (up.error) throw new Error('Falha ao enviar o arquivo: ' + up.error.message);
-  return exec.anexoSalvar(esc, { entidade, entidade_id: entidadeId, caminho, nome: arquivo.name, tamanho: arquivo.size, tipo: arquivo.type || null });
+  const feitos: Awaited<ReturnType<typeof exec.anexoSalvar>>[] = [];
+  for (const id of ids) feitos.push(await exec.anexoSalvar(esc, { entidade, entidade_id: id, caminho, nome: arquivo.name, tamanho: arquivo.size, tipo: arquivo.type || null }));
+  return feitos;
+}
+export async function enviarAnexo(esc: string, entidade: EntidadeAnexo, entidadeId: string, arquivo: File) {
+  return (await enviarAnexoEmVarias(esc, entidade, [entidadeId], arquivo))[0];
+}
+/** Arquivos escolhidos antes de gravar (popup de tarefa nova): junta sem repetir, barra os grandes demais e limita a quantidade. */
+export const MAX_ARQ_LANCAMENTO = 10;
+export function juntarArquivos<T extends { name: string; size: number }>(atuais: T[], novos: T[]): { lista: T[]; avisos: string[] } {
+  const avisos: string[] = [], lista = [...atuais];
+  for (const n of novos) {
+    if (n.size > MAX_MB_ANEXO * 1024 * 1024) { avisos.push(`${n.name}: acima de ${MAX_MB_ANEXO} MB.`); continue; }
+    if (lista.some(a => a.name === n.name && a.size === n.size)) continue;
+    if (lista.length >= MAX_ARQ_LANCAMENTO) { avisos.push(`No máximo ${MAX_ARQ_LANCAMENTO} arquivos por lançamento.`); break; }
+    lista.push(n);
+  }
+  return { lista, avisos };
 }
 export async function abrirAnexo(caminho: string) {
   const r = await sb.storage.from(BUCKET).createSignedUrl(caminho, 120);

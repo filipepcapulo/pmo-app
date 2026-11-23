@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arvoreDemandas, caminhoAnexo, linkDownload, cascataDemandas, fatiasBarra, horarioInvalido, mencoesNoTexto, semAlerta } from './execucao';
+import { arvoreDemandas, caminhoAnexo, juntarArquivos, MAX_ARQ_LANCAMENTO, linkDownload, cascataDemandas, fatiasBarra, horarioInvalido, mencoesNoTexto, semAlerta } from './execucao';
 
 describe('Atendimento Avulso sem alerta (0073)', () => {
   it('a marca vem na demanda ou nos totais dela', () => {
@@ -53,6 +53,25 @@ describe('árvore de demandas', () => {
 describe('caminho do anexo', () => {
   it('começa pela pasta do escritório e limpa o nome', () => {
     expect(caminhoAnexo('esc1', 'demanda', 'Ata reunião (final).pdf', 'u1')).toBe('esc1/demanda/u1-Ata_reuniao_final_.pdf');
+  });
+});
+
+describe('arquivos escolhidos no popup de tarefa nova (4.25.0)', () => {
+  const arq = (name: string, mb = 1) => ({ name, size: mb * 1024 * 1024 });
+  it('junta sem repetir o mesmo arquivo', () => {
+    const r = juntarArquivos([arq('a.pdf')], [arq('a.pdf'), arq('b.png')]);
+    expect(r.lista.map(x => x.name)).toEqual(['a.pdf', 'b.png']);
+    expect(r.avisos).toEqual([]);
+  });
+  it('barra o arquivo acima de 20 MB e avisa, sem perder os outros', () => {
+    const r = juntarArquivos([], [arq('grande.zip', 21), arq('ok.pdf')]);
+    expect(r.lista.map(x => x.name)).toEqual(['ok.pdf']);
+    expect(r.avisos).toEqual(['grande.zip: acima de 20 MB.']);
+  });
+  it('para no limite de arquivos por lançamento', () => {
+    const r = juntarArquivos([], Array.from({ length: MAX_ARQ_LANCAMENTO + 2 }, (_, i) => arq(`f${i}.txt`)));
+    expect(r.lista).toHaveLength(MAX_ARQ_LANCAMENTO);
+    expect(r.avisos).toHaveLength(1);
   });
 });
 

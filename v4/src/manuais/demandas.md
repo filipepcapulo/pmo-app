@@ -131,7 +131,8 @@ Toque em **+ Tarefa**.
 1. Confira o cliente e a demanda e informe o **Título** (obrigatórios).
 2. Monte a agenda: **Consultor**, **Data**, **Período** e **Tipo de agenda**. Toque em **+ Adicionar combinação**. Repita para outras pessoas, dias ou horários; **+ dia útil** repete no dia útil seguinte. Cada combinação vira uma tarefa (até 100 por vez).
 3. Se quiser: **Status**, **Etapa**, **Apontamento**, **Agendamento**, **Experience** e **Detalhamento**. A tarefa nova já vem com a sugestão **Apontamento = OS Experience**, **Agendamento = Agendar** e **Experience = Não lançado** (troque se for outro caso); a **Etapa** é a do cadastro de Etapas do app.
-4. Toque em **Gravar** (ou **Criar N tarefas**).
+4. Se quiser, em **Anexos** toque em **+ Anexar** e escolha os arquivos (até 10, de 20 MB cada). Eles sobem ao gravar; criando várias tarefas de uma vez, vão para todas.
+5. Toque em **Gravar** (ou **Criar N tarefas**).
 
 Períodos: Manhã (08h-12h), Tarde (14h-18h), Dia (08h-18h), Noite (18h-22h) ou **Horário livre**. No horário livre, informe **Início** e **Fim** no formato hh:mm; os minutos são aceitos (ex.: 13:30 às 14:15), então a agenda pode ter menos de uma hora. Enquanto o ClickUp estiver em paralelo, lá a tarefa aparece na hora cheia que contém a janela (13:30 às 14:15 aparece como 13h-15h); no app valem o horário e as horas exatos.
 
@@ -164,7 +165,7 @@ Botões (cada um aparece só quando se aplica):
 
 - **Apontamentos**: origem (OS Sankhya OM, App ou Manual), número, data, início–fim, horas, texto e validação. Sem apontamento, a tarefa conta as horas previstas.
 - **Checklist**: o responsável da tarefa marca e desmarca os itens; quem edita tarefas cria e exclui.
-- **Anexos** e **Comentários**: iguais aos da demanda.
+- **Anexos** e **Comentários**: iguais aos da demanda. Os anexos da tarefa também aparecem no popup **Editar**, onde **+ Anexar** já grava na hora.
 
 Quando houve desvio de agenda, a ficha mostra o quadro do desvio com o link para a outra tarefa. Tarefas criadas juntas aparecem em "Criada junto com".
 

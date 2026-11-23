@@ -119,11 +119,7 @@ export function ClienteTela({ id, aoRenomear, ir }: { id: string; aoRenomear: (t
             <input type="search" aria-label="Buscar projeto" placeholder="Buscar projeto" value={f.texto} onChange={e => mudar({ texto: e.target.value })} />
             <SelecaoMultipla ocultar rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
             <SelecaoMultipla ocultar rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
-            <select aria-label="Situação" value={f.situacao} onChange={e => mudar({ situacao: e.target.value })}>
-              <option value="">Todas as situações</option>
-              <option value="abertos">Ativos e suspensos</option>
-              {SITUACOES.map(s => <option key={s.valor} value={s.valor}>{s.rotulo}</option>)}
-            </select>
+            <SelecaoMultipla ocultar rotulo="Situação" opcoes={SITUACOES} sel={f.situacoes} aoMudar={v => mudar({ situacoes: v })} />
           </BarraFiltros>
         )}
         <Tabela id="cliente-projetos" nome="Projetos do cliente" colunas={colsProj} linhas={projFiltrados as (ProjetoResumo & Record<string, unknown>)[]} chave={l => l.id}

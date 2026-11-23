@@ -51,11 +51,7 @@ export function Projetos({ ir }: { ir: (caminho: string, titulo?: string) => voi
         <SelecaoMultipla ocultar rotulo="Fase" opcoes={opFases} sel={f.fases} aoMudar={v => mudar({ fases: v })} />
         <SelecaoMultipla ocultar rotulo="GP" opcoes={opGps} sel={f.gps} aoMudar={v => mudar({ gps: v })} />
         <SelecaoMultipla ocultar rotulo="Cliente" opcoes={opClientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
-        <select aria-label="Situação" value={f.situacao} onChange={e => mudar({ situacao: e.target.value })}>
-          <option value="abertos">Ativos e suspensos</option>
-          {SITUACOES.map(s => <option key={s.valor} value={s.valor}>{s.rotulo}</option>)}
-          <option value="">Todos</option>
-        </select>
+        <SelecaoMultipla ocultar rotulo="Situação" opcoes={SITUACOES} sel={f.situacoes} aoMudar={v => mudar({ situacoes: v })} />
         <FiltrosSalvos tela="projetos" atuais={f as unknown as Record<string, unknown>} aoAplicar={aplicar} />
       </BarraFiltros>
       {c.erro ? <p className="msg-erro">{c.erro}</p>

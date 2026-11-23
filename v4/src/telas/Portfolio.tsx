@@ -27,7 +27,11 @@ import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
-import { passa } from '../util/selecao';
+import { marcadosDe, montarSelecao, ocultando, passa, semSelecao } from '../util/selecao';
+
+/** Cartões de fase e barras de GP: destacado = está passando num filtro com algo marcado; o clique marca/desmarca no modo atual (Exibir ou Ocultar). */
+const naSel = (sel: string[], v: string) => !semSelecao(sel) && passa(sel, v);
+const alternarSel = (sel: string[], v: string) => montarSelecao(alternar(marcadosDe(sel), v), ocultando(sel));
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const COR_NIVEL = { critico: 'var(--vermelho)', alto: 'var(--laranja)', moderado: 'var(--texto-2)' };
@@ -162,8 +166,8 @@ export function Portfolio() {
             {STATUS_V4.map(s => <label key={s.valor} className="check"><input type="checkbox" checked={s.banco.every(v => status.includes(v))} onChange={() => trocar(s.banco)} /> {s.rotulo}</label>)}
           </div>
         </details>
-        <SelecaoMultipla rotulo="Fase" opcoes={fasesDe(ps)} sel={f.fases} aoMudar={setFases} />
-        <SelecaoMultipla rotulo="GP" opcoes={gpsDe(ps)} sel={f.gps} aoMudar={setGps} />
+        <SelecaoMultipla ocultar rotulo="Fase" opcoes={fasesDe(ps)} sel={f.fases} aoMudar={setFases} />
+        <SelecaoMultipla ocultar rotulo="GP" opcoes={gpsDe(ps)} sel={f.gps} aoMudar={setGps} />
         <SelecaoMultipla ocultar rotulo="Etapa" opcoes={ops.etapas} sel={f.etapas} aoMudar={v => mudar({ etapas: v })} />
         <SelecaoMultipla ocultar rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
         <SelecaoMultipla ocultar rotulo="Cliente" opcoes={ops.clientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
@@ -185,9 +189,9 @@ export function Portfolio() {
       {c.erro && <p className="msg-erro">{c.erro}</p>}
       {c.dados && <>
         <section className="indicadores" aria-label="Projetos por fase">
-          <button type="button" className={`indicador pf-card${fases.length === 0 ? ' sel' : ''}`} onClick={() => setFases([])}><small>Projetos</small><strong style={{ color: 'var(--verde)' }} data-testid="pf-total">{doGp.length}</strong></button>
+          <button type="button" className={`indicador pf-card${semSelecao(fases) ? ' sel' : ''}`} onClick={() => setFases([])}><small>Projetos</small><strong style={{ color: 'var(--verde)' }} data-testid="pf-total">{doGp.length}</strong></button>
           {fasesDe(ps).map(f => (
-            <button key={f} type="button" className={`indicador pf-card${fases.includes(f) ? ' sel' : ''}`} aria-pressed={fases.includes(f)} onClick={() => setFases(alternar(fases, f))}>
+            <button key={f} type="button" className={`indicador pf-card${naSel(fases, f) ? ' sel' : ''}`} aria-pressed={naSel(fases, f)} onClick={() => setFases(alternarSel(fases, f))}>
               <small>{f}</small><strong>{doGp.filter(p => p.fase === f).length}</strong>
             </button>
           ))}
@@ -197,7 +201,7 @@ export function Portfolio() {
             <h2 className="secao">Projetos por GP</h2>
             <div className="pf-gp">
               {barras.map(b => (
-                <button key={b.gp} type="button" aria-pressed={gpsSel.includes(b.gp)} className={`pf-gp-l${gpsSel.includes(b.gp) ? ' sel' : ''}${gpsSel.length && !gpsSel.includes(b.gp) ? ' apagado' : ''}`} onClick={() => setGps(alternar(gpsSel, b.gp))}>
+                <button key={b.gp} type="button" aria-pressed={naSel(gpsSel, b.gp)} className={`pf-gp-l${naSel(gpsSel, b.gp) ? ' sel' : ''}${!semSelecao(gpsSel) && !naSel(gpsSel, b.gp) ? ' apagado' : ''}`} onClick={() => setGps(alternarSel(gpsSel, b.gp))}>
                   <span className="pf-gp-nome">{b.gp}</span>
                   <span className="pf-gp-trilha"><i style={{ width: `${(b.n / max) * 100}%` }} /></span>
                   <b>{b.n}</b><small className="excecao">{b.atrasados ? `${b.atrasados} atrasado${b.atrasados > 1 ? 's' : ''}` : ''}</small>

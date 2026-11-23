@@ -11,7 +11,7 @@
 // módulo 09 da Central), fase do projeto, etapa, responsável, tipo, prioridade, cliente, projeto, atrasadas e texto
 // (3.36.0: a lista inteira é carregada e filtrada na tela); "Relatório HTML" baixa o que está na tela.
 import { useEffect, useMemo, useState } from 'react';
-import { api, FASES, projetoInativo } from '../api/cadastros';
+import { api, FASES, SITUACOES } from '../api/cadastros';
 import { consultor } from '../api/consultor';
 import { arvoreDemandas, PRIORIDADES, STATUS_V4, todasDemandas, type DemandaLinha } from '../api/execucao';
 import { useEtapas } from '../estado/etapas';
@@ -25,7 +25,7 @@ import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { useEquipe, usePode } from '../estado/equipe';
-import { contarPorCliente, filtrarDemandas, itensDoNivel, NIVEIS_FILTRO, SEM, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS_TELA, SIT_PROJETO, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
+import { contarPorCliente, filtrarDemandas, itensDoNivel, NIVEIS_FILTRO, SEM, opcoesNomeadas, opcoesPessoas, opcoesTexto, PADRAO_DEMANDAS_TELA, TIPOS_DEMANDA, useFiltroLista } from '../estado/filtrosLista';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
 import { Resumo } from '../componentes/Resumo';
@@ -67,10 +67,10 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
   const filtro = status.length === TODOS.length ? null : status;
   const c = useCarga(() => (minhas ? consultor.demandas(esc, filtro, null) : todasDemandas(esc, filtro)),
     [esc, minhas, status.join(), ed.geracao]);
-  // 4.26.0: situação dos projetos (para o filtro Projetos ativos/inativos); projeto fora da lista conta como ativo
+  // situação dos projetos (para o filtro Situação do projeto); projeto fora da lista conta como ativo
   const pr = useCarga(() => api.projetos(esc), [esc, ed.geracao]);
-  const inativos = useMemo(() => new Set((pr.dados ?? []).filter(p => projetoInativo(p.situacao)).map(p => p.id)), [pr.dados]);
-  const todas = useMemo(() => (c.dados?.itens ?? []).map(d => ({ ...d, etapa_app_id: et.idDe(d), etapa_nome: et.de(d)?.nome ?? d.etapa, projeto_inativo: inativos.has(d.projeto_id) })), [c.dados, et, inativos]);
+  const sitDe = useMemo(() => new Map((pr.dados ?? []).map(p => [p.id, p.situacao as string])), [pr.dados]);
+  const todas = useMemo(() => (c.dados?.itens ?? []).map(d => ({ ...d, etapa_app_id: et.idDe(d), etapa_nome: et.de(d)?.nome ?? d.etapa, projeto_situacao: sitDe.get(d.projeto_id) ?? 'ativo' })), [c.dados, et, sitDe]);
   const itens = useMemo(() => filtrarDemandas(todas, f), [todas, f]);
   useEffect(() => setMostrar(PROJETOS_POR_VEZ), [f, status]);
   const grupos = useMemo(() => {
@@ -108,8 +108,8 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
       ...(todas.some(d => !d.etapa_app_id) ? [{ valor: SEM, rotulo: '(sem etapa)' }] : [])],
     responsaveis: opcoesPessoas(todas.map(d => d.responsavel_id), id => porId.get(id)?.nome),
     clientes: opcoesNomeadas(todas.map(d => [d.cliente_id, d.cliente])),
-    projetos: opcoesNomeadas(todas.filter(d => passa(f.clientes, d.cliente_id) && (!f.sitProjeto || (f.sitProjeto === 'inativos') === d.projeto_inativo)).map(d => [d.projeto_id, `${d.cliente} · ${d.projeto}`])),
-  }), [todas, porId, f.clientes, f.sitProjeto, et]);
+    projetos: opcoesNomeadas(todas.filter(d => passa(f.clientes, d.cliente_id) && passa(f.sitProjetos, d.projeto_situacao)).map(d => [d.projeto_id, `${d.cliente} · ${d.projeto}`])),
+  }), [todas, porId, f.clientes, f.sitProjetos, et]);
   const statusFora = !mesmos(status, ABERTAS);
   const limparTudo = () => { limpar(); setStatus(ABERTAS); };
   const descricao = [`Status: ${rotuloStatus(status)}`,
@@ -120,7 +120,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
     desc('Prioridade', f.prioridades, PRIORIDADES),
     desc('Cliente', f.clientes, ops.clientes),
     desc('Projeto', f.projetos, ops.projetos),
-    f.sitProjeto ? SIT_PROJETO.find(o => o.valor === f.sitProjeto)?.rotulo ?? '' : '',
+    desc('Situação do projeto', f.sitProjetos, SITUACOES),
     f.atrasadas ? 'Só atrasadas' : '', f.texto.trim() ? `Busca: ${f.texto.trim()}` : '', minhas ? 'Minhas demandas' : ''].filter(Boolean);
   return (
     <div className={minhas ? undefined : 'pagina'}>
@@ -151,9 +151,7 @@ export function Demandas({ minhas }: { minhas?: boolean }) {
         <SelecaoMultipla ocultar rotulo="Responsável" opcoes={ops.responsaveis} sel={f.responsaveis} aoMudar={v => mudar({ responsaveis: v })} />
         <SelecaoMultipla ocultar rotulo="Cliente" opcoes={ops.clientes} sel={f.clientes} aoMudar={v => mudar({ clientes: v })} />
         <SelecaoMultipla ocultar rotulo="Projeto" opcoes={ops.projetos} sel={f.projetos} aoMudar={v => mudar({ projetos: v })} />
-        <select aria-label="Situação do projeto" value={f.sitProjeto} onChange={e => mudar({ sitProjeto: e.target.value })}>
-          {SIT_PROJETO.map(o => <option key={o.valor || 'todos'} value={o.valor}>{o.rotulo}</option>)}
-        </select>
+        <SelecaoMultipla ocultar rotulo="Situação do projeto" opcoes={SITUACOES} sel={f.sitProjetos} aoMudar={v => mudar({ sitProjetos: v })} />
         <SelecaoMultipla ocultar rotulo="Tipo" opcoes={TIPOS_DEMANDA} sel={f.tipos} aoMudar={v => mudar({ tipos: v })} />
         <SelecaoMultipla ocultar rotulo="Prioridade" opcoes={PRIORIDADES} sel={f.prioridades} aoMudar={v => mudar({ prioridades: v })} />
         <label className="check"><input type="checkbox" checked={f.atrasadas} onChange={e => mudar({ atrasadas: e.target.checked })} /> Só atrasadas</label>

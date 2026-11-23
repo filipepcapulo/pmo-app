@@ -46,10 +46,10 @@ describe('clientes', () => {
   });
   it('padrão mostra os ativos; situação, GP, fase e texto se somam', () => {
     expect(ids({})).toEqual(['c1', 'c2']);
-    expect(ids({ situacao: 'inativos' })).toEqual(['c3']);
-    expect(ids({ situacao: 'todos' })).toEqual(['c1', 'c2', 'c3']);
+    expect(ids({ situacoes: ['inativo'] })).toEqual(['c3']);
+    expect(ids({ situacoes: [] })).toEqual(['c1', 'c2', 'c3']);
     expect(ids({ gps: ['bia'] })).toEqual(['c2']);
-    expect(ids({ situacao: 'todos', gps: [SEM] })).toEqual(['c3']);
+    expect(ids({ situacoes: [], gps: [SEM] })).toEqual(['c3']);
     expect(ids({ fases: ['P1', 'Sustentação'] })).toEqual(['c1', 'c2']);
     expect(ids({ fases: ['P2'] })).toEqual([]);   // P2 do c1 está encerrado
     expect(ids({ fases: ['P3'], gps: ['bia'] })).toEqual([]);
@@ -67,18 +67,18 @@ describe('projetos', () => {
   const ids = (f: Partial<typeof PADRAO_PROJETOS>) => filtrarProjetos(proj, { ...PADRAO_PROJETOS, ...f }).map(p => p.id);
   it('situação: abertos (padrão), uma só ou todas', () => {
     expect(ids({})).toEqual(['p1', 'p2']);
-    expect(ids({ situacao: 'encerrado' })).toEqual(['p3']);
-    expect(ids({ situacao: '' })).toEqual(['p1', 'p2', 'p3', 'p4']);
+    expect(ids({ situacoes: ['encerrado'] })).toEqual(['p3']);
+    expect(ids({ situacoes: [] })).toEqual(['p1', 'p2', 'p3', 'p4']);
   });
   it('fase, GP, cliente e texto se somam', () => {
-    expect(ids({ situacao: '', fases: ['P1'] })).toEqual(['p1', 'p4']);
-    expect(ids({ situacao: '', fases: ['P1'], gps: ['ana'], clientes: ['c2'] })).toEqual(['p4']);
-    expect(ids({ situacao: '', gps: [SEM] })).toEqual(['p3']);
-    expect(ids({ situacao: '', texto: 'usina p1' })).toEqual(['p4']);
+    expect(ids({ situacoes: [], fases: ['P1'] })).toEqual(['p1', 'p4']);
+    expect(ids({ situacoes: [], fases: ['P1'], gps: ['ana'], clientes: ['c2'] })).toEqual(['p4']);
+    expect(ids({ situacoes: [], gps: [SEM] })).toEqual(['p3']);
+    expect(ids({ situacoes: [], texto: 'usina p1' })).toEqual(['p4']);
   });
   it('sem cliente na linha (ficha do cliente) o filtro de fase/GP funciona igual', () => {
     const l = [{ nome: 'A', fase: 'P1', situacao: 'ativo', gp: ana }, { nome: 'B', fase: 'P2', situacao: 'encerrado', gp: null }];
-    expect(filtrarProjetos(l, { ...PADRAO_PROJETOS, situacao: '', fases: ['P2'] }).map(x => x.nome)).toEqual(['B']);
+    expect(filtrarProjetos(l, { ...PADRAO_PROJETOS, situacoes: [], fases: ['P2'] }).map(x => x.nome)).toEqual(['B']);
   });
 });
 
@@ -101,14 +101,16 @@ describe('demandas', () => {
     expect(ids({ responsaveis: ['!', 'ana'], nivel: 'subdemanda' })).toEqual(['d1', 'd2']);   // d2 (bia) passa; d1 vem de contexto
     expect(ids({ fases: ['!'] })).toEqual(['d1', 'd2', 'd3', 'd4']);       // só o modo, sem marcados, não filtra
   });
-  it('4.26.0 situação do projeto: ativos, inativos ou todos; sem a marca o projeto conta como ativo', () => {
-    const lista = dem.map(d => (d.projeto_id === 'p2' ? { ...d, projeto_inativo: true } : d.projeto_id === 'p1' ? { ...d, projeto_inativo: false } : d));
-    const com = (sitProjeto: string) => filtrarDemandas(lista, { ...PADRAO_DEMANDAS, sitProjeto }).map(d => d.id);
-    expect(com('ativos')).toEqual(['d1', 'd2', 'd4']);
-    expect(com('inativos')).toEqual(['d3']);
-    expect(com('')).toEqual(['d1', 'd2', 'd3', 'd4']);
-    expect(PADRAO_DEMANDAS.sitProjeto).toBe('');              // as outras listas não olham a situação
-    expect(PADRAO_DEMANDAS_TELA.sitProjeto).toBe('ativos');   // a tela de Demandas abre só com os ativos
+  it('situação do projeto (4.27.0): todas as situações, como na tela de Projetos, com Exibir e Ocultar; sem a situação o projeto conta como ativo', () => {
+    const sit: Record<string, string> = { p1: 'ativo', p2: 'encerrado' };   // p3 fica sem situação
+    const lista = dem.map(d => ({ ...d, projeto_situacao: sit[d.projeto_id] }));
+    const com = (sitProjetos: string[]) => filtrarDemandas(lista, { ...PADRAO_DEMANDAS, sitProjetos }).map(d => d.id);
+    expect(com(['ativo', 'pausado'])).toEqual(['d1', 'd2', 'd4']);
+    expect(com(['encerrado'])).toEqual(['d3']);
+    expect(com(['!', 'encerrado', 'cancelado'])).toEqual(['d1', 'd2', 'd4']);
+    expect(com([])).toEqual(['d1', 'd2', 'd3', 'd4']);
+    expect(PADRAO_DEMANDAS.sitProjetos).toEqual([]);                           // as outras listas não olham a situação
+    expect(PADRAO_DEMANDAS_TELA.sitProjetos).toEqual(['ativo', 'pausado']);    // a tela abre como a de Projetos
   });
   it('fase do projeto, etapa, tipo, prioridade, status, cliente e projeto', () => {
     expect(ids({ fases: ['P3', 'Sustentação'] })).toEqual(['d3', 'd4']);
@@ -236,12 +238,17 @@ describe('agenda da equipe', () => {
 describe('lembrar e limpar', () => {
   it('conta os campos fora do padrão', () => {
     expect(contarAtivos(PADRAO_PROJETOS, PADRAO_PROJETOS)).toBe(0);
-    expect(contarAtivos({ ...PADRAO_PROJETOS, fases: ['P1'], situacao: '' }, PADRAO_PROJETOS)).toBe(2);
+    expect(contarAtivos({ ...PADRAO_PROJETOS, fases: ['P1'], situacoes: [] }, PADRAO_PROJETOS)).toBe(2);
   });
   it('filtro guardado: aproveita só campos conhecidos e do tipo certo', () => {
     expect(normalizarFiltro(PADRAO_PROJETOS, null)).toEqual(PADRAO_PROJETOS);
     expect(normalizarFiltro(PADRAO_PROJETOS, { fases: ['P1', 7], gps: 'ana', situacao: 'encerrado', outro: 1, texto: null }))
-      .toEqual({ ...PADRAO_PROJETOS, fases: ['P1'], situacao: 'encerrado' });
+      .toEqual({ ...PADRAO_PROJETOS, fases: ['P1'], situacoes: ['encerrado'] });   // a situação antiga (um valor) vira lista
+    expect(normalizarFiltro(PADRAO_PROJETOS, { situacao: 'abertos' }).situacoes).toEqual(['ativo', 'pausado']);
+    expect(normalizarFiltro(PADRAO_PROJETOS, { situacao: '' }).situacoes).toEqual([]);
+    expect(normalizarFiltro(PADRAO_CLIENTES, { situacao: 'todos' }).situacoes).toEqual([]);
+    expect(normalizarFiltro(PADRAO_CLIENTES, { situacao: 'inativos' }).situacoes).toEqual(['inativo']);
+    expect(normalizarFiltro(PADRAO_PROJETOS, { situacao: 'abertos', situacoes: ['!', 'cancelado'] }).situacoes).toEqual(['!', 'cancelado']);
     expect(normalizarFiltro(PADRAO_DEMANDAS, { atrasadas: 'sim' }).atrasadas).toBe(false);
     expect(normalizarFiltro(PADRAO_DEMANDAS, { atrasadas: true }).atrasadas).toBe(true);
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { podeDesviar, rotuloDesvioTarefa, type DesvioDaTarefa } from './desvios';
+import { podeDesviar, rotuloAtendido, rotuloDesvioTarefa, type DesvioDaTarefa } from './desvios';
 import { marcadosPadrao, podeEnviar, proximaSemana, type ClienteEnvio } from './envioAgenda';
 
 describe('desvio', () => {
@@ -40,5 +40,19 @@ describe('rotuloDesvioTarefa (V13d-1, ficha da Tarefa)', () => {
   it('pendente e recusado', () => {
     expect(rotuloDesvioTarefa({ ...base, situacao: 'pendente', aprovado_por: null, aprovado_em: null })).toBe('Desvio informado, aguardando o GP do projeto atendido');
     expect(rotuloDesvioTarefa({ ...base, situacao: 'recusado', motivo_recusa: 'Sem orientação' })).toBe('Desvio recusado: Sem orientação');
+  });
+  it('sem atendimento (0118): pendente espera o GP do projeto; aprovado diz que nada foi executado', () => {
+    const sem = { ...base, sem_atendimento: true };
+    expect(rotuloDesvioTarefa({ ...sem, situacao: 'pendente', aprovado_por: null, aprovado_em: null })).toBe('Agenda não executada informada, aguardando o GP do projeto');
+    expect(rotuloDesvioTarefa(sem)).toMatch(/^Não executada: nenhuma agenda executada no horário \(confirmado por Gil em \d{2}\/\d{2}\/2026\)$/);
+    expect(rotuloDesvioTarefa({ ...sem, situacao: 'recusado', motivo_recusa: 'Havia acesso' })).toBe('Desvio recusado: Havia acesso');
+  });
+});
+
+describe('rotuloAtendido (0118)', () => {
+  it('desvio comum mostra cliente e projeto; sem atendimento, o aviso', () => {
+    expect(rotuloAtendido({ cliente_atendido: 'Almont', projeto_atendido: 'P2' })).toBe('Almont · P2');
+    expect(rotuloAtendido({ sem_atendimento: true, cliente_atendido: null, projeto_atendido: null })).toBe('Nenhuma agenda executada');
+    expect(rotuloAtendido({ cliente_atendido: null, projeto_atendido: null })).toBe('Nenhuma agenda executada');
   });
 });

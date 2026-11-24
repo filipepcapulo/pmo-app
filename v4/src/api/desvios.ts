@@ -1,5 +1,5 @@
 // Desvio de agenda (V10b, escopo §6.2): o consultor informa, o GP do projeto atendido aprova (troca automática, D9) ou
-// recusa. Tudo no banco (0037); aqui só as chamadas e as contas da tela.
+// recusa. Sem atendimento (0118): o consultor não executou nenhuma agenda; decide o GP do projeto previsto e nenhuma tarefa nasce. Tudo no banco (0037); aqui só as chamadas e as contas da tela.
 import { novaOperacao, rpc } from './cliente';
 import type { OpcaoCliente, OpcaoDemandaCliente } from './execucao';
 
@@ -7,7 +7,9 @@ export type SituacaoDesvio = 'pendente' | 'aprovado' | 'recusado';
 export interface Desvio extends Record<string, unknown> {
   id: string; versao: number; situacao: SituacaoDesvio; data: string; periodo: string; hora_ini: string | null; hora_fim: string | null; horas: number | null;
   consultor_id: string; consultor: string; tarefa_prevista_id: string; tarefa_prevista: string; demanda_prevista_id: string; demanda_prevista: string;
-  projeto_previsto_id: string; projeto_previsto: string; cliente_previsto: string; projeto_atendido_id: string; projeto_atendido: string; cliente_atendido: string;
+  projeto_previsto_id: string; projeto_previsto: string; cliente_previsto: string;
+  /** 0118: o consultor não executou nenhuma agenda — os campos do atendido vêm nulos. */
+  sem_atendimento?: boolean; projeto_atendido_id: string | null; projeto_atendido: string | null; cliente_atendido: string | null;
   demanda_atendida_id: string | null; demanda_atendida: string | null; tarefa_criada_id: string | null; orientado_por: string | null; motivo: string;
   motivo_recusa: string | null; aprovado_por: string | null; aprovado_em: string | null; criado_em: string; pode_decidir: boolean;
 }
@@ -16,14 +18,17 @@ export interface DesvioDaTarefa {
   id: string; papel: 'prevista' | 'criada'; situacao: SituacaoDesvio; data: string; periodo: string; motivo: string; orientado_por: string | null;
   consultor: string | null; aprovado_por: string | null; aprovado_em: string | null; motivo_recusa: string | null;
   outra_tarefa: { id: string; nome: string; status: string; demanda: string; projeto: string } | null;
+  sem_atendimento?: boolean;
 }
 
 /** Texto do cartão do desvio na ficha da Tarefa. */
 export function rotuloDesvioTarefa(d: DesvioDaTarefa): string {
   const quando = d.aprovado_em ? new Date(d.aprovado_em).toLocaleDateString('pt-BR') : null;
-  if (d.situacao === 'pendente') return d.papel === 'prevista' ? 'Desvio informado, aguardando o GP do projeto atendido' : 'Desvio pendente';
+  if (d.situacao === 'pendente') return d.sem_atendimento ? 'Agenda não executada informada, aguardando o GP do projeto'
+    : d.papel === 'prevista' ? 'Desvio informado, aguardando o GP do projeto atendido' : 'Desvio pendente';
   if (d.situacao === 'recusado') return `Desvio recusado${d.motivo_recusa ? `: ${d.motivo_recusa}` : ''}`;
   const quem = [d.aprovado_por, quando].filter(Boolean).join(' em ');
+  if (d.sem_atendimento) return `Não executada: nenhuma agenda executada no horário${quem ? ` (confirmado por ${quem})` : ''}`;
   return d.papel === 'prevista'
     ? `Não executada por desvio de agenda aprovado${quem ? ` por ${quem}` : ''}`
     : `Criada por desvio de agenda aprovado${quem ? ` por ${quem}` : ''}`;
@@ -46,13 +51,18 @@ export const desvios = {
   demandas: (esc: string, projeto: string) => rpc<OpcaoDemanda[]>('v1_desvio_opcoes', { p_escritorio: esc, p_projeto: projeto }),
   /** Cascata do desvio (0049): sem cliente, os clientes; com cliente, as demandas e subdemandas abertas — todas do escritório. */
   escolha: (esc: string, cliente: string | null) => rpc<OpcaoCliente[] | OpcaoDemandaCliente[]>('v1_desvio_escolha', { p_escritorio: esc, p_cliente: cliente }),
-  informar: (esc: string, d: { tarefa_prevista_id: string; demanda_atendida_id: string; orientado_por?: string; motivo: string }) =>
+  informar: (esc: string, d: { tarefa_prevista_id: string; orientado_por?: string; motivo: string } & ({ demanda_atendida_id: string } | { sem_atendimento: true })) =>
     gravar('v1_desvio_salvar', esc, d),
   aprovar: (esc: string, d: Desvio, demanda?: string) =>
     gravar('v1_desvio_decidir', esc, { id: d.id, versao: d.versao, decisao: 'aprovar', ...(demanda ? { demanda_atendida_id: demanda } : {}) }),
   recusar: (esc: string, d: Desvio, motivo: string) =>
     gravar('v1_desvio_decidir', esc, { id: d.id, versao: d.versao, decisao: 'recusar', motivo_recusa: motivo }),
 };
+
+/** Texto da coluna/linha "Atendido" do desvio. */
+export const SEM_ATENDIMENTO = 'Nenhuma agenda executada';
+export const rotuloAtendido = (d: Pick<Desvio, 'sem_atendimento' | 'cliente_atendido' | 'projeto_atendido'>) =>
+  (d.sem_atendimento || !d.projeto_atendido ? SEM_ATENDIMENTO : `${d.cliente_atendido} · ${d.projeto_atendido}`);
 
 export const ROTULO_SITUACAO: Record<SituacaoDesvio, string> = { pendente: 'Pendente', aprovado: 'Aprovado', recusado: 'Recusado' };
 

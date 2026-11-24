@@ -122,12 +122,13 @@ Use o comentário para registrar o que aconteceu, tirar dúvida com o GP ou avis
 
 ## 7. Quando a agenda não bate com o que aconteceu
 
-- **Atendeu outro cliente ou projeto no horário da agenda (desvio)**: no cartão da tarefa do dia, toque em **Informar desvio**, escolha o **cliente**, a **demanda** e, se houver, a **subdemanda** que você atendeu e diga o motivo. Só dá para escolher entre as demandas que já existem: se a certa não estiver na lista, peça ao GP para criá-la. O GP do projeto atendido aprova ou recusa (acompanhe na aba **Meus desvios**). Aprovado, o app cria a tarefa certa na sua agenda: aponte nela.
+- **Atendeu outro cliente ou projeto no horário da agenda (desvio)**: no cartão da tarefa do dia, toque em **Informar desvio**, deixe marcado **Atendi outra demanda**, escolha o **cliente**, a **demanda** e, se houver, a **subdemanda** que você atendeu e diga o motivo. Só dá para escolher entre as demandas que já existem: se a certa não estiver na lista, peça ao GP para criá-la. O GP do projeto atendido aprova ou recusa (acompanhe na aba **Meus desvios**). Aprovado, o app cria a tarefa certa na sua agenda: aponte nela.
+- **Não executou nenhuma agenda no horário**: em **Informar desvio**, marque **Não executei nenhuma agenda** e diga o motivo (não precisa escolher cliente nem demanda). O GP do projeto da tarefa aprova ou recusa. Aprovado, a tarefa fica como não executada e nenhuma outra é criada.
 - **Precisa de mais horas na demanda**: no cartão, toque em **Preciso de mais agenda**, informe as horas e o motivo. O pedido vai para o GP e aparece em "Meus pedidos de agenda", embaixo da agenda.
 
 ![Formulário Informar desvio](10-desvio.png)
 
-*Informar desvio: escolha cliente, demanda e subdemanda atendidos e diga o motivo.*
+*Informar desvio: escolha cliente, demanda e subdemanda atendidos e diga o motivo. Se não executou nada, marque "Não executei nenhuma agenda" e informe só o motivo.*
 
 ![Formulário Preciso de mais agenda](09-mais-agenda.png)
 

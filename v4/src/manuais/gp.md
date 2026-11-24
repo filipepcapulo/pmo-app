@@ -67,6 +67,8 @@ Desvio é quando o consultor estava agendado num projeto e atendeu outro no mesm
 4. **Aprovar**: confira previsto × atendido e o motivo. Desvios informados antes da 3.14 podem vir sem demanda: nesse caso escolha a **Demanda atendida**. Ao aprovar, o app troca a agenda numa operação só: cria a tarefa no projeto atendido (onde o consultor vai apontar) e marca a tarefa prevista como "não executada". A demanda prevista volta ao backlog. Na ficha da Tarefa, a prevista mostra "Não executada por desvio de agenda aprovado" com o link para a tarefa criada (e a criada aponta a prevista). Desde a 3.28.0, mudar o status no ClickUp para "Não iniciado" ou "Realocar" não reabre a prevista no app; concluir ou cancelar continua valendo.
 5. **Recusar**: informe o **Motivo da recusa** (obrigatório). A agenda prevista continua valendo.
 
+**Desvio sem atendimento (4.31.0):** o consultor também pode informar que **não executou nenhuma agenda** no horário, só com o motivo. Na coluna Atendido aparece "Nenhuma agenda executada" e **quem decide é o GP do projeto previsto** (o da tarefa). Aprovar só marca a tarefa como "não executada" e devolve a demanda ao backlog: nenhuma tarefa é criada.
+
 ![Aprovar desvio com a escolha da demanda atendida](g05-aprovar-desvio.png)
 
 *Aprovar desvio: previsto × atendido, o motivo do consultor e a Demanda atendida (quando ele não soube). Atrás, o log com Aprovar e Recusar na linha pendente.*

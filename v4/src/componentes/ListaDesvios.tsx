@@ -1,7 +1,8 @@
-// Log de desvios: os do consultor (Meus desvios) ou o dos GPs, com aprovar/recusar para o GP do projeto atendido.
+// Log de desvios: os do consultor (Meus desvios) ou o dos GPs, com aprovar/recusar para o GP do projeto atendido
+// (no desvio sem atendimento — 0118 —, o GP do projeto previsto; aprovar só marca a prevista como não executada).
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
-import { desvios, ROTULO_SITUACAO, type Desvio, type OpcaoDemanda } from '../api/desvios';
+import { desvios, ROTULO_SITUACAO, rotuloAtendido, type Desvio, type OpcaoDemanda } from '../api/desvios';
 import { rotuloPeriodo } from '../api/execucao';
 import { traduzirErro } from '../api/mensagens';
 import { useCarga } from '../estado/carga';
@@ -22,15 +23,16 @@ function Decidir({ d, decisao, aoFechar, aoGravar }: { d: Desvio; decisao: 'apro
   const [motivo, setMotivo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
-  const pedeDemanda = decisao === 'aprovar' && !d.demanda_atendida_id;
-  const dem = useCarga<OpcaoDemanda[]>(() => (pedeDemanda ? desvios.demandas(esc, d.projeto_atendido_id) : Promise.resolve([])), [esc, d, pedeDemanda]);
+  const sem = !d.projeto_atendido_id;
+  const pedeDemanda = decisao === 'aprovar' && !sem && !d.demanda_atendida_id;
+  const dem = useCarga<OpcaoDemanda[]>(() => (pedeDemanda && d.projeto_atendido_id ? desvios.demandas(esc, d.projeto_atendido_id) : Promise.resolve([])), [esc, d, pedeDemanda]);
   async function gravar() {
     if (pedeDemanda && !demanda) { setErro('Escolha a demanda atendida.'); return; }
     if (decisao === 'recusar' && !motivo.trim()) { setErro('Informe o motivo da recusa.'); return; }
     setGravando(true); setErro(null);
     try {
       if (decisao === 'aprovar') await desvios.aprovar(esc, d, demanda || undefined); else await desvios.recusar(esc, d, motivo.trim());
-      avisar(decisao === 'aprovar' ? 'Desvio aprovado: agenda trocada' : 'Desvio recusado', 'ok');
+      avisar(decisao !== 'aprovar' ? 'Desvio recusado' : sem ? 'Desvio aprovado: tarefa não executada' : 'Desvio aprovado: agenda trocada', 'ok');
       aoGravar();
     } catch (e) { setErro(traduzirErro(e).mensagem); setGravando(false); }
   }
@@ -41,9 +43,11 @@ function Decidir({ d, decisao, aoFechar, aoGravar }: { d: Desvio; decisao: 'apro
     </>}>
       <Formulario aoEnviar={gravar}>
         <p className="ajuda"><strong>{d.consultor}</strong> · {data(d.data)} · {rotuloPeriodo(d.periodo, d.hora_ini, d.hora_fim)}</p>
-        <p className="ajuda">Previsto: {d.cliente_previsto} · {d.projeto_previsto}. Atendido: {d.cliente_atendido} · {d.projeto_atendido}.</p>
+        <p className="ajuda">Previsto: {d.cliente_previsto} · {d.projeto_previsto}. Atendido: {rotuloAtendido(d)}.</p>
         <p className="ajuda">{d.motivo}</p>
-        {decisao === 'aprovar' && <p className="ajuda">Cria a tarefa no projeto atendido e marca a prevista como não executada; a demanda volta ao backlog.</p>}
+        {decisao === 'aprovar' && <p className="ajuda">{sem
+          ? 'Marca a tarefa prevista como não executada; a demanda volta ao backlog. Nenhuma tarefa é criada.'
+          : 'Cria a tarefa no projeto atendido e marca a prevista como não executada; a demanda volta ao backlog.'}</p>}
         {pedeDemanda && <Campo rotulo="Demanda atendida" tipo="select" obrigatorio valor={demanda} aoMudar={setDemanda}
           opcoes={[{ valor: '', rotulo: 'Escolha…' }, ...(dem.dados ?? []).map(x => ({ valor: x.id, rotulo: x.pai ? `${x.pai} › ${x.nome}` : x.nome }))]} />}
         {decisao === 'recusar' && <Campo rotulo="Motivo da recusa" tipo="textarea" obrigatorio valor={motivo} aoMudar={setMotivo} maxLength={2000} />}
@@ -71,8 +75,8 @@ export function ListaDesvios({ meus, de, ate, situacao = '' }: { meus?: boolean;
     { chave: 'horas', titulo: 'Horas', alinhar: 'dir', texto: d => (d.horas == null ? '' : horas(d.horas)), valor: d => d.horas },
     { chave: 'previsto', titulo: 'Previsto', valor: d => d.projeto_previsto, texto: d => `${d.cliente_previsto} · ${d.projeto_previsto}`,
       render: d => <a href={hashDe(caminhoEntidade('tarefa', d.tarefa_prevista_id))}>{d.cliente_previsto} · {d.projeto_previsto}</a> },
-    { chave: 'atendido', titulo: 'Atendido', valor: d => d.projeto_atendido, texto: d => `${d.cliente_atendido} · ${d.projeto_atendido}${d.demanda_atendida ? ' · ' + d.demanda_atendida : ''}`,
-      render: d => (d.tarefa_criada_id ? <a href={hashDe(caminhoEntidade('tarefa', d.tarefa_criada_id))}>{d.cliente_atendido} · {d.projeto_atendido}</a> : <>{d.cliente_atendido} · {d.projeto_atendido}</>) },
+    { chave: 'atendido', titulo: 'Atendido', valor: d => d.projeto_atendido ?? rotuloAtendido(d), texto: d => `${rotuloAtendido(d)}${d.demanda_atendida ? ' · ' + d.demanda_atendida : ''}`,
+      render: d => (d.tarefa_criada_id ? <a href={hashDe(caminhoEntidade('tarefa', d.tarefa_criada_id))}>{rotuloAtendido(d)}</a> : <>{rotuloAtendido(d)}</>) },
     { chave: 'orientado_por', titulo: 'Quem orientou' },
     { chave: 'motivo', titulo: 'Motivo' },
     { chave: 'situacao', titulo: 'Situação', texto: d => ROTULO_SITUACAO[d.situacao],

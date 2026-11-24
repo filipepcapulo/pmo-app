@@ -9,7 +9,8 @@ import { TarefasDaDemanda } from '../componentes/ListasFiltradas';
 import { BarraHoras } from '../componentes/BarraHoras';
 import { Botao } from '../componentes/Botao';
 import { BotaoFavorito } from '../componentes/BotaoFavorito';
-import { Checklist } from '../componentes/Checklist';
+import { AtividadesDemanda } from '../componentes/Atividades';
+import { TarefasSemAlocacao } from '../componentes/SemAlocacao';
 import { Comentarios } from '../componentes/Comentarios';
 import { NomePessoa } from '../componentes/NomePessoa';
 import { EtapaFicha } from '../componentes/Pilulas';
@@ -41,7 +42,7 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
   const inativo = projetoInativo(projeto.situacao);   // 0105: projeto inativo não movimenta
   const nomes = new Map([[d.id, d.nome], ...subdemandas.map(s => [s.id, s.nome] as [string, string])]);
   const abas: { id: Aba; rotulo: string }[] = [
-    { id: 'tarefas', rotulo: `Tarefas (${tarefas.length})` }, { id: 'checklist', rotulo: `Checklist (${c.dados.checklist.length})` },
+    { id: 'tarefas', rotulo: `Tarefas (${tarefas.length})` }, { id: 'checklist', rotulo: `Atividades (${c.dados.checklist.length})` },
     { id: 'anexos', rotulo: `Anexos (${c.dados.anexos.length})` }, { id: 'comentarios', rotulo: `Comentários (${nCom ?? c.dados.comentarios})` },
     ...(veRenta ? [{ id: 'rentabilidade' as Aba, rotulo: 'Rentabilidade' }] : []),
   ];
@@ -92,8 +93,9 @@ export function DemandaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: st
         <div className="segmentos" role="tablist" aria-label="Seções da demanda">
           {abas.map(a => <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} className={aba === a.id ? 'ativo' : undefined} onClick={() => setAba(a.id)}>{a.rotulo}</button>)}
         </div>
+        {aba === 'tarefas' && <TarefasSemAlocacao demandaId={d.id} inativo={inativo} />}
         {aba === 'tarefas' && <TarefasDaDemanda tarefas={tarefas} nomeDemanda={i => (i === d.id ? null : nomes.get(i) ?? null)} />}
-        {aba === 'checklist' && <Checklist entidade="demanda" id={d.id} itens={c.dados.checklist} aoMudar={c.recarregar} />}
+        {aba === 'checklist' && <AtividadesDemanda id={d.id} itens={c.dados.checklist} aoMudar={c.recarregar} />}
         {aba === 'anexos' && <Anexos entidade="demanda" id={d.id} itens={c.dados.anexos} aoMudar={c.recarregar} />}
         {aba === 'comentarios' && <Comentarios entidade="demanda" id={d.id} aoMudar={setNCom} />}
       </section>

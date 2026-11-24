@@ -8,6 +8,7 @@ import { syncExperience, textoResultado as textoSync, textoSyncTarefa } from '..
 import { exec, rotuloAutoria, rotuloModalidade, rotuloPeriodo, tarefaTravadaOs, AVISO_TAREFA_OS, PERMISSAO_EDITAR_COM_OS, type Apontamento } from '../api/execucao';
 import { hojeIso } from '../api/projeto';
 import { Anexos } from '../componentes/Anexos';
+import { AtividadesTarefa } from '../componentes/Atividades';
 import { StatusPilula } from '../componentes/ArvoreDemandas';
 import { Botao } from '../componentes/Botao';
 import { BotaoFavorito } from '../componentes/BotaoFavorito';
@@ -134,6 +135,9 @@ export function TarefaTela({ id, aoRenomear }: { id: string; aoRenomear: (t: str
             <a href={hashDe(caminhoEntidade('tarefa', g.id))}><NomePessoa id={g.responsavel_id} /> {data(g.data)}</a></span>)}</p>
         )}
       </section>
+
+      {/* 4.29.0 (0117): o que a tarefa precisa cumprir (atividades da demanda/subdemanda); some se a demanda não tem lista */}
+      <AtividadesTarefa tarefaId={t.id} geracao={ed.geracao} aoGravar={ed.mudou} />
 
       <section className="cartao">
         <div className="segmentos" role="tablist" aria-label="Seções da tarefa">

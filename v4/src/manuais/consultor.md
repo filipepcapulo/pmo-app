@@ -46,6 +46,7 @@ O que você **não** faz: criar ou mudar tarefa (data, período, cliente), lanç
 As abas da tela:
 
 - **Minha agenda**: as tarefas do dia ou da semana e, embaixo, os seus pedidos de mais agenda.
+- **Agenda em grade**: a sua agenda no mesmo formato da Agenda da equipe (dias lado a lado, cada tarefa no horário dela), só para consulta. Role para os lados para ver outras semanas, ou filtre por **De** / **Até**; **Hoje** volta para hoje. Clique numa tarefa para abrir o detalhe (cliente, demanda, período, detalhamento e as atividades a cumprir) e use **Ir para o apontamento** para apontar. Nessa aba não dá para mover nem editar tarefa.
 - **Minhas demandas**: as demandas em que você tem tarefa.
 - **Meus apontamentos**: tudo o que conta como hora sua.
 - **Meus desvios**: os desvios que você informou e a resposta do GP.
@@ -66,7 +67,8 @@ As abas da tela:
 3. **Intervalo (min)**: o tempo de almoço ou pausa dentro do período.
 4. **O que foi feito**: descreva o atendimento.
 5. Confira **Horas**, que o app calcula sozinho: fim − início − intervalo. Exemplo: 08:00 a 12:30 com 30 min de intervalo = 4 h.
-6. Toque em **Gravar**. O cartão passa a mostrar "X h apontadas" e o apontamento ganha um número interno.
+6. Se a demanda tem **atividades a cumprir**, elas aparecem em **Atividades da demanda**: para cada uma, diga o que você realizou nesta tarefa — **Não realizei**, **Parcial** ou **Total**. Todas as que estão em aberto precisam de resposta; **Marcar as demais como não realizadas** preenche o resto de uma vez.
+7. Toque em **Gravar**. O cartão passa a mostrar "X h apontadas" e o apontamento ganha um número interno. A lista de atividades da demanda é atualizada com o que você apontou.
 
 ![Formulário Apontar horas preenchido](06-apontar-preenchido.png)
 
@@ -83,6 +85,8 @@ Regras do apontamento:
 - Um apontamento não pode cruzar o horário de outro seu. Se cruzar, o app recusa e mostra o motivo.
 - Pode apontar mais de uma vez na mesma tarefa (por exemplo, antes e depois de uma pausa longa).
 - A OS lançada no Sankhya OM chega sozinha em alguns minutos: não aponte de novo no app o que já tem OS.
+- As **atividades a cumprir** também aparecem na ficha da tarefa, logo abaixo dos dados. Quem aponta as horas pelo Sankhya OM marca as atividades ali e toca em **Gravar atividades**.
+- Uma atividade fica **Realizada** quando alguma tarefa a marca como Total, e **Parcial** quando a maior marca é Parcial. "Não realizei" não desfaz o que outra tarefa já fez. Marcou errado? Corrija na própria tarefa.
 
 Corrigir ou excluir:
 

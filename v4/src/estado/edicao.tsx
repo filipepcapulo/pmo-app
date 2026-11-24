@@ -12,7 +12,11 @@ import { chamV4, type ChamadoDaSub } from '../api/chamadosV4';
 import { useSessao } from './sessao';
 
 export interface AlvoDemanda { id?: string; projeto_id?: string; pai_id?: string | null }
-export interface AlvoTarefa { id?: string; demanda_id?: string; data?: string; responsaveis?: string[] }
+export interface AlvoTarefa {
+  id?: string; demanda_id?: string; data?: string; responsaveis?: string[];
+  /** 4.29.0 (0117): tarefa aberta sem alocação sendo atribuída — o lançamento já vem preenchido e, ao gravar, ela é encerrada. */
+  semAlocacao?: import('../api/semAlocacao').TarefaSemAlocacao;
+}
 interface Edicao {
   geracao: number;
   demanda: (a: AlvoDemanda, aoGravar?: (id: string) => void) => void;

@@ -102,7 +102,12 @@ export function rotuloAutoria(a: Autoria | null | undefined): string {
 }
 /** Contato (pessoa) do cliente: o "usuário do cliente" da tarefa/agenda. */
 export interface ContatoCliente { id: string; nome: string; email: string | null; telefone: string | null; papel: string }
-export interface ItemChecklist { id: string; texto: string; feito: boolean; feito_por: string | null; feito_em: string | null; ordem: number; versao: number }
+export interface ItemChecklist {
+  id: string; texto: string; feito: boolean; feito_por: string | null; feito_em: string | null; ordem: number; versao: number;
+  /** 0117: situação da atividade (item de demanda) e a última marca dada por uma tarefa. */
+  situacao?: 'pendente' | 'parcial' | 'realizada';
+  marca?: { situacao: 'realizada' | 'parcial' | 'nao_realizada'; por: string | null; em: string; tarefa_id: string } | null;
+}
 export interface Anexo { id: string; nome: string; caminho: string; tamanho: number | null; tipo: string | null; criado_em: string; criado_por: string | null }
 export interface FichaDemanda {
   demanda: Demanda; totais: TotaisDemanda | null;

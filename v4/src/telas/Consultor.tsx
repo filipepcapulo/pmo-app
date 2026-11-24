@@ -7,7 +7,11 @@ import { podeDesviar } from '../api/desvios';
 import { ordenarDia } from '../api/equipe';
 import { rotuloModalidade, rotuloPeriodo, rotuloStatusTarefa } from '../api/execucao';
 import { hojeIso, somarDias } from '../api/projeto';
+import { exec } from '../api/execucao';
+import { AtividadesTarefa } from '../componentes/Atividades';
 import { Botao } from '../componentes/Botao';
+import { GradeEquipe } from '../componentes/GradeEquipe';
+import { Popup } from '../componentes/Popup';
 import { ListaDesvios } from '../componentes/ListaDesvios';
 import { RelatorioApontamentos } from '../componentes/RelatorioApontamentos';
 import { Resumo } from '../componentes/Resumo';
@@ -19,9 +23,9 @@ import { useSessao } from '../estado/sessao';
 import { Demandas } from './Demandas';
 import { AbaContaSankhya } from './Equipe';
 
-type Aba = 'agenda' | 'demandas' | 'apontamentos' | 'desvios' | 'sankhya';
+type Aba = 'agenda' | 'grade' | 'demandas' | 'apontamentos' | 'desvios' | 'sankhya';
 const ABAS: { id: Aba; rotulo: string }[] = [
-  { id: 'agenda', rotulo: 'Minha agenda' }, { id: 'demandas', rotulo: 'Minhas demandas' }, { id: 'apontamentos', rotulo: 'Meus apontamentos' },
+  { id: 'agenda', rotulo: 'Minha agenda' }, { id: 'grade', rotulo: 'Agenda em grade' }, { id: 'demandas', rotulo: 'Minhas demandas' }, { id: 'apontamentos', rotulo: 'Meus apontamentos' },
   { id: 'desvios', rotulo: 'Meus desvios' }, { id: 'sankhya', rotulo: 'Minha conta Sankhya' },
 ];
 const SITUACAO = { aberto: 'Aberto', atendido: 'Atendido', recusado: 'Recusado' };
@@ -115,6 +119,60 @@ function MinhaAgenda() {
   );
 }
 
+// 4.29.0: detalhe da tarefa aberto pela grade do consultor — só leitura, com o atalho para o apontamento
+function DetalheTarefa({ id, aoFechar }: { id: string; aoFechar: () => void }) {
+  const esc = useSessao().eu!.escritorio_id!;
+  const pode = usePode();
+  const ed = useEdicao();
+  const hoje = hojeIso();
+  const c = useCarga(() => exec.tarefa(esc, id), [esc, id, ed.geracao]);
+  const r = c.dados;
+  const t = r?.tarefa;
+  const apontavel = !!t && pode('apontamento.gravar') && podeApontar(t, hoje);
+  const motivo = !t || apontavel ? null : !pode('apontamento.gravar') ? 'Você não tem permissão para apontar.'
+    : t.data > hoje ? `O apontamento abre no dia da tarefa (${data(t.data)}).` : 'Esta tarefa não foi executada.';
+  return (
+    <Popup aberto titulo={t?.nome ?? 'Tarefa'} aoFechar={aoFechar} largura={600}
+      rodape={<>
+        {t && <a className="bt bt-secundario a-esquerda" href={hashDe(caminhoEntidade('tarefa', t.id))} onClick={aoFechar}>Abrir a tarefa</a>}
+        <Botao onClick={aoFechar}>Fechar</Botao>
+        <Botao variante="primario" disabled={!apontavel} title={motivo ?? undefined} data-testid="ir-apontamento"
+          onClick={() => { if (!t) return; aoFechar(); ed.apontar({ tarefa_id: t.id, nome: t.nome, data: t.data, periodo: t.periodo, hora_ini: t.hora_ini, hora_fim: t.hora_fim }); }}>Ir para o apontamento</Botao>
+      </>}>
+      {c.erro && <p className="msg-erro">{c.erro}</p>}
+      {!r && !c.erro && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}
+      {r && t && (
+        <div className="detalhe-agenda" data-testid="detalhe-agenda">
+          <p className="ajuda">{r.cliente.nome} · {r.projeto.nome}{r.pai ? ` · ${r.pai.nome}` : ''} · {r.demanda.nome}</p>
+          <dl className="dados">
+            <div><dt>Data</dt><dd>{data(t.data)}</dd></div>
+            <div><dt>Período</dt><dd>{rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim)}</dd></div>
+            <div><dt>Horas</dt><dd>{Number(t.horas_reais) > 0 ? `${horas(t.horas_reais)} apontadas · ` : ''}{horas(t.horas_previstas)} previstas</dd></div>
+            <div><dt>Agenda</dt><dd>{rotuloModalidade(t.modalidade) || '—'}</dd></div>
+            <div><dt>Status</dt><dd>{rotuloStatusTarefa(t.status)}</dd></div>
+            <div><dt>Usuário do cliente</dt><dd>{r.usuario_cliente ? [r.usuario_cliente.nome, r.usuario_cliente.telefone].filter(Boolean).join(' · ') : '—'}</dd></div>
+          </dl>
+          {t.detalhamento && <p className="descricao">{t.detalhamento}</p>}
+          <AtividadesTarefa tarefaId={t.id} geracao={ed.geracao} somenteLeitura cartao={false} />
+          {motivo && <p className="ajuda">{motivo}</p>}
+        </div>
+      )}
+    </Popup>
+  );
+}
+
+// 4.29.0: a mesma grade da Agenda da equipe, só com a própria linha, sem backlog e sem edição
+function MinhaGrade() {
+  const [aberta, setAberta] = useState<string | null>(null);
+  return (
+    <>
+      <p className="ajuda">A sua agenda no formato da Agenda da equipe, só para consulta. Clique numa tarefa para ver o detalhe e ir para o apontamento.</p>
+      <GradeEquipe somenteEu backlogMarcado={false} aoSoltarBacklog={() => {}} aoEditarAusencia={() => {}} aoAbrirTarefa={t => setAberta(t.id)} />
+      {aberta && <DetalheTarefa id={aberta} aoFechar={() => setAberta(null)} />}
+    </>
+  );
+}
+
 function MeusDesvios() {
   const hoje = hojeIso();
   const [de, setDe] = useState(() => somarDias(hoje, -90));
@@ -131,13 +189,14 @@ export function Consultor() {
   const { eu } = useSessao();
   const pode = usePode();
   return (
-    <div className="pagina">
+    <div className={`pagina${aba === 'grade' ? ' pagina-larga' : ''}`}>
       <header className="pagina-topo"><div><h1>{ABAS.find(a => a.id === aba)!.rotulo}</h1></div>
         {pode('ausencia.solicitar') && <a className="bt bt-secundario" href={hashDe('ausencias')}>Solicitar ausência</a>}</header>
       <div className="segmentos" role="tablist" aria-label="Visão do consultor">
         {ABAS.map(a => <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}>{a.rotulo}</button>)}
       </div>
       {aba === 'agenda' && <MinhaAgenda />}
+      {aba === 'grade' && <MinhaGrade />}
       {aba === 'demandas' && <Demandas minhas />}
       {aba === 'apontamentos' && <RelatorioApontamentos />}
       {aba === 'desvios' && <MeusDesvios />}

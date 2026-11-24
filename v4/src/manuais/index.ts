@@ -89,7 +89,7 @@ export const MANUAIS: Manual[] = [
     resumo: 'O fechamento do período 21–20: cálculo, ajustes, fechar, reabrir e exportar.' },
   { id: 'rentabilidade', titulo: 'Rentabilidade', para: 'modulo', texto: rentabilidade, modulos: ['rentabilidade-geral'], papeisCofre: ['dono', 'rentabilidade'],
     resumo: 'A tela Rentabilidade geral (faturado × custo por período, cliente, projeto e consultor) e a aba Rentabilidade das fichas.' },
-  { id: 'sync-experience', titulo: 'Sync com o Experience', para: 'modulo', texto: syncExperience, modulos: ['sync-experience', 'experience-pendentes'],
+  { id: 'sync-experience', titulo: 'Sync com o Experience', para: 'modulo', texto: syncExperience, modulos: ['sync-experience', 'experience-pendentes', 'experience-os'],
     resumo: 'Os lançamentos do Experience feitos pelas tarefas: simulação, execução, resultado e as tarefas pendentes.' },
   { id: 'sync-clickup', titulo: 'Sincronização com o ClickUp', para: 'modulo', texto: syncClickup, modulos: ['sync-clickup'],
     resumo: 'Como ler o status do espelho com o ClickUp e o que fazer quando ele para.' },

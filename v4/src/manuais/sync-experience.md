@@ -114,7 +114,18 @@ No menu (☰): **Execução › Tarefas Pendentes no Experience**. Aparece para 
 - A tela só acompanha, não lança nada. Para lançar, use **Sistema › Sync com o Experience** (botão no topo da tela) ou **Sincronizar esta tarefa** na ficha da tarefa (toque no nome dela). Feito no modo real, a tarefa sai da lista.
 - Entram as mesmas tarefas da seção 2 e ficam fora as da seção 3.
 
-## 10. Se algo der errado
+## 10. Conferência de OS no Experience
+
+No menu (☰): **Execução › Conferência de OS no Experience**. Aparece para quem tem a permissão **Conferir quais agendas (OS) já foram lançadas no Experience** (`experience.conferir`), que o Admin liga por perfil ou por pessoa em **Equipe › Acessos**. Nasce ligada para Admin e GP.
+
+É a tela do assistente de projetos para validar o que já foi lançado no Experience e o que ainda não. Diferente das Tarefas Pendentes, ela mostra **todas** as agendas do período, com a situação do campo **Experience** da tarefa (o mesmo do ClickUp).
+
+- **Cartões**, logo abaixo dos filtros: a contagem de tarefas em cada situação — **Não lançado** (campo vazio também conta aqui), **Alterar**, **Lixeira**, **Lançado** — e **Todas**. Clique num cartão para ver só aquela situação; clique de novo (ou em Todas) para voltar.
+- **Filtros**: **De** e **Até** (padrão: 31 dias para trás e 31 para a frente; no máximo 125 dias), **Experience**, **Consultor**, **Cliente**, **Apontamento** e **Status da tarefa**, todos com seleção múltipla e Exibir / Ocultar. Os cartões contam o que sobra dos outros filtros.
+- **Lista**: Experience, data da agenda, consultor, período com o horário, apontamento, cliente, FAP, demanda, subdemanda, tarefa (toque para abrir), status da tarefa, número do lançamento e se já tem OS no Sankhya. Dá para ordenar, escolher colunas e exportar.
+- A tela só confere: não lança nem altera nada. Entram as mesmas tarefas da seção 2 e ficam fora as da seção 3; agenda cancelada ou não executada que nunca foi lançada também fica fora.
+
+## 11. Se algo der errado
 
 - **"Cadastre sua Conta Sankhya em Equipe › ficha › Conta Sankhya para rodar o sync."** Você ainda não tem a conta cadastrada.
 - **"A Sankhya recusou o login, por isso nada foi feito."** A senha mudou. Atualize em **Equipe › ficha › Conta Sankhya**.

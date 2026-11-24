@@ -44,10 +44,15 @@ function MiniFaixa({ itens }: { itens: TarefaGrade[] }) {
 }
 
 export interface Soltar { data: string; consultor: string }
-export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia, geracaoExtra = 0 }: {
+export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia, geracaoExtra = 0, somenteEu, aoAbrirTarefa }: {
   backlogMarcado: boolean; aoSoltarBacklog: (s: Soltar) => void; aoEditarAusencia: (a: Partial<Ausencia>) => void; geracaoExtra?: number;
+  /** 4.29.0: Minha agenda em grade — só a linha de quem está logado, sem mover, criar ou editar; o clique chama `aoAbrirTarefa`. */
+  somenteEu?: boolean; aoAbrirTarefa?: (t: TarefaGrade) => void;
 }) {
-  const esc = useSessao().eu!.escritorio_id!;
+  const eu = useSessao().eu!;
+  const esc = eu.escritorio_id!;
+  const euId = eu.usuario.id;
+  const soMinhas = useCallback(<T extends { consultor_id: string }>(l: T[]) => (somenteEu ? l.filter(x => x.consultor_id === euId) : l), [somenteEu, euId]);
   const pode = usePode();
   const avisar = useToast();
   const ed = useEdicao();
@@ -77,13 +82,14 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
   const candidatos = useMemo(() => candidatosGrade(lista, new Set(tarefas.map(x => x.consultor_id))), [lista, tarefas]);
   // 3.37.0: quem aparece na grade é escolhido numa seleção múltipla, lembrada neste navegador (pmo4:filtros:agenda:equipe)
   const { f: escolha, mudar: mudarEscolha } = useFiltroLista('agenda:equipe', PADRAO_AGENDA_EQUIPE);
-  const pessoas = useMemo(() => pessoasDaGrade(candidatos, escolha.pessoas, texto), [candidatos, escolha.pessoas, texto]);
+  const pessoas = useMemo(() => (somenteEu ? lista.filter(m => m.id === euId) : pessoasDaGrade(candidatos, escolha.pessoas, texto)),
+    [somenteEu, lista, euId, candidatos, escolha.pessoas, texto]);
 
   const juntar = useCallback((g: { tarefas: TarefaGrade[]; ausencias: Ausencia[] }, deData: string, ateData: string) => {
-    setTarefas(l => [...l.filter(t => t.data < deData || t.data > ateData), ...g.tarefas]);
+    setTarefas(l => [...l.filter(t => t.data < deData || t.data > ateData), ...soMinhas(g.tarefas)]);
     const chave = (a: Ausencia) => [a.id, a.consultor_id, a.de, a.ate].join('|');
-    setAusencias(l => { const m = new Map(l.map(a => [chave(a), a])); g.ausencias.forEach(a => m.set(chave(a), a)); return [...m.values()]; });
-  }, []);
+    setAusencias(l => { const m = new Map(l.map(a => [chave(a), a])); soMinhas(g.ausencias).forEach(a => m.set(chave(a), a)); return [...m.values()]; });
+  }, [soMinhas]);
 
   // recarrega tudo o que está na tela (abertura, gravação em qualquer tela), em janelas que a API aceita
   useEffect(() => {
@@ -98,8 +104,8 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
         }
         const r = await Promise.all(partes);
         if (!vivo) return;
-        setTarefas(r.flatMap(x => x.tarefas));
-        setAusencias(r.flatMap(x => x.ausencias));
+        setTarefas(soMinhas(r.flatMap(x => x.tarefas)));
+        setAusencias(soMinhas(r.flatMap(x => x.ausencias)));
         setErro(null);
       } catch (e) { if (vivo) setErro((e as Error).message); }
       if (vivo) setCarregando(false);
@@ -204,21 +210,22 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
   useEffect(() => { try { localStorage.setItem(CHAVE_RECOLHIDOS, JSON.stringify([...recolhidos])); } catch { /* */ } }, [recolhidos]);
   const alternarConsultor = (id: string) => setRecolhidos(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const todosRecolhidos = pessoas.length > 0 && pessoas.every(p => recolhidos.has(p.id));
-  const podeMover = pode('tarefa.editar');
-  const podeCriar = pode('tarefa.criar');
+  const podeMover = !somenteEu && pode('tarefa.editar');
+  const podeCriar = !somenteEu && pode('tarefa.criar');
+  const editaAusencia = !somenteEu && pode('equipe.editar');
 
   return (
-    <section className="eq-grade-caixa" aria-label="Grade da equipe">
+    <section className={`eq-grade-caixa${somenteEu ? ' so-leitura' : ''}`} aria-label={somenteEu ? 'Minha agenda em grade' : 'Grade da equipe'}>
       <div className="barra-filtros">
-        <SelecaoMultipla ocultar rotulo="Equipe" opcoes={candidatos.map(m => ({ valor: m.id, rotulo: m.nome }))} sel={escolha.pessoas} aoMudar={v => mudarEscolha({ pessoas: v })} />
-        <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Consultor…" aria-label="Filtrar consultor" />
+        {!somenteEu && <SelecaoMultipla ocultar rotulo="Equipe" opcoes={candidatos.map(m => ({ valor: m.id, rotulo: m.nome }))} sel={escolha.pessoas} aoMudar={v => mudarEscolha({ pessoas: v })} />}
+        {!somenteEu && <input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Consultor…" aria-label="Filtrar consultor" />}
         <input type="date" value={de} onChange={e => setDe(e.target.value)} aria-label="De" />
         <input type="date" value={ate} onChange={e => setAte(e.target.value)} aria-label="Até" />
         <Botao onClick={aplicarFiltro}>Filtrar</Botao>
         <Botao onClick={voltarHoje}>Hoje</Botao>
-        <Botao aria-pressed={todosRecolhidos} onClick={() => setRecolhidos(todosRecolhidos ? new Set() : new Set(pessoas.map(p => p.id)))}>{todosRecolhidos ? 'Expandir consultores' : 'Recolher consultores'}</Botao>
+        {!somenteEu && <Botao aria-pressed={todosRecolhidos} onClick={() => setRecolhidos(todosRecolhidos ? new Set() : new Set(pessoas.map(p => p.id)))}>{todosRecolhidos ? 'Expandir consultores' : 'Recolher consultores'}</Botao>}
         {podeMover && <Botao aria-pressed={selecionando} onClick={() => { setSelecionando(!selecionando); setSel(new Set()); }}>{selecionando ? 'Concluir seleção' : 'Selecionar'}</Botao>}
-        {pode('equipe.editar') && <Botao onClick={() => aoEditarAusencia({})}>+ Ausência</Botao>}
+        {editaAusencia && <Botao onClick={() => aoEditarAusencia({})}>+ Ausência</Botao>}
         {carregando && <span className="giro" aria-label="Carregando" />}
       </div>
       {sel.size > 0 && (
@@ -248,14 +255,14 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
           </thead>
           <tbody>
             {pessoas.map(p => {
-              const recolhido = recolhidos.has(p.id);
+              const recolhido = !somenteEu && recolhidos.has(p.id);
               return (
               <tr key={p.id} className={recolhido ? 'recolhida' : 'aberta'}>
                 <th scope="row" className="col-nome">
                   <div className="eq-nome">
                     <NomePessoa id={p.id} comAvatar />
-                    <button type="button" className={`eq-chev${recolhido ? '' : ' aberto'}`} aria-expanded={!recolhido} aria-label={`${recolhido ? 'Expandir' : 'Recolher'} ${p.nome}`}
-                      onClick={() => alternarConsultor(p.id)}><Icone nome="baixo" tam={16} /></button>
+                    {!somenteEu && <button type="button" className={`eq-chev${recolhido ? '' : ' aberto'}`} aria-expanded={!recolhido} aria-label={`${recolhido ? 'Expandir' : 'Recolher'} ${p.nome}`}
+                      onClick={() => alternarConsultor(p.id)}><Icone nome="baixo" tam={16} /></button>}
                   </div>
                   {!recolhido && (
                     <div className="eq-regua" style={{ top: TOPO + 4, height: alturaEscala }} aria-hidden>
@@ -273,12 +280,12 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
                   return (
                     <td key={d} data-consultor={p.id} data-dia={d}
                       className={`cel${fimDeSemana(d) ? ' fds' : ''}${aus ? ' ausente' : doDia.length ? ' ausente-parcial' : ''}${horas > capacidade ? ' sobrecarga' : ''}`}
-                      onDragOver={aus ? undefined : e => { e.preventDefault(); e.currentTarget.classList.add('alvo'); }}
+                      onDragOver={aus || somenteEu ? undefined : e => { e.preventDefault(); e.currentTarget.classList.add('alvo'); }}
                       onDragLeave={e => e.currentTarget.classList.remove('alvo')}
-                      onDrop={aus ? undefined : e => soltar(e, d, p.id)}>
+                      onDrop={aus || somenteEu ? undefined : e => soltar(e, d, p.id)}>
                       {recolhido ? <>
                         {(aus ? [aus] : doDia).map(a => (
-                          <button key={a.id ?? a.de} type="button" className={`eq-ausencia${diaInteiro(a) ? '' : ' parcial'}`} disabled={a.origem === 'clickup' || !pode('equipe.editar')}
+                          <button key={a.id ?? a.de} type="button" className={`eq-ausencia${diaInteiro(a) ? '' : ' parcial'}`} disabled={a.origem === 'clickup' || !editaAusencia}
                             title={[a.motivo, diaInteiro(a) ? null : `${horasTexto(Number(a.horas ?? 0))} fora; capacidade do dia ${horasTexto(capacidade)}`].filter(Boolean).join(' · ') || undefined}
                             onClick={() => aoEditarAusencia(a)}>{rotuloAusenciaDia(a)}</button>
                         ))}
@@ -294,7 +301,7 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
                         <div className="eq-dia-topo" style={{ height: TOPO }}>
                           {horas > 0 && <small className={`eq-carga ${nivelCarga(horas + fora)}`}
                             title={fora && !aus ? `${horasTexto(horas)} de ${horasTexto(capacidade)} disponíveis` : undefined}>{horasTexto(horas)}</small>}
-                          {aus && <button type="button" className="eq-ausencia" disabled={aus.origem === 'clickup' || !pode('equipe.editar')} title={aus.motivo || undefined}
+                          {aus && <button type="button" className="eq-ausencia" disabled={aus.origem === 'clickup' || !editaAusencia} title={aus.motivo || undefined}
                             onClick={() => aoEditarAusencia(aus)}>{rotuloAusenciaDia(aus)}</button>}
                         </div>
                         <div className="eq-escala" style={{ height: alturaEscala }}>
@@ -304,7 +311,7 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
                             if (!f) return null;
                             const ini = Math.max(escala[0], f[0]), fim = Math.min(escala[1], f[1]);
                             return (
-                              <button key={a.id ?? a.de} type="button" className="eq-ausencia parcial na-escala" disabled={a.origem === 'clickup' || !pode('equipe.editar')}
+                              <button key={a.id ?? a.de} type="button" className="eq-ausencia parcial na-escala" disabled={a.origem === 'clickup' || !editaAusencia}
                                 style={{ top: yHora(ini), height: Math.max(PX_HORA, (fim - ini) * PX_HORA) }}
                                 title={[a.motivo, `${horasTexto(Number(a.horas ?? 0))} fora; capacidade do dia ${horasTexto(capacidade)}`].filter(Boolean).join(' · ')}
                                 onClick={() => aoEditarAusencia(a)}>{rotuloAusenciaDia(a)}</button>
@@ -319,7 +326,7 @@ export function GradeEquipe({ backlogMarcado, aoSoltarBacklog, aoEditarAusencia,
                                 style={{ top: yHora(ini) + 1, height: dur * PX_HORA - 2, left: `calc(${coluna / colunas * 100}% + 1px)`, width: `calc(${100 / colunas}% - 2px)` }}
                                 onDragStart={e => { arrastada.current = t.id; e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; }}
                                 onDragEnd={() => { arrastada.current = null; }}
-                                onClick={e => { if (selecionando || e.ctrlKey || e.metaKey) alternar(t.id); else ed.tarefa({ id: t.id }); }}>
+                                onClick={e => { if (somenteEu) aoAbrirTarefa?.(t); else if (selecionando || e.ctrlKey || e.metaKey) alternar(t.id); else ed.tarefa({ id: t.id }); }}>
                                 <Resumo tipo="demanda" id={t.demanda_id} local={`${t.cliente} · ${t.projeto}`} rodape={rotuloAutoria(t.autoria)}><b>{t.cliente}</b><span>{t.nome}</span><small className="eq-tarefa-pe"><span>{semHora ? 'sem horário' : rotuloPeriodo(t.periodo, t.hora_ini, t.hora_fim).replace(/ \(.*/, '').replace(/:00/g, 'h').replace('–', '-')}</span>
                                   {rotuloAgenda(t.modalidade) && <i className={`eq-agenda ag-${t.modalidade}`}>{rotuloAgenda(t.modalidade)}</i>}</small></Resumo>
                               </button>

@@ -39,15 +39,15 @@ O que você **não** faz: criar ou mudar tarefa (data, período, cliente), lanç
 ## 3. Consultar a sua agenda
 
 1. Toque no menu (☰) e, em **Execução**, escolha **Minha agenda**.
-2. A tela abre no dia de hoje. Use **‹ Hoje ›** para mudar de dia e **Dia / Semana** para ver a semana.
-3. Cada cartão é uma tarefa sua: período (Manhã, Tarde…), modalidade, nome da tarefa e, embaixo, cliente · projeto · demanda.
+2. A tela abre na **Agenda em grade**: os dias lado a lado e cada tarefa sua no horário dela. Clique numa tarefa para ver o detalhe e use **Ir para o apontamento**.
+3. Na aba **Dia e semana**, cada cartão é uma tarefa sua (use **‹ Hoje ›** para mudar de dia e **Dia / Semana** para ver a semana): período (Manhã, Tarde…), modalidade, nome da tarefa e, embaixo, cliente · projeto · demanda.
 4. Toque no nome da tarefa para abrir a tarefa; toque no cliente, no projeto ou na demanda para ver um resumo e abrir a ficha.
 
 As abas da tela:
 
-- **Minha agenda**: as tarefas do dia ou da semana e, embaixo, os seus pedidos de mais agenda.
-- **Agenda em grade**: a sua agenda no mesmo formato da Agenda da equipe (dias lado a lado, cada tarefa no horário dela), só para consulta. Role para os lados para ver outras semanas, ou filtre por **De** / **Até**; **Hoje** volta para hoje. Clique numa tarefa para abrir o detalhe (cliente, demanda, período, detalhamento e as atividades a cumprir) e use **Ir para o apontamento** para apontar. Nessa aba não dá para mover nem editar tarefa.
-- **Minhas demandas**: as demandas em que você tem tarefa.
+- **Agenda em grade** (a que abre primeiro): a sua agenda no mesmo formato da Agenda da equipe (dias lado a lado, cada tarefa no horário dela), só para consulta. Role para os lados para ver outras semanas, ou filtre por **De** / **Até**; **Hoje** volta para hoje. Clique numa tarefa para abrir o detalhe (cliente, demanda, período, detalhamento e as atividades a cumprir) e use **Ir para o apontamento** para apontar. Nessa aba não dá para mover nem editar tarefa.
+- **Dia e semana**: as tarefas do dia ou da semana em cartões, com os botões Apontar, Preciso de mais agenda e Informar desvio, e, embaixo, os seus pedidos de mais agenda.
+- **Minhas tarefas**: a lista das suas tarefas (30 dias para trás e 60 para a frente; no máximo 93 dias), com busca, período e os filtros **Status** e **Cliente**. Mostra data, tarefa, cliente, projeto, demanda, período, tipo de agenda, status e horas; toque na tarefa para abri-la e em **Apontar** para apontar.
 - **Meus apontamentos**: tudo o que conta como hora sua.
 - **Meus desvios**: os desvios que você informou e a resposta do GP.
 - **Minha conta Sankhya**: o vínculo com a sua conta Sankhya (seção 9).
@@ -58,11 +58,11 @@ As abas da tela:
 
 ![Minha agenda com as tarefas do dia](04-minha-agenda.png)
 
-*Minha agenda: cada cartão é uma tarefa, com os botões Apontar, Preciso de mais agenda e Informar desvio.*
+*Aba Dia e semana: cada cartão é uma tarefa, com os botões Apontar, Preciso de mais agenda e Informar desvio.*
 
 ## 4. Apontar as horas
 
-1. No cartão da tarefa, toque em **Apontar**.
+1. No cartão da tarefa (aba **Dia e semana**), na lista **Minhas tarefas** ou no detalhe aberto pela grade, toque em **Apontar** (na grade, **Ir para o apontamento**).
 2. **Início** e **Fim** já vêm preenchidos com o horário da agenda (Manhã 08:00–12:00 · Tarde 14:00–18:00 · Dia 08:00–18:00 com 120 min de intervalo · Noite 18:00–22:00). **Troque pelo horário real do atendimento.**
 3. **Intervalo (min)**: o tempo de almoço ou pausa dentro do período.
 4. **O que foi feito**: descreva o atendimento.
@@ -111,7 +111,7 @@ Na aba **Meus apontamentos** você vê tudo o que conta como hora sua:
 
 Use o comentário para registrar o que aconteceu, tirar dúvida com o GP ou avisar um colega. Fica gravado na demanda, com o seu nome e a hora.
 
-1. Abra a demanda: em **Minha agenda**, toque na demanda embaixo do cartão da tarefa (ou abra a aba **Minhas demandas** e toque no nome).
+1. Abra a demanda: em **Minha agenda**, toque na demanda embaixo do cartão da tarefa (ou abra a aba **Minhas tarefas** e toque na demanda da linha).
 2. Na ficha da demanda, abra a aba **Comentários**.
 3. Escreva em "Escreva um comentário…" e toque em **Comentar** (ou Ctrl+Enter no computador).
 4. Para avisar alguém, digite **@** e escolha a pessoa: ela recebe o aviso no sino.

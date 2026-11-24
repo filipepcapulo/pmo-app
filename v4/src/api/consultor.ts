@@ -5,10 +5,27 @@ import type { DemandaLinha, StatusTarefa } from './execucao';
 import { diaNum, somarDias } from './projeto';
 import { marcadosDe, montarSelecao, ocultando, passa, semSelecao } from '../util/selecao';
 
-export interface LinhaAgenda {
+export interface LinhaAgenda extends Record<string, unknown> {
   tarefa_id: string; data: string; periodo: string; hora_ini: string | null; hora_fim: string | null; horas_previstas: number | null;
   modalidade: string | null; status: StatusTarefa; tarefa: string; demanda_id: string; demanda: string; projeto_id: string; projeto: string;
   cliente_id: string; cliente: string; horas_reais: number;
+}
+// 4.30.0: Minha agenda › Minhas tarefas — a lista do consultor é de tarefas (não de demandas)
+/** Período padrão da lista: 30 dias para trás e 60 para a frente (a agenda aceita até 93 dias por chamada). */
+export const periodoMinhasTarefas = (hoje: string) => ({ de: somarDias(hoje, -30), ate: somarDias(hoje, 60) });
+export function erroPeriodoTarefas(de: string, ate: string): string | null {
+  if (!de || !ate) return 'Informe o período.';
+  if (ate < de) return 'A data final é antes da inicial.';
+  if (diaNum(ate) - diaNum(de) > 92) return 'Período de no máximo 93 dias.';
+  return null;
+}
+export interface FiltroMinhasTarefas { texto: string; status: readonly string[]; cliente: readonly string[] }
+const semAcento = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+/** Busca por tarefa, cliente, projeto ou demanda; Status e Cliente em seleção múltipla com Exibir/Ocultar. */
+export function filtrarMinhasTarefas(l: LinhaAgenda[], f: FiltroMinhasTarefas): LinhaAgenda[] {
+  const t = semAcento(f.texto.trim());
+  return l.filter(x => passa(f.status, x.status) && passa(f.cliente, x.cliente_id)
+    && (!t || semAcento([x.tarefa, x.cliente, x.projeto, x.demanda].join(' ')).includes(t)));
 }
 /** Origens do filtro de Ordens de Serviço (seleção múltipla; nenhuma marcada = todas). 'previsto' = agenda sem apontamento (0110). */
 export type OrigemSel = 'sankhya_om' | 'app' | 'previsto';

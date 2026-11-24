@@ -123,6 +123,7 @@ Lista o que há para agendar, em Cliente › Projeto › Demanda › Subdemanda.
 - **Log**: Data, Período, Consultor, Horas, Previsto, Atendido, Quem orientou, Motivo, Situação e Decidido por. O **Previsto** abre a tarefa prevista; depois de aprovado, o **Atendido** abre a tarefa criada.
 - **Aprovar** e **Recusar** aparecem só na linha pendente de projeto em que você é o GP do projeto atendido.
 - **Aprovar**: se o desvio veio sem demanda, escolha a **Demanda atendida**. O app cria a tarefa no projeto atendido, marca a prevista como não executada e a demanda volta ao backlog.
+- **Desvio sem atendimento**: quando o consultor informa que não executou nenhuma agenda, o Atendido mostra "Nenhuma agenda executada", decide o GP do projeto previsto e aprovar só marca a prevista como não executada (não cria tarefa).
 - **Recusar**: o **Motivo da recusa** é obrigatório.
 
 ## 7. Ociosidade

@@ -99,3 +99,27 @@ describe('Conferência de OS no Experience (0117)', () => {
     expect(modulosVisiveis(['experience.conferir']).some(m => m.id === 'experience-os')).toBe(true);
   });
 });
+
+// 4.30.0: Minha agenda abre na grade e a lista do consultor é de tarefas
+import { erroPeriodoTarefas, filtrarMinhasTarefas, periodoMinhasTarefas, type LinhaAgenda } from './consultor';
+const la = (m: Partial<LinhaAgenda>): LinhaAgenda => ({ tarefa_id: 't1', data: '2026-11-24', periodo: 'manha', hora_ini: null, hora_fim: null, horas_previstas: 4, modalidade: 'remoto',
+  status: 'planejada', tarefa: 'Parametrizar compras', demanda_id: 'd1', demanda: 'Implantação', projeto_id: 'p1', projeto: 'P1', cliente_id: 'k1', cliente: 'Almont', horas_reais: 0, ...m });
+describe('Minha agenda › Minhas tarefas (4.30.0)', () => {
+  it('período padrão de 30 dias para trás e 60 para a frente; no máximo 93 dias', () => {
+    expect(periodoMinhasTarefas('2026-11-24')).toEqual({ de: '2026-10-25', ate: '2027-01-23' });
+    expect(erroPeriodoTarefas('2026-10-25', '2027-01-23')).toBeNull();
+    expect(erroPeriodoTarefas('2026-01-01', '2026-04-03')).toBeNull();        // 93 dias
+    expect(erroPeriodoTarefas('2026-01-01', '2026-04-04')).toMatch(/93/);
+    expect(erroPeriodoTarefas('2026-02-01', '2026-01-01')).toMatch(/antes/);
+    expect(erroPeriodoTarefas('', '2026-01-01')).toMatch(/Informe/);
+  });
+  it('busca por tarefa, cliente, projeto ou demanda (sem acento) e filtros de Status e Cliente com Exibir/Ocultar', () => {
+    const l = [la({ tarefa_id: 'a' }), la({ tarefa_id: 'b', tarefa: 'Treinar usuários', status: 'concluida', cliente_id: 'k2', cliente: 'HPA' }), la({ tarefa_id: 'c', demanda: 'Fiscal', status: 'cancelada' })];
+    const f = { texto: '', status: [], cliente: [] };
+    expect(filtrarMinhasTarefas(l, f)).toHaveLength(3);
+    expect(filtrarMinhasTarefas(l, { ...f, texto: 'usuarios' }).map(x => x.tarefa_id)).toEqual(['b']);
+    expect(filtrarMinhasTarefas(l, { ...f, texto: 'fiscal' }).map(x => x.tarefa_id)).toEqual(['c']);
+    expect(filtrarMinhasTarefas(l, { ...f, status: ['planejada', 'concluida'] }).map(x => x.tarefa_id)).toEqual(['a', 'b']);
+    expect(filtrarMinhasTarefas(l, { ...f, status: [OCULTAR, 'cancelada'], cliente: ['k1'] }).map(x => x.tarefa_id)).toEqual(['a']);
+  });
+});

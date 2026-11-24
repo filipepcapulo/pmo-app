@@ -2,10 +2,10 @@
 // apontamentos e Meus desvios. O consultor não edita a tarefa: grava só apontamento, pedido de agenda e desvio.
 import { useMemo, useState } from 'react';
 import { data, horas } from '../api/cadastros';
-import { consultor, diasDaSemana, nomeDia, podeApontar, type LinhaAgenda } from '../api/consultor';
+import { consultor, diasDaSemana, erroPeriodoTarefas, filtrarMinhasTarefas, nomeDia, periodoMinhasTarefas, podeApontar, type LinhaAgenda } from '../api/consultor';
 import { podeDesviar } from '../api/desvios';
 import { ordenarDia } from '../api/equipe';
-import { rotuloModalidade, rotuloPeriodo, rotuloStatusTarefa } from '../api/execucao';
+import { rotuloModalidade, rotuloPeriodo, rotuloStatusTarefa, STATUS_TAREFA } from '../api/execucao';
 import { hojeIso, somarDias } from '../api/projeto';
 import { exec } from '../api/execucao';
 import { AtividadesTarefa } from '../componentes/Atividades';
@@ -15,17 +15,19 @@ import { Popup } from '../componentes/Popup';
 import { ListaDesvios } from '../componentes/ListaDesvios';
 import { RelatorioApontamentos } from '../componentes/RelatorioApontamentos';
 import { Resumo } from '../componentes/Resumo';
+import { SelecaoMultipla } from '../componentes/SelecaoMultipla';
+import { Tabela, type Coluna } from '../componentes/Tabela';
 import { useCarga } from '../estado/carga';
 import { useEdicao } from '../estado/edicao';
 import { usePode } from '../estado/equipe';
 import { caminhoEntidade, hashDe } from '../estado/rotas';
 import { useSessao } from '../estado/sessao';
-import { Demandas } from './Demandas';
 import { AbaContaSankhya } from './Equipe';
 
-type Aba = 'agenda' | 'grade' | 'demandas' | 'apontamentos' | 'desvios' | 'sankhya';
+type Aba = 'grade' | 'agenda' | 'tarefas' | 'apontamentos' | 'desvios' | 'sankhya';
 const ABAS: { id: Aba; rotulo: string }[] = [
-  { id: 'agenda', rotulo: 'Minha agenda' }, { id: 'grade', rotulo: 'Agenda em grade' }, { id: 'demandas', rotulo: 'Minhas demandas' }, { id: 'apontamentos', rotulo: 'Meus apontamentos' },
+  // 4.30.0: a grade é a aba principal; a lista do consultor é de tarefas (não de demandas)
+  { id: 'grade', rotulo: 'Agenda em grade' }, { id: 'agenda', rotulo: 'Dia e semana' }, { id: 'tarefas', rotulo: 'Minhas tarefas' }, { id: 'apontamentos', rotulo: 'Meus apontamentos' },
   { id: 'desvios', rotulo: 'Meus desvios' }, { id: 'sankhya', rotulo: 'Minha conta Sankhya' },
 ];
 const SITUACAO = { aberto: 'Aberto', atendido: 'Atendido', recusado: 'Recusado' };
@@ -173,6 +175,54 @@ function MinhaGrade() {
   );
 }
 
+// 4.30.0: lista das tarefas do consultor (no lugar da lista de demandas)
+function MinhasTarefas() {
+  const { eu } = useSessao();
+  const esc = eu!.escritorio_id!;
+  const ed = useEdicao();
+  const pode = usePode();
+  const hoje = hojeIso();
+  const [periodo, setPeriodo] = useState(() => periodoMinhasTarefas(hoje));
+  const [texto, setTexto] = useState('');
+  const [status, setStatus] = useState<string[]>([]);
+  const [cliente, setCliente] = useState<string[]>([]);
+  const erroP = erroPeriodoTarefas(periodo.de, periodo.ate);
+  const c = useCarga(() => (erroP ? Promise.resolve(null) : consultor.agenda(esc, periodo.de, periodo.ate, eu!.usuario.id)), [esc, periodo.de, periodo.ate, erroP, eu, ed.geracao]);
+  const linhas = useMemo(() => c.dados ?? [], [c.dados]);
+  const clientes = useMemo(() => [...new Map(linhas.map(l => [l.cliente_id, l.cliente])).entries()].map(([valor, rotulo]) => ({ valor, rotulo })).sort((a, b) => a.rotulo.localeCompare(b.rotulo)), [linhas]);
+  const vistas = useMemo(() => filtrarMinhasTarefas(linhas, { texto, status, cliente }), [linhas, texto, status, cliente]);
+  const colunas = useMemo<Coluna<LinhaAgenda>[]>(() => [
+    { chave: 'data', titulo: 'Data', valor: l => l.data, texto: l => data(l.data) },
+    { chave: 'tarefa', titulo: 'Tarefa', texto: l => l.tarefa, render: l => <a href={hashDe(caminhoEntidade('tarefa', l.tarefa_id))}>{l.tarefa}</a> },
+    { chave: 'cliente', titulo: 'Cliente', texto: l => l.cliente },
+    { chave: 'projeto', titulo: 'Projeto', texto: l => l.projeto },
+    { chave: 'demanda', titulo: 'Demanda', texto: l => l.demanda, render: l => <a href={hashDe(caminhoEntidade('demanda', l.demanda_id))}>{l.demanda}</a> },
+    { chave: 'periodo', titulo: 'Período', valor: l => `${l.hora_ini ?? ''} ${l.periodo}`, texto: l => rotuloPeriodo(l.periodo, l.hora_ini, l.hora_fim) },
+    { chave: 'modalidade', titulo: 'Agenda', texto: l => rotuloModalidade(l.modalidade) },
+    { chave: 'status', titulo: 'Status', texto: l => rotuloStatusTarefa(l.status), render: l => <span className={`pilula st-${l.status}`}>{rotuloStatusTarefa(l.status)}</span> },
+    { chave: 'horas_previstas', titulo: 'Previstas', alinhar: 'dir', valor: l => Number(l.horas_previstas ?? 0), texto: l => horas(l.horas_previstas) },
+    { chave: 'horas_reais', titulo: 'Apontadas', alinhar: 'dir', valor: l => Number(l.horas_reais ?? 0), texto: l => (Number(l.horas_reais) > 0 ? horas(l.horas_reais) : '') },
+    { chave: 'acao', titulo: '', fixa: true, render: l => (pode('apontamento.gravar') && podeApontar(l, hoje)
+      ? <button type="button" className="link" onClick={() => ed.apontar({ tarefa_id: l.tarefa_id, nome: l.tarefa, data: l.data, periodo: l.periodo, hora_ini: l.hora_ini, hora_fim: l.hora_fim })}>Apontar</button> : null) },
+  ], [hoje, pode, ed]);
+  return (
+    <section className="cartao" aria-label="Minhas tarefas" data-testid="minhas-tarefas">
+      <div className="barra-filtros">
+        <input type="search" aria-label="Buscar tarefa" placeholder="Buscar tarefa" value={texto} onChange={e => setTexto(e.target.value)} />
+        <label className="ajuda">De <input type="date" aria-label="Data inicial" value={periodo.de} onChange={e => setPeriodo(p => ({ ...p, de: e.target.value }))} /></label>
+        <label className="ajuda">Até <input type="date" aria-label="Data final" value={periodo.ate} onChange={e => setPeriodo(p => ({ ...p, ate: e.target.value }))} /></label>
+        <SelecaoMultipla ocultar rotulo="Status" opcoes={STATUS_TAREFA} sel={status} aoMudar={setStatus} />
+        <SelecaoMultipla ocultar rotulo="Cliente" opcoes={clientes} sel={cliente} aoMudar={setCliente} />
+        {erroP && <small className="msg-erro">{erroP}</small>}
+      </div>
+      {c.erro && <p className="msg-erro">{c.erro}</p>}
+      {c.carregando && !c.dados && <div className="carregando-tela"><span className="giro" /> Carregando…</div>}
+      {c.dados && <Tabela id="minhas-tarefas" nome={`Minhas tarefas ${periodo.de} a ${periodo.ate}`} colunas={colunas} linhas={vistas}
+        chave={l => l.tarefa_id} tamanhoInicial={30} vazio="Nenhuma tarefa neste filtro." />}
+    </section>
+  );
+}
+
 function MeusDesvios() {
   const hoje = hojeIso();
   const [de, setDe] = useState(() => somarDias(hoje, -90));
@@ -185,7 +235,7 @@ function MeusDesvios() {
 }
 
 export function Consultor() {
-  const [aba, setAba] = useState<Aba>('agenda');
+  const [aba, setAba] = useState<Aba>('grade');
   const { eu } = useSessao();
   const pode = usePode();
   return (
@@ -197,7 +247,7 @@ export function Consultor() {
       </div>
       {aba === 'agenda' && <MinhaAgenda />}
       {aba === 'grade' && <MinhaGrade />}
-      {aba === 'demandas' && <Demandas minhas />}
+      {aba === 'tarefas' && <MinhasTarefas />}
       {aba === 'apontamentos' && <RelatorioApontamentos />}
       {aba === 'desvios' && <MeusDesvios />}
       {aba === 'sankhya' && eu && (

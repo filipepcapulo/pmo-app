@@ -119,8 +119,8 @@ Botões:
 
 O quadro **Subdemandas** lista as filhas (só na demanda mãe). Abaixo, as abas:
 
-- **Tarefas**: data, tarefa, responsável, período, tipo de agenda, status e horas. Filtros por busca, **Responsável**, **Status** e período (**De** / **até**). Horas em negrito são reais; em cinza, previstas.
-- **Checklist**: quem edita a demanda cria itens em **Novo item…** + **Adicionar**, marca e exclui.
+- **Tarefas**: quando há **tarefas abertas sem alocação** (seção 7), elas aparecem num quadro no alto da aba, com **Atribuir** e **Excluir**. Abaixo, a lista: data, tarefa, responsável, período, tipo de agenda, status e horas. Filtros por busca, **Responsável**, **Status** e período (**De** / **até**). Horas em negrito são reais; em cinza, previstas.
+- **Atividades**: a lista do que precisa ser cumprido pelas tarefas da demanda ou subdemanda. Quem edita a demanda cria em **Nova atividade…** + **Adicionar** e exclui no **×**. Cada atividade tem a situação **Pendente**, **Parcial** ou **Realizada**: ela muda sozinha conforme os consultores apontam nas tarefas (a linha mostra quem apontou por último, quando e em qual tarefa) e quem edita a demanda pode defini-la à mão — nesse caso vale o que foi definido e as marcas anteriores das tarefas são descartadas. No topo, o resumo "N de M realizadas".
 - **Anexos**: **+ Anexar** (até 20 MB por arquivo). Toque no nome para abrir e em **⬇ Baixar** para baixar; **×** remove (quem anexou, ou Admin, GP e Líder Tech).
 - **Comentários**: veja a seção 9.
 - **Rentabilidade**: só para quem tem o papel no cofre financeiro; tem manual próprio.
@@ -143,6 +143,15 @@ Se houver choque de horário, abre **Conflito de horário**: **Voltar ao lançam
 
 Na tarefa já gravada, **+ Mais agenda** cria outra agenda igual pedindo só a **Nova data** e o período (**Criar agenda**). **Excluir** pede confirmação.
 
+### Tarefa sem alocação (remanejar depois)
+
+Planejou uma tarefa e ela precisa ser remanejada, mas ainda não se sabe para quem nem para quando? Abra a tarefa (**Editar**) e toque em **Remover alocação**. A tarefa sai da agenda do consultor e fica **aberta na demanda, sem consultor e sem data**, guardando título, período, tipo de agenda, etapa, apontamento, agendamento, usuário do cliente e detalhamento.
+
+- Só vale para tarefa **Não iniciada** ou **Em andamento**, sem apontamento. Agenda já lançada no Experience precisa antes ir para **Lixeira** e ser sincronizada.
+- No ClickUp, a tarefa antiga fica cancelada; ao atribuir, nasce uma tarefa nova.
+- Para atribuir: na ficha da demanda, aba **Tarefas**, quadro **tarefas abertas sem alocação**, toque em **Atribuir**. Abre o lançamento de tarefa já preenchido: escolha consultor e data (uma ou várias combinações) e grave. **Excluir** descarta a tarefa aberta.
+- Ao lançar uma **tarefa nova** numa demanda ou subdemanda que já tem tarefa aberta sem alocação, o app avisa, lista as abertas e pergunta se você quer **Continuar com o lançamento** ou **Voltar**.
+
 ## 8. A ficha da tarefa
 
 Mostra responsável, data, período, horas (reais e previstas), tipo de agenda, usuário do cliente, etapa, agendamento, Experience, apontamento e o link do ClickUp.
@@ -160,12 +169,15 @@ Botões (cada um aparece só quando se aplica):
 
 1. Toque em **Apontar**.
 2. Confira **Início**, **Fim** e **Intervalo (min)**. O app já sugere o horário da agenda (no período Dia, com 120 minutos de intervalo).
-3. Escreva **O que foi feito** e toque em **Gravar**. O total aparece em **Horas**.
+3. Escreva **O que foi feito**. Se a demanda tem atividades, diga em **Atividades da demanda** o que realizou de cada uma.
+4. Toque em **Gravar**. O total aparece em **Horas**.
 
 ### Abas da tarefa
 
 - **Apontamentos**: origem (OS Sankhya OM, App ou Manual), número, data, início–fim, horas, texto e validação. Sem apontamento, a tarefa conta as horas previstas.
 - **Checklist**: o responsável da tarefa marca e desmarca os itens; quem edita tarefas cria e exclui.
+
+Acima das abas, o quadro **Atividades a cumprir** mostra as atividades da demanda ou subdemanda da tarefa (some quando a demanda não tem lista). O responsável marca o que realizou — **Não realizei**, **Parcial** ou **Total** — e toca em **Gravar atividades**; o mesmo quadro aparece no popup **Apontar**, onde responder é obrigatório.
 - **Anexos** e **Comentários**: iguais aos da demanda. Os anexos da tarefa também aparecem no popup **Editar**, onde **+ Anexar** já grava na hora.
 
 Quando houve desvio de agenda, a ficha mostra o quadro do desvio com o link para a outra tarefa. Tarefas criadas juntas aparecem em "Criada junto com".

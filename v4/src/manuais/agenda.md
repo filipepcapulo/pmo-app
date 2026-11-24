@@ -77,6 +77,7 @@ Se a demanda agendada tinha pedido de mais agenda, o pedido fica atendido sozinh
 - **Várias**: toque em **Selecionar** e marque os cartões (no computador, Ctrl ou Cmd + clique também marca). Aparece a barra "N selecionada(s)": informe **Mover para** (data) e/ou o consultor e toque em **Mover**. **Limpar** desmarca tudo.
 - Arrastando um cartão marcado, os demais marcados andam os mesmos dias.
 - Tocar no cartão, fora do modo de seleção, abre a tarefa.
+- **Remover alocação** (no popup da tarefa): tira o consultor e a data e deixa a tarefa aberta na demanda para atribuir depois, sem lançar tudo de novo. Veja "Tarefa sem alocação" no manual de Demandas.
 
 ### Ausências
 

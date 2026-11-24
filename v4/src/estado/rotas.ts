@@ -51,6 +51,8 @@ export const MODULOS: Modulo[] = [
   { id: 'aceite-os', titulo: 'Aceite de OS', area: 'execucao', icone: 'seta', permissao: 'aceite_os.gerenciar', parametro: true },
   // 4.14.0 (0105): agendas que ainda pedem abertura, ajuste ou exclusão do lançamento no Experience
   { id: 'experience-pendentes', titulo: 'Tarefas Pendentes no Experience', area: 'execucao', icone: 'seta', permissao: 'sync_experience.gerenciar' },
+  // 4.29.0 (0117): o assistente de projetos confere quais agendas (OS) já foram lançadas no Experience (campo Experience do ClickUp)
+  { id: 'experience-os', titulo: 'Conferência de OS no Experience', area: 'execucao', icone: 'lista', permissao: 'experience.conferir' },
   { id: 'ociosidade', titulo: 'Ociosidade', area: 'execucao', icone: 'pessoas', permissao: 'ociosidade.ver' },
   { id: 'ferias', titulo: 'Controle de Férias', area: 'execucao', icone: 'calendario', permissao: 'ferias.ver' },
   // V11d-1: módulo pessoal (só o Admin por padrão); #/reembolso/relatorio abre direto na aba (link do aviso do dia 1º)

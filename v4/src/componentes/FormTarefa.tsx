@@ -25,6 +25,8 @@ import { EscolhaDemanda } from './EscolhaDemanda';
 import { EscolhaUsuarioCliente } from './EscolhaUsuarioCliente';
 import { CaixaEscolhida, dataCurta, hojeLocal, opcoesDe, proximoDiaUtil } from './FormComum';
 import { Popup } from './Popup';
+import { AvisoSemAlocacao } from './SemAlocacao';
+import { abertasDaDemanda, semAlocacao, type TarefaSemAlocacao } from '../api/semAlocacao';
 import { useToast } from './Toasts';
 
 interface Combinacao { resp: string; data: string; periodo: string; ini: string; fim: string; modalidade: string }
@@ -47,17 +49,23 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir, aoMud
   const [caixa, setCaixa] = useState<{ local: string; nome: string } | null>(null);
   const [cliente, setCliente] = useState<string | null>(null);
   const dataInicial = alvo.data ?? hojeLocal();
+  // 4.29.0 (0117): atribuindo uma tarefa aberta sem alocação — o conteúdo guardado preenche o lançamento
+  const sa = alvo.semAlocacao;
+  const horaSa = (h: string | null | undefined) => h?.slice(0, 5) ?? '';
   const [f, setF] = useState({ demanda: alvo.demanda_id ?? '', nome: '', modalidade: '', status: 'planejada', detalhamento: '', etapa: '', etapaApp: '',
     // tarefa nova já vem com a sugestão padrão (pedido do Filipe, 16/11); editar mostra o que está gravado
-    ...(alvo.id ? { agendamento: '', experience: '', apontamento: '' } : PADRAO_TAREFA), periodo: 'manha', ini: '', fim: '', data: dataInicial, resp: '', usuario: '' });
+    ...(alvo.id ? { agendamento: '', experience: '', apontamento: '' } : PADRAO_TAREFA), periodo: 'manha', ini: '', fim: '', data: dataInicial, resp: '', usuario: '',
+    ...(sa ? { nome: sa.nome, detalhamento: sa.detalhamento ?? '', etapa: sa.etapa ?? '', etapaApp: sa.etapa_id ?? '', usuario: sa.usuario_cliente_id ?? '',
+      ...(sa.agendamento ? { agendamento: sa.agendamento } : {}), ...(sa.apontamento ? { apontamento: sa.apontamento } : {}) } : {}) });
   const umResp = alvo.responsaveis?.length === 1 ? alvo.responsaveis[0] : '';
-  const [mont, setMont] = useState<Combinacao>({ resp: umResp, data: dataInicial, periodo: 'manha', ini: '', fim: '', modalidade: 'remoto' });
+  const [mont, setMont] = useState<Combinacao>({ resp: umResp, data: dataInicial, periodo: sa?.periodo ?? 'manha', ini: horaSa(sa?.hora_ini), fim: horaSa(sa?.hora_fim), modalidade: sa?.modalidade ?? 'remoto' });
   const [combos, setCombos] = useState<Combinacao[]>(
     (alvo.responsaveis?.length ?? 0) > 1 ? alvo.responsaveis!.map(r => ({ resp: r, data: dataInicial, periodo: 'manha', ini: '', fim: '', modalidade: 'remoto' })) : []);
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
   const [mais, setMais] = useState<{ data: string; periodo: string; ini: string; fim: string } | null>(null);
   const [conf, setConf] = useState<{ lista: Conflito[]; seguir: () => void } | null>(null);
+  const [abertas, setAbertas] = useState<{ lista: TarefaSemAlocacao[]; seguir: () => void } | null>(null);
   const novo = !alvo.id;
   // anexos: `arquivos` espera a tarefa nova ser gravada; `anexos` são os da tarefa já lançada
   const [arquivos, setArquivos] = useState<File[]>([]);
@@ -143,7 +151,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir, aoMud
     setConf({ lista: achados, seguir: () => { setConf(null); gravar(achados.some(c => c.tipo === 'ausencia')); } });
   };
 
-  const enviar = async (excluir = false) => {
+  const enviar = async (excluir = false, cienteAbertas = false) => {
     setErro(null);
     if (!excluir) {
       if (!f.demanda || !f.nome.trim()) { setErro('Cliente, demanda e título são obrigatórios.'); return; }
@@ -153,6 +161,14 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir, aoMud
     // editar sem mexer em consultor, data ou horário não pergunta de novo por um choque que já existia
     const mesmoHorario = !novo && orig && orig.responsavel_id === f.resp && orig.data === f.data && orig.periodo === f.periodo
       && (orig.hora_ini?.slice(0, 5) ?? '') === (f.periodo === 'livre' ? f.ini : '') && (orig.hora_fim?.slice(0, 5) ?? '') === (f.periodo === 'livre' ? f.fim : '');
+    // 4.29.0 (0117): a demanda já tem tarefa aberta sem alocação? Avisa e pergunta antes de lançar outra (falha na consulta não impede)
+    if (novo && !cienteAbertas) {
+      let l: TarefaSemAlocacao[] = [];
+      setGravando(true);
+      try { l = abertasDaDemanda(await semAlocacao.lista(esc, f.demanda), f.demanda, sa?.id); } catch { l = []; }
+      setGravando(false);
+      if (l.length) { setAbertas({ lista: l, seguir: () => { setAbertas(null); void enviar(false, true); } }); return; }
+    }
     if (excluir || mesmoHorario || (!novo && ['cancelada', 'nao_executada'].includes(f.status))) return gravar(excluir, false);
     return conferir(novo ? lista.map(c => item(c.resp, c.data, c)) : [item(f.resp, f.data, f, alvo.id)], ign => gravar(false, ign));
   };
@@ -176,6 +192,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir, aoMud
           if (f.etapaApp) await definirEtapa(idsCriadas(r), f.etapaApp);
         }
         await anexar(criadas);
+        await encerrarAberta(criadas);
         avisar(`${feitas} tarefa(s) criada(s)`, 'ok');
         aoGravar();
       } catch (e) {
@@ -183,6 +200,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir, aoMud
         setCombos(lista.slice(feitas));
         // as que entraram já levam os anexos; os arquivos ficam escolhidos para as que faltam
         await anexar(criadas);
+        if (feitas) await encerrarAberta(criadas);
         setErro(`${feitas ? `${feitas} de ${lista.length} criada(s). ` : ''}${(e as Error).message}`);
       }
       setGravando(false);
@@ -197,6 +215,21 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir, aoMud
       if (!excluir && f.status === 'concluida' && orig?.status !== 'concluida') aoConcluir?.(f.demanda);
       aoGravar();
     } catch (e) { setErro((e as Error).message); }
+    setGravando(false);
+  };
+
+  // a tarefa aberta que originou o lançamento é encerrada (atribuída) assim que a primeira tarefa nova entra
+  const encerrarAberta = async (criadas: string[]) => {
+    if (!sa) return;
+    try { await semAlocacao.atribuida(esc, sa.id, criadas[0] ?? null); }
+    catch (e) { avisar(`Tarefa gravada, mas a aberta sem alocação continua na demanda: ${(e as Error).message}`, 'erro'); }
+  };
+  // tira o consultor e a data: a tarefa sai da agenda e fica aberta na demanda para atribuir depois
+  const desalocar = async () => {
+    if (!orig || !confirm('Tirar o consultor e a data desta tarefa?\n\nEla sai da agenda e fica aberta na demanda, sem alocação, para você atribuir depois.')) return;
+    setGravando(true); setErro(null);
+    try { await semAlocacao.desalocar(esc, orig.id, orig.versao); avisar('Tarefa sem alocação: ficou aberta na demanda', 'ok'); aoGravar(); }
+    catch (e) { setErro((e as Error).message); }
     setGravando(false);
   };
 
@@ -228,10 +261,12 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir, aoMud
   const horasDe = (p: string) => (p !== 'livre' ? opcoes?.periodos?.[p] : null);
   const nNovas = lista.length;
   return (
-    <Popup aberto titulo={novo ? 'Nova tarefa' : 'Tarefa'} aoFechar={aoFechar} largura={640}
+    <Popup aberto titulo={novo ? (sa ? 'Atribuir tarefa sem alocação' : 'Nova tarefa') : 'Tarefa'} aoFechar={aoFechar} largura={640}
       rodape={<>
         {!novo && podeGravar && <Botao variante="perigo" className="a-esquerda" carregando={gravando}
           onClick={() => { if (confirm('Excluir esta tarefa?')) enviar(true); }}>Excluir</Botao>}
+        {!novo && orig && podeGravar && ['planejada', 'em_andamento'].includes(orig.status) && <Botao disabled={gravando} onClick={desalocar}
+          title="Tira o consultor e a data; a tarefa fica aberta na demanda para atribuir depois">Remover alocação</Botao>}
         {!novo && orig && pode('tarefa.criar') && !mais && <Botao onClick={() => setMais({ data: proximoDiaUtil(orig.data), periodo: orig.periodo,
           ini: orig.hora_ini?.slice(0, 5) ?? '', fim: orig.hora_fim?.slice(0, 5) ?? '' })}>+ Mais agenda</Botao>}
         <Botao onClick={aoFechar}>{podeGravar ? 'Cancelar' : 'Fechar'}</Botao>
@@ -346,6 +381,7 @@ export function FormTarefa({ alvo, opcoes, aoFechar, aoGravar, aoConcluir, aoMud
         )}
         {erro && <p className="msg-erro" role="alert">{erro}</p>}
       </Formulario>
+      {abertas && <AvisoSemAlocacao lista={abertas.lista} aoVoltar={() => setAbertas(null)} aoSeguir={abertas.seguir} />}
       {conf && <ConflitosAgenda conflitos={conf.lista} gravando={gravando} aoVoltar={() => setConf(null)} aoSeguir={conf.seguir} />}
     </Popup>
   );

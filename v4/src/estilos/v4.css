@@ -304,3 +304,40 @@ button.rg-nivel { cursor: pointer; }
 .lote-linha select { width: auto; min-height: 36px; padding: 4px 8px; max-width: 220px; }
 .lote-n { white-space: nowrap; padding-right: 4px; }
 .lote-falhas { list-style: none; margin: 0; padding: 8px 10px; max-height: 130px; overflow: auto; font-size: 13px; border-radius: 8px; background: var(--superficie-2); color: var(--vermelho, #b42318); }
+
+/* 4.29.0 (0117): atividades da demanda, apontadas pela tarefa */
+.atividades ul { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.atividades li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--linha); border-left: 4px solid var(--linha); border-radius: 10px; background: var(--superficie); }
+.atividades li.at-parcial { border-left-color: var(--laranja); }
+.atividades li.at-realizada { border-left-color: var(--verde); }
+.atividades form input { flex: 1 1 220px; }
+.atividades .secao small { text-transform: none; font-weight: 600; letter-spacing: 0; }
+.atv-texto { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+.atv-ops { display: inline-flex; flex: 0 0 auto; border: 1px solid var(--linha); border-radius: 999px; overflow: hidden; background: var(--superficie); }
+.atv-ops button { border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--texto-2); padding: 6px 11px; min-height: 32px; cursor: pointer; }
+.atv-ops button + button { border-left: 1px solid var(--linha); }
+.atv-ops button[aria-pressed=true] { background: var(--superficie-2); color: var(--texto); }
+.atv-ops button.op-parcial[aria-pressed=true] { background: var(--laranja); color: #fff; }
+.atv-ops button.op-realizada[aria-pressed=true] { background: var(--verde); color: #fff; }
+.pilula.at-pendente { background: var(--superficie-2); color: var(--texto-2); border: 1px solid var(--linha); }
+.pilula.at-parcial { background: var(--laranja); color: #fff; }
+.pilula.at-realizada { background: var(--verde); color: #fff; }
+@media (max-width: 520px) { .atv-ops { width: 100%; } .atv-ops button { flex: 1 1 0; min-height: 40px; } }
+
+/* 4.29.0 (0117): tarefas abertas sem alocação na ficha da demanda e aviso no lançamento */
+.sem-alocacao { margin: 0 0 12px; padding: 10px 12px; border-left: 4px solid var(--laranja); background: var(--superficie-2); border-radius: 8px; }
+.sem-alocacao ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sem-alocacao li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+.sem-alocacao li > div:first-child { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+
+/* 4.29.0: cartões de contagem por situação (Conferência de OS no Experience) */
+.cartoes-contagem { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+.cartao-contagem { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; padding: 12px 14px; border: 1px solid var(--linha); border-left: 5px solid var(--cor, var(--verde)); border-radius: var(--raio); background: var(--superficie); font: inherit; color: inherit; cursor: pointer; }
+.cartao-contagem strong { font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cartao-contagem small { color: var(--texto-2); font-size: 12px; font-weight: 600; }
+.cartao-contagem:hover { border-color: var(--cor, var(--verde)); }
+.cartao-contagem[aria-pressed=true] { background: color-mix(in srgb, var(--cor, var(--verde)) 12%, var(--superficie)); border-color: var(--cor, var(--verde)); }
+
+/* 4.29.0: Minha agenda em grade (só leitura) e detalhe da tarefa */
+.eq-grade-caixa.so-leitura .eq-tarefa { cursor: pointer; }
+.detalhe-agenda .dados { margin-bottom: 8px; }
